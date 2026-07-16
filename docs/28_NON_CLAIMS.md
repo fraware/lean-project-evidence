@@ -22,8 +22,10 @@ ENGINEERING_SPEC §21 and do **not** prove LPE improves outcomes.
    incomplete; empty `axioms_used` is not axiom closure.
 5. **M6 / M7 training (EPIC-039 / EPIC-040) blocked until §21.** Training
    entrypoints do **not** exist. `lpe routing` / `lpe research train` exit
-   non-zero. Deterministic routing baseline and synthesis fixture harness are
-   scaffolds only.
+   non-zero. Deterministic routing baseline (`deterministic_baseline.v1`) is
+   wired into review-question selection as an explicit `baseline_id` for a
+   future held-out comparison; synthesis fixture harness is a scaffold only.
+   Neither is learned routing or model training.
 6. **Dry-run / warehouse tests are not a study.** Synthetic corpora do not
    substitute for prospective human expert review under a frozen analysis plan.
 7. **No WORM / external root of trust** for the utility ledger (archive + seal

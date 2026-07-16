@@ -4,7 +4,18 @@
 
 ### Changed
 
-- **Validation baseline:** `pytest -q -m "not slow"` — **575 passed**, 1 env-gated skip, 1 slow deselected (was 543).
+- **Validation baseline:** `pytest -q -m "not slow"` — **583 passed**, 1 env-gated skip, 1 slow deselected (was 575).
+- **Seal custody workflow:** `lpe ledger seal --seal` / `verify-seal --seal` write and verify from
+  alternate (off-host / read-only) paths; CLI reports `colocated` + `storage_recommendation`;
+  `lpe doctor --ledger` warns on missing seal **and** co-located default seals.
+- **Packet provenance:** evidence packets carry `evidence_fingerprint`; optional
+  `ledger_seal_tip`; markdown / warehouse / review-record cross-link the fingerprint
+  (and tip after append) for audit trails.
+- **Deterministic routing baseline id:** `select_review_question` uses
+  `DeterministicRoutingBaseline` and records `baseline_id=deterministic_baseline.v1`
+  on every review question (scaffold for future §21 held-out comparison; no learning).
+- **CI:** explicit honesty/seal CLI smoke step
+  (`tests/integration/test_honesty_seal_cli_smoke.py`).
 - **Anti-oversell + M6/M7 blocking:** canonical `docs/28_NON_CLAIMS.md`; mandatory
   `NON_CLAIMS` on `lpe pilot summary` / `dry-run`; refuse oversell CLI flags;
   `lpe research status` gate matrix; `lpe routing` / `research train` exit
@@ -19,8 +30,8 @@
   if repo/SHA unset); default `python` job never requires secrets. Expanded
   runbook `docs/github_check_e2e.md` (throwaway repo, branch protection, ADR
   0003). Mocked `--post` integration test; live POST still env-gated.
-- **Audit gap closure (honesty):** `VALIDATION_REPORT.md` baseline aligned to
-  **543** non-slow tests (was 480); `docs/22` header refreshed; `ENGINEERING_SPEC` §4.2
+- **Audit gap closure (honesty):** `VALIDATION_REPORT.md` baseline aligned;
+  `docs/22` header refreshed; `ENGINEERING_SPEC` §4.2
   describes shipped M3–M4 interfaces with residual depth (not “fully deferred”);
   `docs/17` month-one language clarifies pilot readiness vs extraction tooling;
   CODEOWNERS/`MAINTAINERS` use `@fraware`; CI CODEOWNERS check is fail-closed
@@ -41,6 +52,8 @@
 
 ### Added
 
+- **Crash/recovery + seal interaction tests:** mid-txn crash preserves prior seal;
+  append after seal fails closed until reseal.
 - **Ledger external seal:** `lpe ledger seal` / `lpe ledger verify-seal` write and
   check a snapshot manifest (default `<ledger_dir>/.lpe/ledger.seal.json`) with
   tip hashes, event count, export content hash, timestamp, and tool version.

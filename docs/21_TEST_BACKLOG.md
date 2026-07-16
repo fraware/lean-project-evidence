@@ -1,6 +1,6 @@
 # Remaining integration / security / performance test backlog
 
-Short backlog of tests **not** covered by the current suite (**480 tests** as of 2026-07-16 redaction/archive/cone cut; prior Week 2 baseline was 328). Actionable schedule, capability matrix, and exit criteria live in **[22_COMPREHENSIVE_TEST_PLAN.md](22_COMPREHENSIVE_TEST_PLAN.md)**. Progress: **[23_TEST_EXECUTION_LOG.md](23_TEST_EXECUTION_LOG.md)**.
+Short backlog of tests **not** covered by the current suite (**583 tests** as of 2026-07-16 seal/provenance/baseline cut; prior honesty cut was 575). Actionable schedule, capability matrix, and exit criteria live in **[22_COMPREHENSIVE_TEST_PLAN.md](22_COMPREHENSIVE_TEST_PLAN.md)**. Progress: **[23_TEST_EXECUTION_LOG.md](23_TEST_EXECUTION_LOG.md)**.
 
 ## Integration
 

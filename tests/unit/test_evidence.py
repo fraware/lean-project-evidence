@@ -67,6 +67,7 @@ def test_semantic_priority_over_repository() -> None:
     )
     assert question is not None
     assert "mathematical object" in question.question
+    assert question.baseline_id == "deterministic_baseline.v1"
 
 
 def test_r3_always_escalates(example_project: Path, example_candidate) -> None:
@@ -88,6 +89,9 @@ def test_r3_example_escalates(
         "domain-lead",
         "repository-maintainer",
     ]
+    assert packet.review_question.baseline_id == "deterministic_baseline.v1"
+    assert packet.evidence_fingerprint
+    assert packet.packet_id == f"packet_{packet.evidence_fingerprint}"
     assert any(f.check_id.startswith("semantic.") for f in packet.findings)
 
 

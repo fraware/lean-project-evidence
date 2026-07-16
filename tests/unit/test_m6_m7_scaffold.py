@@ -11,6 +11,7 @@ def test_deterministic_routing_orders_semantic_first() -> None:
     baseline = DeterministicRoutingBaseline()
     decision = baseline.route(unresolved_dimensions=["kernel", "semantic", "downstream"])
     assert decision.question_priority[0] == "semantic"
+    assert decision.baseline_id == DeterministicRoutingBaseline.BASELINE_ID
     assert "not a learned policy" in decision.rationale.lower() or "§21" in decision.rationale
 
 

@@ -7,6 +7,7 @@ raises ``ResearchGateBlocked``.
 """
 
 from lpe.routing.baseline import (
+    DETERMINISTIC_BASELINE_ID,
     DeterministicRoutingBaseline,
     RoutingDecision,
     RoutingStrategy,
@@ -14,6 +15,7 @@ from lpe.routing.baseline import (
 )
 
 __all__ = [
+    "DETERMINISTIC_BASELINE_ID",
     "DeterministicRoutingBaseline",
     "RoutingDecision",
     "RoutingStrategy",

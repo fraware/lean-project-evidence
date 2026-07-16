@@ -409,6 +409,11 @@
           },
           "title": "Supporting Finding Ids",
           "type": "array"
+        },
+        "baseline_id": {
+          "default": "deterministic_baseline.v1",
+          "title": "Baseline Id",
+          "type": "string"
         }
       },
       "required": [
@@ -511,6 +516,30 @@
         }
       ],
       "default": null
+    },
+    "evidence_fingerprint": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidence Fingerprint"
+    },
+    "ledger_seal_tip": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ledger Seal Tip"
     },
     "created_at": {
       "format": "date-time",

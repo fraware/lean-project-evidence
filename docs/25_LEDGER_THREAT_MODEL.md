@@ -57,7 +57,9 @@ lpe ledger init <fresh.sqlite3>
 2. Prefer `LPE_LEDGER_SEAL_KEY` for HMAC seals when operators can keep the key out of the ledger host; without it, custody is content-hash-only.
 3. After any integrity failure, supersede downstream evidence packets (see incident rule in [09_SECURITY_AND_PRIVACY.md](09_SECURITY_AND_PRIVACY.md)).
 4. Do not treat a green `verify` on a host you no longer trust as historical proof.
-5. `lpe doctor --ledger` warns when no seal exists and when the ledger looks world-writable (POSIX).
+5. `lpe doctor --ledger` warns when no seal exists, when a seal is **co-located**
+   with the ledger directory, and when the ledger looks world-writable (POSIX).
+   Prefer `lpe ledger seal --seal <off-host-path>` and verify from that path.
 
 ## Explicitly deferred
 

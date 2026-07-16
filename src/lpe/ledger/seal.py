@@ -46,9 +46,31 @@ class LedgerSealError(RuntimeError):
     """Raised when seal write/verify fails closed."""
 
 
+STORAGE_RECOMMENDATION = (
+    "Store the seal separately from the ledger (or read-only / off-host). "
+    "Use `lpe ledger seal --seal <path>` to write to an alternate location and "
+    "`lpe ledger verify-seal --seal <path>` to verify from that copy. "
+    "Co-located writable seals can be rewritten with a forged ledger. Not hardware WORM."
+)
+
+
 def default_seal_path(ledger_path: Path) -> Path:
     """Default seal location: ``<ledger_dir>/.lpe/ledger.seal.json``."""
     return ledger_path.resolve().parent / ".lpe" / "ledger.seal.json"
+
+
+def is_seal_colocated(ledger_path: Path, seal_path: Path) -> bool:
+    """True when the seal path lives under the ledger file's parent directory.
+
+    Default ``.lpe/ledger.seal.json`` next to the DB is colocated. An alternate
+    ``--seal`` path outside that tree is treated as separately stored.
+    """
+    ledger_parent = ledger_path.resolve().parent
+    try:
+        seal_path.resolve().relative_to(ledger_parent)
+    except ValueError:
+        return False
+    return True
 
 
 def _seal_key_from_env() -> bytes | None:
@@ -161,9 +183,12 @@ def write_seal(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    colocated = is_seal_colocated(store.path, path)
     return {
         "seal_path": str(path.resolve()),
         "manifest": manifest,
+        "colocated": colocated,
+        "storage_recommendation": STORAGE_RECOMMENDATION,
     }
 
 
@@ -249,12 +274,15 @@ def verify_seal(
     else:
         raise LedgerSealError(f"unknown seal custody mode: {custody!r}")
 
+    colocated = is_seal_colocated(store.path, path)
     return {
         "ok": True,
         "seal_path": str(path.resolve()),
         "event_count": state["event_count"],
         "custody": custody,
         "not_worm": True,
+        "colocated": colocated,
+        "storage_recommendation": STORAGE_RECOMMENDATION,
         "custody_note": sealed.get("custody_note")
         or (_HMAC_NOTE if custody == CUSTODY_HMAC else _CONTENT_HASH_NOTE),
     }

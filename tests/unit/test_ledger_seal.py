@@ -176,3 +176,127 @@ def test_empty_seal_key_fails_closed(
     store.initialize()
     with pytest.raises(LedgerSealError, match="empty"):
         write_seal(store)
+
+
+def test_seal_alternate_path_round_trip(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from lpe.ledger.seal import is_seal_colocated
+
+    monkeypatch.delenv(SEAL_ENV_KEY, raising=False)
+    ledger = tmp_path / "data" / "ledger.sqlite3"
+    ledger.parent.mkdir()
+    alternate = tmp_path / "custody" / "read-only" / "ledger.seal.json"
+    store = LedgerStore(ledger)
+    store.append(_event("e1", {"x": 1}))
+
+    result = write_seal(store, alternate)
+    assert Path(result["seal_path"]) == alternate.resolve()
+    assert result["colocated"] is False
+    assert "separately" in result["storage_recommendation"].lower()
+    assert not is_seal_colocated(ledger, alternate)
+    assert verify_seal(store, alternate)["ok"] is True
+    assert verify_seal(store, alternate)["colocated"] is False
+
+    # Default path was never written; verify without --seal fails closed.
+    with pytest.raises(LedgerSealError, match="not found"):
+        verify_seal(store)
+
+
+def test_cli_seal_alternate_path_and_verify(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv(SEAL_ENV_KEY, raising=False)
+    ledger = tmp_path / "data" / "ledger.sqlite3"
+    ledger.parent.mkdir()
+    alternate = tmp_path / "offhost" / "seal.json"
+    store = LedgerStore(ledger)
+    store.append(_event("e1", {"x": 1}))
+
+    sealed = runner.invoke(
+        app, ["ledger", "seal", str(ledger), "--seal", str(alternate)]
+    )
+    assert sealed.exit_code == 0, sealed.output
+    payload = json.loads(sealed.stdout)
+    assert payload["colocated"] is False
+    assert payload["storage_recommendation"]
+    assert alternate.is_file()
+
+    checked = runner.invoke(
+        app, ["ledger", "verify-seal", str(ledger), "--seal", str(alternate)]
+    )
+    assert checked.exit_code == 0, checked.output
+    assert json.loads(checked.stdout)["colocated"] is False
+
+    store.append(_event("e2", {"x": 2}))
+    failed = runner.invoke(
+        app, ["ledger", "verify-seal", str(ledger), "--seal", str(alternate)]
+    )
+    assert failed.exit_code == 1
+
+
+def test_crash_mid_txn_preserves_prior_seal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Uncommitted crash must not invalidate a seal of committed state."""
+    monkeypatch.delenv(SEAL_ENV_KEY, raising=False)
+    ledger = tmp_path / "ledger.sqlite3"
+    store = LedgerStore(ledger)
+    store.append(_event("e1", {"x": 1}))
+    write_seal(store)
+    assert verify_seal(store)["ok"] is True
+
+    connection = store.connect()
+    try:
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(
+            """
+            INSERT INTO events (
+                event_id, event_type, project_id, artifact_id, obligation_id,
+                occurred_at, actor_id, payload_json, supersedes_event_id,
+                previous_hash, event_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "event-ghost",
+                EventType.EVIDENCE_COMPILED.value,
+                "project",
+                "artifact",
+                "O-01",
+                datetime(2026, 1, 1, tzinfo=UTC).isoformat(),
+                "tester",
+                "{}",
+                None,
+                "deadbeef",
+                "ghost" + ("0" * 59),
+            ),
+        )
+        # Crash: close without COMMIT (rollback on close for uncommitted).
+        connection.close()
+    finally:
+        try:
+            connection.close()
+        except Exception:
+            pass
+
+    recovered = LedgerStore(ledger)
+    recovered.verify()
+    assert len(recovered.events()) == 1
+    assert verify_seal(recovered)["ok"] is True
+
+
+def test_recovery_after_append_requires_reseal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv(SEAL_ENV_KEY, raising=False)
+    ledger = tmp_path / "ledger.sqlite3"
+    store = LedgerStore(ledger)
+    store.append(_event("e1", {"x": 1}))
+    write_seal(store)
+    store.append(_event("e2", {"x": 2}))
+    with pytest.raises(LedgerSealError, match="event_count"):
+        verify_seal(store)
+    # Reseal after legitimate growth.
+    write_seal(store)
+    assert verify_seal(store)["ok"] is True
+    assert verify_seal(store)["event_count"] == 2

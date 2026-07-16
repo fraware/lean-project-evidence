@@ -1083,7 +1083,7 @@ def compile_evidence(
         )
 
     candidate_hash = sha256_value(candidate.model_dump(mode="json"))
-    run_fingerprint = sha256_value(
+    evidence_fingerprint = sha256_value(
         {
             "contract_hash": contract.contract_hash,
             "candidate_hash": candidate_hash,
@@ -1091,7 +1091,7 @@ def compile_evidence(
         }
     )
     return EvidencePacket(
-        packet_id=f"packet_{run_fingerprint}",
+        packet_id=f"packet_{evidence_fingerprint}",
         run_id=run_id,
         project_id=contract.project.project_id,
         contract_hash=contract.contract_hash,
@@ -1103,4 +1103,5 @@ def compile_evidence(
         recommendation_reasons=reasons,
         unresolved_uncertainty=decision.uncertainty,
         review_question=question,
+        evidence_fingerprint=evidence_fingerprint,
     )

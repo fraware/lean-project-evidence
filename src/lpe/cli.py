@@ -32,8 +32,10 @@ from lpe.github.submit import (
     submit_check_run,
 )
 from lpe.ledger.seal import (
+    STORAGE_RECOMMENDATION,
     LedgerSealError,
     default_seal_path,
+    is_seal_colocated,
     verify_seal,
     write_seal,
 )
@@ -205,12 +207,23 @@ def _ledger_permission_report(path: Path) -> dict:
     seal_path = default_seal_path(path)
     report["seal_path"] = str(seal_path)
     report["seal_exists"] = seal_path.is_file()
+    report["seal_colocated"] = (
+        is_seal_colocated(path, seal_path) if seal_path.is_file() else None
+    )
+    report["seal_storage_recommendation"] = STORAGE_RECOMMENDATION
     if not seal_path.is_file():
         report["warnings"].append(
-            "no ledger seal found; run `lpe ledger seal` then store the seal "
-            "separately or read-only. Seal detects silent SQLite mutation only "
-            "if the seal is protected; not hardware WORM "
-            "(docs/25_LEDGER_THREAT_MODEL.md)"
+            "no ledger seal found; run `lpe ledger seal --seal <off-host-path>` "
+            "(or default then copy) and store the seal separately or read-only. "
+            "Seal detects silent SQLite mutation only if the seal is protected; "
+            "not hardware WORM (docs/25_LEDGER_THREAT_MODEL.md)"
+        )
+    elif is_seal_colocated(path, seal_path):
+        report["warnings"].append(
+            "ledger seal is co-located with the ledger directory; prefer "
+            "`lpe ledger seal --seal <separate-path>` and verify with "
+            "`lpe ledger verify-seal --seal <separate-path>` from read-only/"
+            "off-host storage (docs/25_LEDGER_THREAT_MODEL.md)"
         )
 
     if os.name == "nt":
@@ -225,8 +238,8 @@ def _ledger_permission_report(path: Path) -> dict:
             "optional fresh lpe ledger init for a new working set"
         )
         report["supported_seal"] = (
-            "lpe ledger seal / lpe ledger verify-seal; optional "
-            "LPE_LEDGER_SEAL_KEY HMAC (not WORM)"
+            "lpe ledger seal [--seal PATH] / lpe ledger verify-seal [--seal PATH]; "
+            "prefer separate storage; optional LPE_LEDGER_SEAL_KEY HMAC (not WORM)"
         )
         return report
 
@@ -249,8 +262,8 @@ def _ledger_permission_report(path: Path) -> dict:
         "optional fresh lpe ledger init for a new working set"
     )
     report["supported_seal"] = (
-        "lpe ledger seal / lpe ledger verify-seal; optional "
-        "LPE_LEDGER_SEAL_KEY HMAC (not WORM)"
+        "lpe ledger seal [--seal PATH] / lpe ledger verify-seal [--seal PATH]; "
+        "prefer separate storage; optional LPE_LEDGER_SEAL_KEY HMAC (not WORM)"
     )
     return report
 
@@ -487,7 +500,8 @@ def ledger_seal(
         typer.Option(
             "--seal",
             help=(
-                "Seal manifest path (default: <ledger_dir>/.lpe/ledger.seal.json)."
+                "Seal manifest path (default: <ledger_dir>/.lpe/ledger.seal.json). "
+                "Prefer a path outside the ledger directory for separate storage."
             ),
         ),
     ] = None,
@@ -514,6 +528,8 @@ def ledger_seal(
                 "export_content_hash": manifest["export_content_hash"],
                 "custody": manifest["custody"],
                 "not_worm": True,
+                "colocated": result["colocated"],
+                "storage_recommendation": result["storage_recommendation"],
                 "custody_note": manifest["custody_note"],
             },
             indent=2,
@@ -529,7 +545,9 @@ def ledger_verify_seal(
         typer.Option(
             "--seal",
             help=(
-                "Seal manifest path (default: <ledger_dir>/.lpe/ledger.seal.json)."
+                "Seal manifest path to verify against (default: "
+                "<ledger_dir>/.lpe/ledger.seal.json). Use the same alternate "
+                "path written by `lpe ledger seal --seal`."
             ),
         ),
     ] = None,
@@ -703,12 +721,35 @@ def review_record(
             help="Comma-separated obligation ids for TPPR ACCEPT credit (optional).",
         ),
     ] = None,
+    packet: Annotated[
+        Path | None,
+        typer.Option(
+            "--packet",
+            exists=True,
+            dir_okay=False,
+            help=(
+                "Optional evidence packet JSON; cross-links evidence_fingerprint "
+                "into the ledger review payload."
+            ),
+        ),
+    ] = None,
 ) -> None:
-    from lpe.models import RiskClass
+    from lpe.models import EvidencePacket, RiskClass
 
     contract = load_contract(project)
     decision = ReviewDecision.model_validate(_read_json(decision_path))
     risk = RiskClass(risk_class)
+    fingerprint: str | None = None
+    if packet is not None:
+        evidence = EvidencePacket.model_validate(_read_json(packet))
+        if evidence.packet_id != decision.packet_id:
+            typer.echo(
+                "packet_id mismatch between --packet and decision "
+                f"({evidence.packet_id!r} vs {decision.packet_id!r})",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        fingerprint = evidence.evidence_fingerprint
     try:
         validate_reviewer_authority(
             contract,
@@ -740,6 +781,7 @@ def review_record(
         decision,
         project_id=contract.project.project_id,
         obligation_ids=obl_list,
+        evidence_fingerprint=fingerprint,
     )
     typer.echo(digest)
 
@@ -1039,6 +1081,8 @@ def pilot_record(
                 recommendation=recommendation or extras.get("recommendation"),
                 risk_class=risk_class or extras.get("risk_class"),
                 hard_gate_passed=extras.get("hard_gate_passed"),
+                evidence_fingerprint=extras.get("evidence_fingerprint"),
+                packet_id=extras.get("packet_id"),
             )
         elif kind_norm == "overhead":
             base = (

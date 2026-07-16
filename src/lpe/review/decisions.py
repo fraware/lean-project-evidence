@@ -11,6 +11,8 @@ def review_decision_to_event(
     *,
     project_id: str,
     obligation_id: str | None = None,
+    evidence_fingerprint: str | None = None,
+    ledger_seal_tip: str | None = None,
 ) -> UtilityEvent:
     event_type = (
         EventType.ARTIFACT_ACCEPTED
@@ -28,6 +30,10 @@ def review_decision_to_event(
         "answer": decision.answer,
         "required_repair": decision.required_repair,
     }
+    if evidence_fingerprint:
+        payload["evidence_fingerprint"] = evidence_fingerprint
+    if ledger_seal_tip:
+        payload["ledger_seal_tip"] = ledger_seal_tip
     # Human ACCEPT is the attestation for TPPR acceptance flags (docs/07_TPPR_SPEC.md).
     if decision.decision.value == "ACCEPT":
         payload["semantic_fidelity"] = True
@@ -81,17 +87,26 @@ def record_review_decision(
     *,
     project_id: str,
     obligation_ids: list[str] | None = None,
+    evidence_fingerprint: str | None = None,
 ) -> str:
     store = LedgerStore(ledger_path)
     if not ledger_path.exists():
         store.initialize()
     primary_obligation = obligation_ids[0] if obligation_ids else None
+    # Prefer an explicit fingerprint; else derive from packet_id prefix convention.
+    fingerprint = evidence_fingerprint
+    if fingerprint is None and decision.packet_id.startswith("packet_"):
+        derived = decision.packet_id.removeprefix("packet_")
+        if len(derived) == 64 and all(c in "0123456789abcdef" for c in derived):
+            fingerprint = derived
     event = review_decision_to_event(
-        decision, project_id=project_id, obligation_id=primary_obligation
+        decision,
+        project_id=project_id,
+        obligation_id=primary_obligation,
+        evidence_fingerprint=fingerprint,
     )
     digest = store.append(event)
-    # When multiple obligations are accepted, append linked ACCEPT events so TPPR
-    # can credit each (same review_id suffix; hash-chained separately).
+    # Cross-link the post-append tip into a superseding note on the time event.
     if (
         decision.decision.value == "ACCEPT"
         and obligation_ids
@@ -105,14 +120,23 @@ def record_review_decision(
                 }
             )
             store.append(linked)
-    store.append(
-        expert_time_event(
-            event_id=f"{event.event_id}_time",
-            project_id=project_id,
-            artifact_id=decision.packet_id,
-            actor_id=decision.reviewer_id,
-            minutes=decision.review_minutes,
-            category="review",
-        )
+    time_event = expert_time_event(
+        event_id=f"{event.event_id}_time",
+        project_id=project_id,
+        artifact_id=decision.packet_id,
+        actor_id=decision.reviewer_id,
+        minutes=decision.review_minutes,
+        category="review",
     )
+    if fingerprint:
+        time_event = time_event.model_copy(
+            update={
+                "payload": {
+                    **time_event.payload,
+                    "evidence_fingerprint": fingerprint,
+                    "ledger_seal_tip": digest,
+                }
+            }
+        )
+    store.append(time_event)
     return digest

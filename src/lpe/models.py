@@ -341,6 +341,8 @@ class ReviewQuestion(StrictModel):
     required_roles: list[str]
     estimated_minutes: int = Field(ge=1, le=240)
     supporting_finding_ids: list[str] = Field(default_factory=list)
+    # Explicit M6 comparison id (deterministic scaffold; no learning until §21).
+    baseline_id: str = "deterministic_baseline.v1"
 
 
 class EvidencePacket(VersionedStrictModel):
@@ -356,6 +358,12 @@ class EvidencePacket(VersionedStrictModel):
     recommendation_reasons: list[str]
     unresolved_uncertainty: list[str] = Field(default_factory=list)
     review_question: ReviewQuestion | None = None
+    # Stable content hash of contract+candidate+compiler (cross-link for ledger /
+    # seal tip provenance). Optional so historical 0.1.0 packets still load.
+    evidence_fingerprint: str | None = None
+    # Optional ledger seal / chain tip recorded when the packet is linked to a
+    # ledger snapshot (warehouse / review record). Not present at compile time.
+    ledger_seal_tip: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

@@ -63,14 +63,17 @@ class PilotWarehouse:
         self.store.initialize()
 
     def _base_payload(self, **fields: Any) -> dict[str, Any]:
-        return {
+        payload = {
             "pilot_schema": PILOT_PAYLOAD_SCHEMA,
             "source": PILOT_SOURCE,
             "durable": True,
             "section_21_cleared": False,
             "causal_claims": False,
-            **fields,
         }
+        for key, value in fields.items():
+            if value is not None:
+                payload[key] = value
+        return payload
 
     def register_candidate(
         self,
@@ -143,8 +146,15 @@ class PilotWarehouse:
         recommendation: str | None = None,
         risk_class: str | None = None,
         hard_gate_passed: bool | None = None,
+        evidence_fingerprint: str | None = None,
+        packet_id: str | None = None,
     ) -> PilotRecordResult:
-        """Append ``EVIDENCE_COMPILED`` marking automated packet construction."""
+        """Append ``EVIDENCE_COMPILED`` marking automated packet construction.
+
+        When ``evidence_fingerprint`` is provided it is stored for cross-link to
+        the evidence packet; ``ledger_seal_tip`` in the result is the event hash
+        of this append (usable as a tip cross-link before an external seal).
+        """
         event = UtilityEvent(
             event_id=new_id("evt"),
             event_type=EventType.EVIDENCE_COMPILED,
@@ -158,6 +168,8 @@ class PilotWarehouse:
                 recommendation=recommendation,
                 risk_class=risk_class,
                 hard_gate_passed=hard_gate_passed,
+                evidence_fingerprint=evidence_fingerprint,
+                packet_id=packet_id,
             ),
         )
         digest = self.store.append(event)

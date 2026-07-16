@@ -1,6 +1,6 @@
 # Lean Project Evidence — Spec & Roadmap Audit
-**Date / commit:** 2026-07-16 / post–audit-gap-closure (fixture-excellence 0.2)  
-**Verdict one-liner:** Engineering **0.2 fixture-excellence**: M0–M4 Done at fixture scope; §17 orch measured (harness); doc drift closed; M5 instrument-ready only; M6–M7 / partner pilot / §21 still deferred — do not claim science, Mathlib-complete truth, or R3/R4 auto-ACCEPT.
+**Date / commit:** 2026-07-16 / post–seal-provenance-baseline cut  
+**Verdict one-liner:** Engineering **0.2 fixture-excellence** plus seal custody CLI, packet fingerprint / seal-tip cross-links, and explicit `baseline_id` on review questions: M0–M4 Done at fixture scope; M5 instrument-ready only; M6–M7 / partner pilot / §21 still deferred — do not claim science, Mathlib-complete truth, or R3/R4 auto-ACCEPT.
 
 ## 1. Executive scorecard
 
@@ -15,8 +15,8 @@
 | Roadmap M3–M4 | Lean extract + semantic providers | **DONE (fixture-scoped)**; Mathlib out of scope | **Met** (fixture-excellence) |
 | Roadmap M5 | Shadow pilot 30–50 candidates | Partner kit + warehouse; **no live partner pilot** | **Partial** |
 | Roadmap M6–M7 | Learned routing / synthesis | Deterministic + fixture harness scaffolds only | **Gap** (blocked) |
-| Test / quality | Green suite; honest VALIDATION | **575 passed**, 1 env-gated skip, 1 slow deselected; month-one gate green | **Met** |
-| Security (docs/09) | Sandbox, allowlist, redaction, no R3/R4 auto-ACCEPT | Controls present; CODEOWNERS `@fraware`; sealed-ledger snapshot (not WORM) | **Partial** (no hardware WORM) |
+| Test / quality | Green suite; honest VALIDATION | **583 passed**, 1 env-gated skip, 1 slow deselected; month-one gate green | **Met** |
+| Security (docs/09) | Sandbox, allowlist, redaction, no R3/R4 auto-ACCEPT | Controls present; CODEOWNERS `@fraware`; sealed-ledger snapshot with alternate-path / doctor co-location advice (not WORM) | **Partial** (no hardware WORM) |
 
 ## 2. Milestone matrix M0–M7
 
@@ -66,7 +66,7 @@ Grouped by milestone. Status legend: **DONE** / **PARTIAL** / **STUB** / **NOT S
 | ID | Title | Status | Notes |
 | --- | --- | --- | --- |
 | EPIC-017 | Review operation | **DONE** | Question → decision → ledger minutes |
-| ISSUE-018 | Deterministic review-question routing | **DONE** | Semantic priority in `router.py` |
+| ISSUE-018 | Deterministic review-question routing | **DONE** | Semantic priority via `DeterministicRoutingBaseline`; explicit `baseline_id=deterministic_baseline.v1` on questions |
 | ISSUE-019 | Reviewer authority checks | **DONE** | `review.yaml` only; R3/R4 ACCEPT refused (ADR 0003) |
 | ISSUE-020 | Review decision recording | **DONE** | `record_review_decision` + obligation_ids → TPPR |
 | ISSUE-021 | GitHub Check output adapter | **DONE** | Payload render; `submit-check` dry-run / optional `--post` |
@@ -107,7 +107,7 @@ Grouped by milestone. Status legend: **DONE** / **PARTIAL** / **STUB** / **NOT S
 
 | ID | Title | Status | Notes |
 | --- | --- | --- | --- |
-| EPIC-039 | Learn review routing from utility outcomes | **BLOCKED** | Baseline only; §21 unmet |
+| EPIC-039 | Learn review routing from utility outcomes | **BLOCKED** | Baseline wired into review selection (`baseline_id`); no training; §21 unmet |
 | EPIC-040 | Evaluate project-targeted data synthesis | **BLOCKED** | Fixture harness; no training |
 
 ## 4. ENGINEERING_SPEC §20 checklist
@@ -123,7 +123,7 @@ Version 0.1 is complete when:
 7. **Pass** — Acceptance and persistence events appendable (`ledger/store.py`; EventTypes; TPPR pending until `PERSISTENCE_CONFIRMED`).
 8. **Pass** — Ledger hash chain verifies (`lpe ledger verify`; longevity 10k).
 9. **Pass** — TPPR computable (`lpe tppr compute`; `metrics/tppr.py`).
-10. **Pass** — CI, tests, documentation, examples pass (`ci.yml`; **480** non-slow tests green this audit; docs + examples present).
+10. **Pass** — CI, tests, documentation, examples pass (`ci.yml`; **583** non-slow tests green this audit; docs + examples present).
 
 ## 5. ENGINEERING_SPEC §21 scientific gates
 
@@ -143,7 +143,7 @@ Version 0.1 is complete when:
 | --- | --- |
 | Enough accept/revise/reject/persistence outcomes | **Not met** |
 | Held-out evaluation available | **Not met** |
-| Deterministic baselines established | **Met** (software baseline exists in `routing/baseline.py`) |
+| Deterministic baselines established | **Met** (`deterministic_baseline.v1` wired into `select_review_question`; no learning) |
 | Learning demonstrably improves TPPR / preregistered proxy | **Not met** (no training) |
 
 **Conclusion:** Product must **not** advance from “scaffold / instrument-ready” to claimed shadow-pilot science or learned routing.
@@ -159,7 +159,7 @@ Version 0.1 is complete when:
 | Month-one / extraction language | “Continue to Lean extraction only when…” | **Closed** — pilot readiness wording | Closed |
 | Partner “ready” language in docs/24 | Ready to instrument | Intact banner; handoff in `docs/27` | Residual misclaim risk if over-read |
 | Default `LPE_DOCKER_IMAGE` | Often implied Lean-capable | `lpe doctor` warns; docs clarify `lpe-lean:4.14` | Residual |
-| Ledger “append-only” marketing | Tamper-evident store | FS SQLite + archive path; not WORM (`docs/25`) | **High** if oversold |
+| Ledger “append-only” marketing | Tamper-evident store | FS SQLite + archive + seal (`--seal` alternate path / doctor co-location warn); not WORM (`docs/25`) | **High** if oversold |
 | Semantic provider PASS | Could be read as mathematical fidelity | Fixture Lake/structural; intent fidelity remains human | **High** if oversold |
 | §17 orchestration &lt;10% of Lean | Listed as target | **Measured** on fixture; soft assert + published ratio | Closed / soft |
 
@@ -169,15 +169,16 @@ Version 0.1 is complete when:
 
 | Command | Result |
 | --- | --- |
-| `pytest -q -m "not slow"` | Re-run after gap closure; expect **480+** passed, 1 slow deselected |
-| `lpe doctor` | Warns when image is default ubuntu; optional `--ledger` permission report |
+| `pytest -q -m "not slow"` | **583 passed**, 1 env-gated skip, 1 slow deselected |
+| `lpe doctor` | Warns when image is default ubuntu; optional `--ledger` permission / seal co-location report |
 | `lpe gate month-one` | Scaffold criteria; disclaimer intact |
+| Honesty / seal CLI smoke | `tests/integration/test_honesty_seal_cli_smoke.py` + CI step |
 
 ### Covered vs missing
 
 | Covered | Missing / thin (deferred) |
 | --- | --- |
-| Fixture M3/M4, property hashing/ledger, orch vs Lean wall harness, env-gated GH Check, doctor ledger warnings, CODEOWNERS fail-closed | Partner human protocol; Mathlib-scale; §21; WORM root of trust; M6/M7 training |
+| Fixture M3/M4, property hashing/ledger, orch vs Lean wall harness, env-gated GH Check, doctor ledger/seal warnings, alternate-path seal, packet fingerprint + `baseline_id`, CODEOWNERS fail-closed | Partner human protocol; Mathlib-scale; §21; WORM root of trust; M6/M7 training |
 
 ## 8. Remaining work ranked
 
@@ -195,10 +196,10 @@ Version 0.1 is complete when:
 ### P2 (post–§21 only)
 
 1. M6 / M7 — **BLOCKED**.
-2. Stronger ledger root-of-trust beyond archive + doctor warnings.
+2. Stronger ledger root-of-trust beyond archive + seal + doctor warnings (hardware WORM / transparency log).
 
 **Partner pilot note:** Engineering 0.2 fixture-excellence is the prerequisite. Do not reopen M3/M4 mid-pilot.
 
 ## 9. Bottom-line assessment
 
-Lean Project Evidence after audit gap closure is a credible **engineering 0.2 fixture-excellence** cut: M3–M4 Done at fixture scope, doc honesty closed, §17 orch measured, suite green. Partner pilot / §21 / M6–M7 remain deferred. What must **not** be claimed is unchanged: R3/R4 auto-ACCEPT, Mathlib-complete truth, causal utility from dry-runs, WORM ledger, opaque quality scalars.
+Lean Project Evidence after the seal/provenance/baseline cut remains a credible **engineering 0.2 fixture-excellence** product: M3–M4 Done at fixture scope, seal custody CLI hardened, packet fingerprint + deterministic `baseline_id` instrumented for a future §21 study, suite green (**583** non-slow). Partner pilot / §21 / M6–M7 remain deferred. What must **not** be claimed is unchanged: R3/R4 auto-ACCEPT, Mathlib-complete truth, causal utility from dry-runs, WORM ledger, opaque quality scalars.

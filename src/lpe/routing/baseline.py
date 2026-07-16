@@ -5,6 +5,10 @@ from enum import StrEnum
 
 from lpe.honesty.research_gates import ResearchGateBlocked, refuse_research_entrypoint
 
+# Stable id for §21 held-out comparison against any future learned policy.
+# No learning: this is a fixed-priority scaffold only (EPIC-039 blocked).
+DETERMINISTIC_BASELINE_ID = "deterministic_baseline.v1"
+
 
 class TrainingBlockedError(ResearchGateBlocked):
     """Alias: M6 training does not exist until §21."""
@@ -18,6 +22,7 @@ class RoutingStrategy(StrEnum):
 @dataclass(frozen=True)
 class RoutingDecision:
     strategy: RoutingStrategy
+    baseline_id: str
     question_priority: list[str]
     rationale: str
 
@@ -31,7 +36,15 @@ class DeterministicRoutingBaseline:
     no ``fit`` / ``train`` implementation that succeeds.
     """
 
-    PRIORITY = ["semantic", "repository", "downstream", "kernel", "persistence", "uncertainty"]
+    BASELINE_ID = DETERMINISTIC_BASELINE_ID
+    PRIORITY = [
+        "semantic",
+        "repository",
+        "downstream",
+        "kernel",
+        "persistence",
+        "uncertainty",
+    ]
 
     def route(self, *, unresolved_dimensions: list[str]) -> RoutingDecision:
         ordered = sorted(
@@ -40,10 +53,12 @@ class DeterministicRoutingBaseline:
         )
         return RoutingDecision(
             strategy=RoutingStrategy.DETERMINISTIC_BASELINE,
+            baseline_id=self.BASELINE_ID,
             question_priority=ordered,
             rationale=(
                 "Fixed dimension priority per ADR 0003 human authority constraints; "
-                "not a learned policy; EPIC-039 blocked until §21"
+                "not a learned policy; EPIC-039 blocked until §21; "
+                f"baseline_id={self.BASELINE_ID}"
             ),
         )
 

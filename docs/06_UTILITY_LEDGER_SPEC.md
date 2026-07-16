@@ -48,4 +48,4 @@ lpe ledger seal <live.sqlite3>
 lpe ledger verify-seal <live.sqlite3>
 ```
 
-Default path: `<ledger_dir>/.lpe/ledger.seal.json`. The seal records tip hashes, event count, export content hash, timestamp, and tool version. Optional HMAC when `LPE_LEDGER_SEAL_KEY` is set. This detects silent SQLite mutation only if the seal is stored separately or read-only; it is **not** hardware WORM and does not rewrite the append-only chain.
+Default path: `<ledger_dir>/.lpe/ledger.seal.json`. Prefer `lpe ledger seal --seal <path>` to write outside the ledger directory and `lpe ledger verify-seal --seal <path>` to verify from that copy. The seal records tip hashes, event count, export content hash, timestamp, and tool version. Optional HMAC when `LPE_LEDGER_SEAL_KEY` is set. This detects silent SQLite mutation only if the seal is stored separately or read-only; it is **not** hardware WORM and does not rewrite the append-only chain.

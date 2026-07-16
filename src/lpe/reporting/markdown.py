@@ -49,12 +49,18 @@ def render_packet(packet: EvidencePacket) -> str:
     ]
     if _packet_uses_regex_stub(packet):
         lines.extend([REGEX_STUB_PACKET_BANNER, ""])
-    lines.extend(
+    identity = [
+        f"- Project: `{packet.project_id}`",
+        f"- Run: `{packet.run_id}`",
+        f"- Contract hash: `{packet.contract_hash}`",
+        f"- Candidate: `{packet.candidate.candidate_id}`",
+    ]
+    if packet.evidence_fingerprint:
+        identity.append(f"- Evidence fingerprint: `{packet.evidence_fingerprint}`")
+    if packet.ledger_seal_tip:
+        identity.append(f"- Ledger seal tip: `{packet.ledger_seal_tip}`")
+    identity.extend(
         [
-            f"- Project: `{packet.project_id}`",
-            f"- Run: `{packet.run_id}`",
-            f"- Contract hash: `{packet.contract_hash}`",
-            f"- Candidate: `{packet.candidate.candidate_id}`",
             f"- Risk: `{packet.risk_class.value}`",
             f"- Hard gate passed: `{packet.hard_gate_passed}`",
             (
@@ -67,6 +73,7 @@ def render_packet(packet: EvidencePacket) -> str:
             "",
         ]
     )
+    lines.extend(identity)
     for reason in packet.recommendation_reasons:
         lines.append(f"- {reason}")
 
@@ -107,6 +114,7 @@ def render_packet(packet: EvidencePacket) -> str:
                 f"- Required roles: {', '.join(packet.review_question.required_roles)}",
                 f"- Estimated minutes: {packet.review_question.estimated_minutes}",
                 f"- Answer type: {packet.review_question.answer_type}",
+                f"- Routing baseline_id: `{packet.review_question.baseline_id}`",
             ]
         )
     return "\n".join(lines) + "\n"

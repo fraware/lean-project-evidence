@@ -8,16 +8,12 @@ from lpe.models import (
     ReviewQuestion,
     RiskClass,
 )
+from lpe.routing.baseline import (
+    DETERMINISTIC_BASELINE_ID,
+    DeterministicRoutingBaseline,
+)
 
-
-PRIORITY = {
-    EvidenceDimension.SEMANTIC: 0,
-    EvidenceDimension.REPOSITORY: 1,
-    EvidenceDimension.DOWNSTREAM: 2,
-    EvidenceDimension.KERNEL: 3,
-    EvidenceDimension.PERSISTENCE: 4,
-    EvidenceDimension.UNCERTAINTY: 5,
-}
+_BASELINE = DeterministicRoutingBaseline()
 
 
 def select_review_question(
@@ -26,6 +22,12 @@ def select_review_question(
     required_roles: list[str],
     estimated_minutes: int,
 ) -> ReviewQuestion | None:
+    """Select one structured review question using the deterministic baseline.
+
+    ``baseline_id`` is always ``deterministic_baseline.v1`` (no learning). This
+    wires the M6 comparison scaffold into production question selection so a
+    future §21 held-out study can contrast against an explicit baseline id.
+    """
     unresolved = [
         finding
         for finding in findings
@@ -34,7 +36,15 @@ def select_review_question(
     if not unresolved and risk_class not in {RiskClass.R3, RiskClass.R4}:
         return None
 
-    unresolved.sort(key=lambda finding: PRIORITY[finding.dimension])
+    routing = _BASELINE.route(
+        unresolved_dimensions=[finding.dimension.value for finding in unresolved]
+    )
+    priority_rank = {
+        name: index for index, name in enumerate(routing.question_priority)
+    }
+    unresolved.sort(
+        key=lambda finding: priority_rank.get(finding.dimension.value, 99)
+    )
     finding = unresolved[0] if unresolved else None
 
     if finding is not None and finding.dimension is EvidenceDimension.SEMANTIC:
@@ -70,4 +80,5 @@ def select_review_question(
         required_roles=required_roles,
         estimated_minutes=estimated_minutes,
         supporting_finding_ids=[finding.finding_id] if finding else [],
+        baseline_id=routing.baseline_id or DETERMINISTIC_BASELINE_ID,
     )
