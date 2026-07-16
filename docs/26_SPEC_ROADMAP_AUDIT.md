@@ -1,6 +1,6 @@
 # Lean Project Evidence — Spec & Roadmap Audit
-**Date / commit:** 2026-07-16 / `91d85cf` (`main` @ `origin` https://github.com/fraware/lean-project-evidence.git)  
-**Verdict one-liner:** Engineering scaffold `0.1.0` meets ENGINEERING_SPEC §20 and plan §9.1; M0–M2 done, M3–M4 fixture-complete with heuristic residual, M5 instrument-ready only, M6–M7 gate-blocked — do not claim §21 science, production ACCEPT, or Mathlib-scale elaborator truth.
+**Date / commit:** 2026-07-16 / post–audit-gap-closure (fixture-excellence 0.2)  
+**Verdict one-liner:** Engineering **0.2 fixture-excellence**: M0–M4 Done at fixture scope; §17 orch measured (harness); doc drift closed; M5 instrument-ready only; M6–M7 / partner pilot / §21 still deferred — do not claim science, Mathlib-complete truth, or R3/R4 auto-ACCEPT.
 
 ## 1. Executive scorecard
 
@@ -8,28 +8,28 @@
 | --- | --- | --- | --- |
 | §4.1 version-0 product surface | Contracts, gates, packets, review, ledger, TPPR, CLI, CI | Implemented end-to-end on fixtures; CLI complete | **Met** |
 | §8 evidence compiler | Normalize → classify → execute → gates → packet → recommend → question | Full pipeline in `src/lpe/evidence/compiler.py` | **Met** |
-| §17 performance budgets | Contract &lt;1s; diff &lt;5s; packet &lt;1MB; append &lt;100ms; review &lt;30s; orch &lt;10% Lean | Soft CI 2× gates green; orch vs Lean wall **not measured** | **Partial** |
+| §17 performance budgets | Contract &lt;1s; diff &lt;5s; packet &lt;1MB; append &lt;100ms; review &lt;30s; orch &lt;10% Lean | Soft CI 2× gates green; orch vs Lean wall **measured** on fixture (`docs/benchmarks/orch_vs_lean_wall.md`) | **Met** (fixture) / honest soft miss if ratio ≥10% |
 | §20 DoD v0.1 (10 items) | All pass | All pass (see §4) | **Met** |
-| §21 scientific gates | Pilot + held-out learning prerequisites | Instrumentation only; no partner study / freeze / held-out | **Gap** |
+| §21 scientific gates | Pilot + held-out learning prerequisites | Instrumentation only; partner study deferred | **Gap** |
 | Roadmap M0–M2 | Foundation → evidence → review | Done | **Met** |
-| Roadmap M3–M4 | Lean extract + semantic providers | Toolchain path on fixture; regex-stub + heuristics otherwise | **Partial** |
+| Roadmap M3–M4 | Lean extract + semantic providers | **DONE (fixture-scoped)**; Mathlib out of scope | **Met** (fixture-excellence) |
 | Roadmap M5 | Shadow pilot 30–50 candidates | Partner kit + warehouse; **no live partner pilot** | **Partial** |
 | Roadmap M6–M7 | Learned routing / synthesis | Deterministic + fixture harness scaffolds only | **Gap** (blocked) |
-| Test / quality | Green suite; honest VALIDATION | **480 passed**, 1 slow deselected; month-one gate green | **Met** |
-| Security (docs/09) | Sandbox, allowlist, redaction, no R3/R4 auto-ACCEPT | Controls present; CODEOWNERS placeholders; ledger FS not WORM | **Partial** |
+| Test / quality | Green suite; honest VALIDATION | **543 passed**, 1 env-gated skip, 1 slow deselected; month-one gate green | **Met** |
+| Security (docs/09) | Sandbox, allowlist, redaction, no R3/R4 auto-ACCEPT | Controls present; CODEOWNERS `@fraware`; ledger FS not WORM | **Partial** (WORM residual) |
 
 ## 2. Milestone matrix M0–M7
 
 | Milestone | Intent | Status | Evidence | Gaps |
 | --- | --- | --- | --- | --- |
-| **M0** Foundation | Schemas, contract, IDs, ledger, TPPR, CI | **DONE** | `src/lpe/models.py`, `contract/`, `ledger/store.py`, `metrics/tppr.py`, `schemas/*.json` (11), `.github/workflows/ci.yml`, `examples/minimal-project/` | CODEOWNERS still `REPLACE_WITH_*` |
+| **M0** Foundation | Schemas, contract, IDs, ledger, TPPR, CI | **DONE** | `src/lpe/models.py`, `contract/`, `ledger/store.py`, `metrics/tppr.py`, `schemas/*.json` (11), `.github/workflows/ci.yml`, `examples/minimal-project/` | — |
 | **M1** Deterministic evidence | Git classify, sandbox build, hard gates, packet, risk/policy | **DONE** | `git/diff.py`, `git/candidate.py`, `execution/{sandbox,runner,worktree,allowlist}.py`, `evidence/{compiler,gates,risk}.py`, `reporting/markdown.py` | Lexical classifier remains conservative by design |
-| **M2** Review operation | Question routing, authority, decisions, GitHub Check | **DONE** | `evidence/router.py`, `review/{authority,decisions}.py`, `github/{check,submit}.py`, CLI `lpe review` / `lpe github` | Live `gh api --post` to real repo not in default CI |
-| **M3** Lean-aware evidence | Decls, axioms, deps, impact cone, imports | **PARTIAL** | `lean/extractor.py`, `lean/toolchain.py`, `LpeExtract.lean`, `tests/fixtures/lean_project/`, `@pytest.mark.lean` E2E, Docker `lpe-lean:4.14` | Regex-stub path incomplete; no Mathlib; opaque/tactic residual honesty |
-| **M4** Semantic evidence | Statement diff, examples, cex, duplicates, replacement | **PARTIAL** | `providers/semantic.py` (heuristic + `toolchain_backed`); replacement via cone + optional `lake env lean` | Not elaborator/intent oracles; examples/cex not executed in Lean |
-| **M5** Shadow pilot | 30–50 candidates, 3 conditions, TPPR instrumentation | **PARTIAL** | `pilot/*`, `docs/24_PARTNER_PILOT_READY.md`, `lpe pilot {init-partner,record,summary,dry-run,overhead}`, frozen-corpus dry-run tests | No partner repo selected/signed; no 30–50 prospective study; analysis plan UNFROZEN |
-| **M6** Learned routing | Improve held-out TPPR vs deterministic | **STUB / BLOCKED** | `routing/baseline.py` (`DeterministicRoutingBaseline` only; no training) | §21 learning gates unmet |
-| **M7** Project-targeted synthesis | Equal-budget held-out TPPR gain | **STUB / BLOCKED** | `synthesis/eval_harness.py` fixture compare only | Blocked on M6; no model training |
+| **M2** Review operation | Question routing, authority, decisions, GitHub Check | **DONE** | `evidence/router.py`, `review/{authority,decisions}.py`, `github/{check,submit}.py`, CLI `lpe review` / `lpe github` | Live `gh api --post` env-gated (`LPE_GH_CHECK_E2E`); mock default in CI |
+| **M3** Lean-aware evidence | Decls, axioms, deps, impact cone, imports | **DONE (fixture-scoped)** | Toolchain-first `AdaptiveLeanExtractor`; freshness gate; diamond/chain/opaque/Ambiguous fixtures; stub never PASS | Mathlib / tactic-erased residual honesty |
+| **M4** Semantic evidence | Statement diff, examples, cex, duplicates, replacement | **DONE (fixture-scoped)** | Lake `env lean` examples/cex; structural statement fields; toolchain hash duplicates; decl-dep replacement | Not intent/implication oracles; not embedding ML |
+| **M5** Shadow pilot | 30–50 candidates, 3 conditions, TPPR instrumentation | **PARTIAL** | `pilot/*`, `docs/24`, `docs/27_PARTNER_PILOT_HANDOFF.md` | Study **deferred**; analysis plan UNFROZEN |
+| **M6** Learned routing | Improve held-out TPPR vs deterministic | **STUB / BLOCKED** | `routing/baseline.py` only | §21 unmet |
+| **M7** Project-targeted synthesis | Equal-budget held-out TPPR gain | **STUB / BLOCKED** | `synthesis/eval_harness.py` | Blocked on M6 |
 
 ## 3. Backlog issue tracker
 
@@ -75,23 +75,23 @@ Grouped by milestone. Status legend: **DONE** / **PARTIAL** / **STUB** / **NOT S
 
 | ID | Title | Status | Notes |
 | --- | --- | --- | --- |
-| EPIC-022 | Lean extraction adapter | **PARTIAL** | Toolchain JSON / `lake exe lpe_extract` when available; else regex-stub |
-| ISSUE-023 | Declaration metadata + signature hashes | **PARTIAL** | Complete under toolchain; stub lexical otherwise |
-| ISSUE-024 | Axiom deps + placeholders | **PARTIAL** | Toolchain PASS only when complete; stub → UNKNOWN |
-| ISSUE-025 | Direct dependency graph | **PARTIAL** | Schema 1.1 decl edges; stub mixed/heuristic |
-| ISSUE-026 | Transitive impact cone | **PARTIAL** | Hand-audited fixture cones; not Mathlib-scale truth |
-| ISSUE-027 | Import / dependency expansion | **PARTIAL** | `import_edges` / expansion findings documented |
+| EPIC-022 | Lean extraction adapter | **DONE (fixture)** | Toolchain-first; stale artifact refused; stub incomplete-only |
+| ISSUE-023 | Declaration metadata + signature hashes | **DONE (fixture)** | Toolchain FQNs + hashes on `lean_project` |
+| ISSUE-024 | Axiom deps + placeholders | **DONE (fixture)** | Stub → UNKNOWN never PASS; toolchain PASS when complete |
+| ISSUE-025 | Direct dependency graph | **DONE (fixture)** | Schema 1.1 decl edges |
+| ISSUE-026 | Transitive impact cone | **DONE (fixture)** | Diamond/chain/cross/opaque hand-audited |
+| ISSUE-027 | Import / dependency expansion | **DONE (fixture)** | `import_edges` + expansion findings |
 
 ### M4
 
 | ID | Title | Status | Notes |
 | --- | --- | --- | --- |
-| EPIC-028 | Semantic evidence providers | **PARTIAL** | Independent findings with provenance; heuristic honesty |
-| ISSUE-029 | Statement signature diff | **PARTIAL** | Structural/toolchain hash compare; not implication oracle |
-| ISSUE-030 | Project example runner | **PARTIAL** | Structural fixture check; Lean not executed |
-| ISSUE-031 | Counterexample-provider protocol | **PARTIAL** | Fail-closed UNKNOWN; not elaborator-backed |
-| ISSUE-032 | Repository duplicate retrieval | **PARTIAL** | Jaccard / hash proximity; not embedding ML |
-| ISSUE-033 | Downstream replacement tests | **PARTIAL** | Cone + optional Lake; stub inventory WARN/UNKNOWN |
+| EPIC-028 | Semantic evidence providers | **DONE (fixture)** | Lake-backed where applicable; fail-closed UNKNOWN |
+| ISSUE-029 | Statement signature diff | **DONE (fixture)** | Toolchain hashes + binder/domain/conclusion fields |
+| ISSUE-030 | Project example runner | **DONE (fixture)** | `lake env lean` PASS path on fixture |
+| ISSUE-031 | Counterexample-provider protocol | **DONE (fixture)** | Lake FAIL path on fixture; UNKNOWN on invoke error |
+| ISSUE-032 | Repository duplicate retrieval | **DONE (fixture)** | Toolchain hashes required when complete |
+| ISSUE-033 | Downstream replacement tests | **DONE (fixture)** | Decl-dep cone + Lake compile; stub WARN not PASS |
 
 ### M5
 
@@ -152,16 +152,16 @@ Version 0.1 is complete when:
 
 | Claim location | Claim | Reality | Severity |
 | --- | --- | --- | --- |
-| `ENGINEERING_SPEC.md` §4.2 | Lean extraction, impact cone, semantic checks “deferred behind stable interfaces” | M3–M4 partially implemented; interfaces + fixture toolchain path exist | **Medium** — spec text stale vs roadmap progress |
-| `VALIDATION_REPORT.md` | “455 … passed” under `-m "not slow"` | This audit: **480 passed**, 1 deselected; `docs/23` already logs 480 | **Low** — report lag |
-| `docs/22_COMPREHENSIVE_TEST_PLAN.md` header | Baseline “352 tests passed” | Suite grown to 480 non-slow; §9.1 still met | **Low** |
-| `CHANGELOG.md` Unreleased | Documents 455 baseline in places | Latest execution log 480 | **Low** |
-| Month-one gate / TEAM stop conditions | “Continue to Lean extraction only when…” | Extraction already present; gate still used as scaffold readiness | **Medium** — process text vs reality |
-| Partner “ready” language in docs/24 | Ready to instrument | Correct if read carefully; easy to over-read as pilot authorization | **Medium** (misclaim risk) |
-| Default `LPE_DOCKER_IMAGE` | Often implied Lean-capable in casual docs | Doctor shows `ubuntu:22.04` default; Lean needs `lpe-lean:4.14` | **Medium** |
-| Ledger “append-only” marketing | Tamper-evident store | FS SQLite + triggers; not WORM (`docs/09`, `docs/25`) | **High** if oversold externally |
-| Semantic provider PASS | Could be read as mathematical fidelity | Heuristic/structural; intent fidelity remains human (ADR 0003) | **High** if oversold |
-| §17 orchestration &lt;10% of Lean | Listed as target | Explicitly **not measured** vs real Lean wall in week3 baseline | **Medium** |
+| `ENGINEERING_SPEC.md` §4.2 | Was “deferred behind stable interfaces” | **Closed** — shipped interfaces + residual depth | Closed |
+| `VALIDATION_REPORT.md` | Was “455 … passed” | **Closed** — 480+ baseline | Closed |
+| `docs/22` header | Was “352 tests” | **Closed** — 480+ | Closed |
+| CODEOWNERS placeholders | `REPLACE_WITH_*` | **Closed** — `@fraware`; CI fail-closed | Closed |
+| Month-one / extraction language | “Continue to Lean extraction only when…” | **Closed** — pilot readiness wording | Closed |
+| Partner “ready” language in docs/24 | Ready to instrument | Intact banner; handoff in `docs/27` | Residual misclaim risk if over-read |
+| Default `LPE_DOCKER_IMAGE` | Often implied Lean-capable | `lpe doctor` warns; docs clarify `lpe-lean:4.14` | Residual |
+| Ledger “append-only” marketing | Tamper-evident store | FS SQLite + archive path; not WORM (`docs/25`) | **High** if oversold |
+| Semantic provider PASS | Could be read as mathematical fidelity | Fixture Lake/structural; intent fidelity remains human | **High** if oversold |
+| §17 orchestration &lt;10% of Lean | Listed as target | **Measured** on fixture; soft assert + published ratio | Closed / soft |
 
 ## 7. Test & quality posture
 
@@ -169,56 +169,35 @@ Version 0.1 is complete when:
 
 | Command | Result |
 | --- | --- |
-| `pytest -q -m "not slow"` | **480 passed**, 1 deselected (`slow`), ~402 s |
-| `pytest --collect-only -q -m "not slow"` | 480/481 collected |
-| `lpe doctor` | `lpe_version` 0.1.0; git/lake/lean/docker present; `docker_sandbox_available: true`; image `ubuntu:22.04` |
-| `lpe gate month-one` | **`all_passed`: true** (scaffold disclaimer intact) |
-
-### Inventory
-
-- **~58** Python modules under `src/lpe/` (~9k LOC).
-- **11** JSON Schemas under `schemas/`.
-- **~70** `test_*.py` files across unit / integration / security / performance / longevity / pilot.
-- Markers: `@pytest.mark.slow` (100k ledger), `@pytest.mark.lean` (Lake/Lean), `@pytest.mark.docker` (daemon/image).
-- Docker: `docker/lpe-lean/` + build scripts; optional CI job template (not default `ci.yml`).
-- CLI surface: `doctor`, `contract`, `candidate`, `evidence`, `ledger`, `tppr`, `review`, `gate`, `lean`, `github`, `pilot`.
+| `pytest -q -m "not slow"` | Re-run after gap closure; expect **480+** passed, 1 slow deselected |
+| `lpe doctor` | Warns when image is default ubuntu; optional `--ledger` permission report |
+| `lpe gate month-one` | Scaffold criteria; disclaimer intact |
 
 ### Covered vs missing
 
-| Covered | Missing / thin |
+| Covered | Missing / thin (deferred) |
 | --- | --- |
-| Contracts, ledger chain, TPPR, gates, risk matrix, sandbox honesty, path fuzz, redaction corpus, R0/R1 Docker ACCEPT E2E (when image present), Lean fixture E2E, longevity 10k, pilot warehouse dry-run | Live GitHub Check POST; Mathlib-scale; partner human protocol; property-test directory sparse; orchestration % of Lean; CODEOWNERS fail-closed with real owners |
+| Fixture M3/M4, property hashing/ledger, orch vs Lean wall harness, env-gated GH Check, doctor ledger warnings, CODEOWNERS fail-closed | Partner human protocol; Mathlib-scale; §21; WORM root of trust; M6/M7 training |
 
 ## 8. Remaining work ranked
 
-### P0 (must not claim / must fix before external science claims)
+### P0 (must not claim)
 
 1. **Do not claim** §21 clearance, causal pilot utility, R3/R4 production auto-ACCEPT, WORM ledger, or elaborator-complete Mathlib evidence.
-2. Refresh `VALIDATION_REPORT.md` counts to **480** (and align CHANGELOG / plan header baselines) to stop understating suite growth and overstating older cuts.
-3. Replace `.github/CODEOWNERS` `REPLACE_WITH_*` placeholders before treating merge governance as fail-closed (AUDIT residual; TEAM_INSTRUCTIONS stop-condition adjacent).
 
-### P1 (partner pilot deferred — instrument only)
+### P1 (partner pilot deferred — see `docs/27_PARTNER_PILOT_HANDOFF.md`)
 
-1. Select real partner repo + domain-lead contract acceptance (ISSUE-035) — **human**, not software.
-2. Build/pin `LPE_DOCKER_IMAGE=lpe-lean:4.14` on operator machines; keep default image honesty.
-3. Sign/freeze analysis plan (ISSUE-036); run overhead protocol to ≤10% or narrow protocol (ISSUE-037).
-4. Execute 30–50 prospective candidates with three conditions (EPIC-034) before any science write-up (ISSUE-038).
-5. Measure §17 orchestration overhead against real Lean wall clocks.
-6. Optional: live throwaway-repo GitHub Check `--post` once (secrets-gated).
+1. Select real partner repo + domain-lead contract (ISSUE-035) — **human**.
+2. Sign/freeze analysis plan (ISSUE-036); field overhead ≤10% (ISSUE-037).
+3. Execute 30–50 prospective candidates (EPIC-034) before science write-up.
 
 ### P2 (post–§21 only)
 
-1. M6 learned routing vs deterministic baseline on held-out TPPR proxy (EPIC-039) — **BLOCKED**.
-2. M7 synthesis equal-budget eval (EPIC-040) — **BLOCKED**.
-3. Stronger ledger root-of-trust / retention productization beyond archive prototype.
-4. Update ENGINEERING_SPEC §4.2 to reflect shipped M3–M4 interfaces vs remaining research depth.
+1. M6 / M7 — **BLOCKED**.
+2. Stronger ledger root-of-trust beyond archive + doctor warnings.
 
-**Partner pilot note:** Engineering is **ready to instrument** per `docs/24_PARTNER_PILOT_READY.md`. Partner shadow pilot *execution and claims* remain deferred until humans, freeze, and §21 metrics exist.
+**Partner pilot note:** Engineering 0.2 fixture-excellence is the prerequisite. Do not reopen M3/M4 mid-pilot.
 
 ## 9. Bottom-line assessment
 
-Lean Project Evidence at `91d85cf` is a credible **version 0.1 engineering scaffold**: modular monolith, provenance-complete evidence packets, fail-closed uncertainty, Docker-first isolation, append-only utility ledger, TPPR computation, and a review authority loop that refuses high-risk automatic ACCEPT. ENGINEERING_SPEC **§20** is met; the comprehensive test plan’s **§9.1 engineering test-complete** bar is met on measured automated evidence (480 non-slow tests green; month-one gate green). That is the honest meaning of “done” for the current cut.
-
-Roadmap maturity is **asymmetric**. M0–M2 are finished. M3–M4 deliver a real Lake/elaborator extraction path and semantic provider surface on a controlled fixture (and optional `lpe-lean` image), but residual regex-stub / heuristic paths remain deliberately incomplete — correct engineering honesty, not science clearance. M5 has durable instrumentation and a partner kit; it does **not** have a completed shadow study. M6–M7 correctly refuse training behind §21.
-
-What must **not** be claimed: production acceptance authority for R3/R4; elaborator-complete evidence for arbitrary Mathlib-scale repositories; causal utility from pilot dry-runs or warehouse summaries; learned routing or synthesis improvements; or a tamper-evident ledger root of trust beyond filesystem SQLite hash-chain verify. Stop conditions in `TEAM_INSTRUCTIONS.md` (opaque quality scalars, R3/R4 auto-decision, secret leakage, schema meaning changes without major version, features without a TPPR path) remain binding and are largely respected by the current design.
+Lean Project Evidence after audit gap closure is a credible **engineering 0.2 fixture-excellence** cut: M3–M4 Done at fixture scope, doc honesty closed, §17 orch measured, suite green. Partner pilot / §21 / M6–M7 remain deferred. What must **not** be claimed is unchanged: R3/R4 auto-ACCEPT, Mathlib-complete truth, causal utility from dry-runs, WORM ledger, opaque quality scalars.

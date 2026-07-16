@@ -1,8 +1,8 @@
 # Comprehensive test plan — Lean Project Evidence
 
-**Status:** Week 4 executed (2026-07-16). Engineering test-complete criteria (§9.1) met for scaffold `0.1.x`; §9.2 research gates remain open. See `docs/23_TEST_EXECUTION_LOG.md`.  
-**Baseline:** `pytest -q` — **352 tests passed**, **1 deselected** (`@pytest.mark.slow` 100k ledger) (local run, 2026-07-16). Prior: Week 3 **342**; Week 2 **328**; Week 1 **303**; pre-plan **201**.  
-**Inputs:** `docs/21_TEST_BACKLOG.md`, `VALIDATION_REPORT.md`, `docs/ENGINEERING_SPEC.md` §15/§17/§20/§21, `docs/10_TESTING_AND_VALIDATION.md`, Phases 1–5 security remediation (AUDIT-001..032).
+**Status:** Week 4 executed (2026-07-16); audit gap closure in progress. Engineering test-complete criteria (§9.1) met for scaffold `0.1.x`; §9.2 research gates remain open. See `docs/23_TEST_EXECUTION_LOG.md`.  
+**Baseline:** `pytest -q -m "not slow"` — **543 tests passed**, **1 skipped** (env-gated GH Check E2E), **1 deselected** (`@pytest.mark.slow`). Prior: audit **480**; **455**; Week 3 **342**.  
+**Inputs:** `docs/21_TEST_BACKLOG.md`, `VALIDATION_REPORT.md`, `docs/ENGINEERING_SPEC.md` §15/§17/§20/§21, `docs/10_TESTING_AND_VALIDATION.md`, Phases 1–5 security remediation (AUDIT-001..032), `docs/26_SPEC_ROADMAP_AUDIT.md`.
 
 ---
 

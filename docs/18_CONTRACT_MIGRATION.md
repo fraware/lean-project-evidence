@@ -38,7 +38,7 @@ A migrated contract must pass:
 - non-empty intent markdown;
 - deterministic `contract_hash` reproducibility from canonical JSON.
 
-## Dry-run helper
+## Dry-run and apply helpers
 
 Use `lpe contract migrate-dry-run PATH [--to VERSION]` to plan a rewrite
 **without mutating files**. Behavior:
@@ -47,5 +47,10 @@ Use `lpe contract migrate-dry-run PATH [--to VERSION]` to plan a rewrite
 - all files already at target → `no_op`;
 - otherwise → `would_rewrite` listing filenames (`mutated: false`).
 
-This is not an automatic migrator. Listing a new version and editing YAML still
-follow the steps above.
+Use `lpe contract migrate PATH [--to VERSION] --write` to apply a versioned
+rewrite after the target is listed in `SUPPORTED_SCHEMA_VERSIONS`. Default is
+still dry-run (`--dry-run`). Field-level transformers register in
+`MIGRATION_REWRITERS` in `src/lpe/contract/migration.py`; absent a custom
+handler, only `schema_version` is rewritten.
+
+Refuse-unknown remains fail-closed for both commands.

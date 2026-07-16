@@ -1,5 +1,29 @@
 # Test execution log
 
+## 2026-07-16 — Audit gap closure (fixture-excellence 0.2)
+
+**Command:** `pytest -q -m "not slow"`  
+**Result:** **543** collected under filter — **543 passed**, **1 skipped** (`LPE_GH_CHECK_E2E` unset), 1 deselected (slow). Prior baseline: **480**.
+
+### What changed
+
+| Item | Detail |
+| --- | --- |
+| Phase 0 honesty | VALIDATION/CHANGELOG/§4.2/month-one; CODEOWNERS `@fraware`; CI fail-closed |
+| M3 fixture-excellence | Toolchain-first; stale artifact gate; Ambiguous FQN warnings; diamond/chain/opaque cones |
+| M4 Lake semantics | `lake env lean` examples PASS + cex FAIL; statement structure fields |
+| §17 orch vs Lean | `tests/performance/test_orchestration_lean_wall.py` + `docs/benchmarks/orch_vs_lean_wall.md` |
+| Ops / trust | Env-gated GH Check E2E; property tests; `lpe doctor --ledger`; `migrate --write` |
+| Handoff | `docs/27_PARTNER_PILOT_HANDOFF.md` — partner pilot still deferred |
+
+### Residual deferred
+
+- Partner pilot / §21 / M6–M7 / Mathlib-scale
+- Live GH Check POST (needs `LPE_GH_CHECK_E2E=1` + throwaway repo)
+- WORM ledger root of trust
+
+---
+
 ## 2026-07-16 — Redaction / ledger archive / impact-cone scale / threat model
 
 **Command:** `pytest -q -m "not slow"`  

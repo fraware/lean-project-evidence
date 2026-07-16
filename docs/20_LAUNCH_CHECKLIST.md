@@ -4,7 +4,7 @@ Use this checklist with `docs/16_REPOSITORY_LAUNCH.md` and `TEAM_INSTRUCTIONS.md
 
 ## Pre-push
 
-- [ ] **FAIL if skipped:** Replace placeholder handles in `.github/CODEOWNERS` (`MAINTAINERS.md`). Run `python scripts/check_codeowners_placeholders.py` (must exit 0 before merge; CI fails without `LPE_CODEOWNERS_PLACEHOLDERS_OK`).
+- [ ] **FAIL if skipped:** Confirm `.github/CODEOWNERS` has real `@user` / `@org/team` handles (no `REPLACE_WITH_*`). Run `python scripts/check_codeowners_placeholders.py` (must exit 0; CI is fail-closed).
 - [ ] Confirm Apache-2.0 license and repository metadata
 - [ ] Run clean-clone verification locally: `python scripts/verify_clean_clone.py`
 

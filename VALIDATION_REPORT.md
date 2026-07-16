@@ -2,17 +2,18 @@
 
 ## Release
 
-Lean Project Evidence engineering scaffold `0.1.0` (post security-hardening Phases 1–5 + Weeks 1–4 + toolchain extraction + elaborator dependency IR schema 1.1 + E2E Lake compile path + optional `lpe-lean:4.14` Docker sandbox).
+Lean Project Evidence engineering scaffold `0.1.0` (post security-hardening Phases 1–5 + Weeks 1–4 + toolchain extraction + elaborator dependency IR schema 1.1 + E2E Lake compile path + optional `lpe-lean:4.14` Docker sandbox + audit gap closure fixture-excellence).
 
 ## Honesty preamble
 
 This report describes **current automated validation**, not production acceptance readiness.
 Clearing local/CI checks and the month-one scaffold gate does **not** authorize production
 ACCEPT decisions, elaborator-complete Lean evidence for arbitrary Mathlib-scale repos, or §21 science claims.
+Mirror audit non-claims in `docs/26_SPEC_ROADMAP_AUDIT.md` §9.
 
 ## Completed checks (current)
 
-- **455 unit + integration + security + performance + longevity + pilot warehouse/dry-run + partner scaffold + durability/adapter tests** collected under default `pytest -q` (`-m "not slow"`; **455 passed** on this host, 0 Docker skips). `@pytest.mark.lean` runs when Lake/Lean is installed; otherwise skips. `@pytest.mark.docker` retries `docker info` briefly before skipping when the daemon is down. Docker Lean E2E (`lpe-lean:4.14`) does not require host Lake for extract; prefers one combined sandbox invocation (`sandbox_invocations: 1`). See `docs/23_TEST_EXECUTION_LOG.md`.
+- **543 unit + integration + security + performance + longevity + pilot warehouse/dry-run + partner scaffold + durability/adapter + property tests** collected under default `pytest -q` (`-m "not slow"`; **543 passed**, 1 env-gated GitHub Check E2E skipped when unset, 1 slow deselected). Prior audit baseline was **480**. `@pytest.mark.lean` runs when Lake/Lean is installed; otherwise skips. `@pytest.mark.docker` retries `docker info` briefly before skipping when the daemon is down. Docker Lean E2E (`lpe-lean:4.14`) does not require host Lake for extract; prefers one combined sandbox invocation (`sandbox_invocations: 1`). See `docs/23_TEST_EXECUTION_LOG.md`.
 - **R0/R1 ACCEPT E2E (Docker):** with `lpe-lean:4.14`, sandboxed build+extract yields toolchain-complete packets; R0 docs-only can gate-`ACCEPT`; R1 policy-`ESCALATE` then authorized human ACCEPT; ledger + TPPR sustained path. R3/R4 ACCEPT still refused (ADR 0003).
 - **E2E Lean path (host):** real `lake build` without `--skip-build` on `tests/fixtures/lean_project/` via `--insecure-host-exec` produces toolchain-complete axiom/impact findings (schema 1.1). Default Docker image lacks Lean — isolation PASS under Docker does not imply typecheck.
 - **E2E Lean path (Docker):** with local image `LPE_DOCKER_IMAGE=lpe-lean:4.14` (`docker/lpe-lean/`, built on this host), `network_policy: deny` yields sandboxed Lake build+extract in one container, isolation PASS, and toolchain-complete findings. Image absent → test skips via `docker image inspect` (pytest never rebuilds).
@@ -31,7 +32,7 @@ ACCEPT decisions, elaborator-complete Lean evidence for arbitrary Mathlib-scale 
 - Docker sandbox defaults (rw mount for Lake); host exec requires `--insecure-host-exec`.
 - CLI doctor, contract validation, and month-one gate evaluator smoke paths.
 - M3: regex-stub fail-closed **plus** optional Lake `lpe_extract` / committed toolchain JSON; M4 heuristic providers with `toolchain_backed` when complete; M5–M7 scaffolds only.
-- CI: pinned Actions SHAs, `pip-audit` (CODEOWNERS placeholder script remains warn-mode locally; not a focus for this release cut).
+- CI: pinned Actions SHAs, `pip-audit`; CODEOWNERS placeholders replaced (`@fraware`); placeholder check **fail-closed** in CI (no `LPE_CODEOWNERS_PLACEHOLDERS_OK` escape).
 - **Longevity:** 10k ledger verify ~1.7 s; schema migration refuse/load; historical packet reload (`docs/benchmarks/week4_longevity.md`).
 - **Pilot warehouse:** durable ledger-backed instrumentation (`lpe pilot record` / `summary` / `dry-run`); software metrics only — **not §21**.
 - **Pilot dry-run:** frozen corpus via warehouse (`docs/pilot_dry_run.md`) — **not §21**.
@@ -51,7 +52,7 @@ ACCEPT decisions, elaborator-complete Lean evidence for arbitrary Mathlib-scale 
 | Worktree isolation | Create/cleanup; dirty main tree excluded; post-build JSON captured before cleanup |
 | GitHub Check adapter | Payload render; `lpe github submit-check` dry-run / optional `--post` via `gh api` |
 | Month-one gate CLI | Scaffold criteria only |
-| M3–M7 modules | Honest scaffolds / heuristics — not science-cleared |
+| M3–M7 modules | Fixture-excellence M3/M4 depth; M5 instrument; M6/M7 scaffolds only — not science-cleared |
 | Pilot warehouse | Durable ledger append + `lpe pilot summary`; instrumentation only — not §21 |
 | Partner pilot kit | Scaffold + field overhead CLI; ready to instrument — not ready to claim |
 | Contract migrate dry-run | Plans rewrite; never mutates; unsupported target refused |
@@ -65,7 +66,7 @@ ACCEPT decisions, elaborator-complete Lean evidence for arbitrary Mathlib-scale 
 - No maintained official `leanprover/lean4` Docker Hub image; use local `lpe-lean:4.14` (`scripts/build_lean_docker_image.*`) or pin/verify community tags via `LPE_DOCKER_IMAGE`.
 - No M6 learned routing or M7 model training (§21 gate-blocked).
 - Ledger is **filesystem SQLite**, not a WORM / tamper-evident root of trust.
-- §17 performance / cost baselines recorded for Week 3 (`docs/benchmarks/week3_baseline.md`); soft CI gate is 2× budget.
+- §17 performance / cost baselines recorded for Week 3 (`docs/benchmarks/week3_baseline.md`); soft CI gate is 2× budget; orchestration vs Lean wall measured when Lake/`lpe-lean` available (`docs/benchmarks/`).
 - Longevity 10k + schema migration recorded for Week 4 (`docs/benchmarks/week4_longevity.md`); optional 100k behind `@pytest.mark.slow`.
 - Pilot dry-run / warehouse / partner kit are **instrumentation only** — ready to *instrument*, not ready to *claim*. Partner shadow pilot still requires human experts, signed protocol freeze, held-out evaluation, and §21 gates before causal claims.
 
@@ -78,7 +79,7 @@ ACCEPT decisions, elaborator-complete Lean evidence for arbitrary Mathlib-scale 
 | Packet &lt; 1 MB excl. logs | Met (~17 KB skip_build) |
 | Ledger append &lt; 100 ms | Met (p95 ~6 ms @ N=1000) |
 | Review packet &lt; 30 s | Met (~335 ms skip_build + markdown) |
-| Orchestration &lt; 10% of Lean | Not measured (needs real Lean wall); skip_build orchestration ~365 ms with isolation non-PASS |
+| Orchestration &lt; 10% of Lean | Measured when Lake available; see `docs/benchmarks/` (do not invent ratio without measurement) |
 | Docker cold-start | ~1.45 s trivial container vs ~1.06 s host trivial; prefer Docker for untrusted / `network_policy: deny` |
 
 ## Longevity (Week 4)
@@ -96,6 +97,15 @@ ACCEPT decisions, elaborator-complete Lean evidence for arbitrary Mathlib-scale 
 
 Scaffold `0.1.x` meets the **engineering** exit criteria in `docs/22_COMPREHENSIVE_TEST_PLAN.md` §9.1 (automated coverage, longevity 10k, honest validation report). This does **not** imply §9.2 research clearance.
 
+## Explicit non-claims (audit §9 mirror)
+
+- No causal utility from dry-runs or warehouse metrics alone.
+- No Mathlib-complete elaborator truth.
+- No WORM / external root of trust for the utility ledger.
+- No R3/R4 auto-ACCEPT.
+- No opaque quality scalars (ADR 0002).
+- Partner pilot / §21 remain deferred until humans and frozen protocol exist.
+
 ## Execution boundary
 
 - **Without Lean/Lake:** regex-stub extraction only; axiom/impact findings stay UNKNOWN.
@@ -104,7 +114,8 @@ Scaffold `0.1.x` meets the **engineering** exit criteria in `docs/22_COMPREHENSI
   can produce toolchain-complete packets; `@pytest.mark.lean` E2E covers
   `tests/fixtures/lean_project/` (build → extract → axiom/impact/replacement).
 - **Docker without Lean image:** sandboxed build may FAIL; isolation can still PASS;
-  never invents `complete: true`.
+  never invents `complete: true`. Default `ubuntu:22.04` ≠ Lean — set
+  `LPE_DOCKER_IMAGE=lpe-lean:4.14` for typecheck+extract.
 - **Docker with `lpe-lean:4.14`:** sandboxed Lake build can PASS with isolation PASS
   and toolchain-complete findings (build scripts under `scripts/`; see
   `docker/lpe-lean/README.md`).
@@ -118,11 +129,4 @@ Scaffold `0.1.x` meets the **engineering** exit criteria in `docs/22_COMPREHENSI
 - subprocess backend never claims network isolation PASS;
 - no external model provider is enabled;
 - elaborator IR (schema 1.1) uses `ConstantInfo.getUsedConstantsAsSet` for decl edges and
-  module→module `import_edges` — still not full impact truth under tactic erasure, opaque
-  constants, or Mathlib-scale repos; cones prefer decl-deps (not coarse import fan-out).
-
-## Release decision
-
-The package is suitable as an **engineering scaffold** that meets plan §9.1 test-complete criteria for continued development and audit remediation, now including a real Lake-backed extraction path when Lean is installed.
-
-It is **ready to instrument** a partner shadow pilot (`docs/24_PARTNER_PILOT_READY.md`). It is **not** ready for production acceptance decisions, partner shadow pilots *claiming* causal utility, or §21 science publication gates (§9.2 remains research-gated).
+  ModuleData for import edges; tactic-erased consts and opaque bodies remain residual UNKNOWN/WARN.

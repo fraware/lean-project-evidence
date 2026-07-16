@@ -2,8 +2,35 @@
 
 ## Unreleased
 
+### Changed
+
+- **Audit gap closure (honesty):** `VALIDATION_REPORT.md` baseline aligned to
+  **543** non-slow tests (was 480); `docs/22` header refreshed; `ENGINEERING_SPEC` §4.2
+  describes shipped M3–M4 interfaces with residual depth (not “fully deferred”);
+  `docs/17` month-one language clarifies pilot readiness vs extraction tooling;
+  CODEOWNERS/`MAINTAINERS` use `@fraware`; CI CODEOWNERS check is fail-closed
+  (removed `LPE_CODEOWNERS_PLACEHOLDERS_OK` escape).
+- **M3 fixture-excellence:** toolchain-first for declared `lpe_extract` /
+  schema≥1.1 artifacts; stale complete JSON refused or re-extracted; regex-stub
+  never PASS for axioms/impact; FQN ambiguity warnings; diamond/chain/opaque
+  cone expectations; AmbiguousA/B short-name fixture.
+- **M4 Lake-backed semantics (fixture depth):** statement-diff structural
+  binder/domain/conclusion fields; examples/cex via `lake env lean` when
+  present; duplicate retrieval requires toolchain hashes when complete;
+  replacement keeps decl-dep cones + Lake compile.
+- **§17 orch vs Lean wall:** measurement harness +
+  `docs/benchmarks/orch_vs_lean_wall.md` (honest ratio; no invented budget).
+- **Trust productization:** `lpe doctor --ledger` permission warnings; Docker
+  default-image Lean honesty hint; `lpe contract migrate --write`; audit
+  scorecard refresh; partner handoff `docs/27_PARTNER_PILOT_HANDOFF.md`.
+
 ### Added
 
+- **GitHub Check E2E (env-gated):** `LPE_GH_CHECK_E2E=1` + runbook
+  `docs/github_check_e2e.md` (mock remains default CI).
+- **Property tests:** hashing + ledger chain invariants under `tests/property/`.
+- **Lean example/cex fixtures** under
+  `tests/fixtures/lean_project/.lean-project-contract/tests/`.
 - **Secret-redaction corpus expansion:** Slack (`xox*` / `xapp-`), GitLab `glpat-`,
   npm, Stripe, OpenAI/Anthropic `sk-`, Hugging Face `hf_`, JWT triples, and
   multiline PEM/OpenSSH private-key blocks; adversarial Lean/Lake log

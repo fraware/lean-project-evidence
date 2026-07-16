@@ -59,14 +59,26 @@ Compute, latency, and monetary cost are reported as guardrails.
 - CLI and machine-readable JSON output;
 - CI integration.
 
-### 4.2 Deferred behind stable interfaces
+### 4.2 Shipped interfaces with residual depth
 
-- Lean declaration and dependency extraction;
-- exact impact-cone construction;
-- statement implication and equivalence checks;
-- counterexample generation;
-- repository semantic retrieval;
-- successor-theorem replacement testing;
+**Shipped in the engineering scaffold (fixture-excellence depth):**
+
+- Lean declaration and dependency extraction via Lake `lpe_extract` / committed
+  toolchain JSON (schema ≥1.1), with regex-stub fallback that never PASS-claims
+  axiom closure or impact cones;
+- impact-cone construction from toolchain declaration edges on declared Lean
+  projects (hand-audited on `tests/fixtures/lean_project/`);
+- structural statement-diff, example/cex harness protocol, lexical duplicate
+  retrieval, and decl-dep successor replacement when toolchain-complete;
+- fail-closed UNKNOWN when providers cannot execute or extraction is incomplete.
+
+**Still deferred / research-grade (not claimed):**
+
+- Mathlib-scale elaborator completeness and tactic-erased constant recovery;
+- statement implication and equivalence oracles;
+- automatic counterexample *generation* (execution of declared cex remains
+  fixture-scoped);
+- repository-scale semantic / embedding retrieval;
 - model-assisted interpretation;
 - GitHub App and hosted API;
 - learned review routing;

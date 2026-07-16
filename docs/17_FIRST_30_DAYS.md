@@ -48,9 +48,16 @@ Exit condition: one candidate completes the lifecycle from obligation registrati
 
 ## Month-one decision
 
-Continue to Lean extraction only when:
+Lean extraction tooling for **declared** fixture / helper projects already
+exists in the scaffold (`lake exe lpe_extract`, committed `.lpe` JSON,
+optional `lpe-lean:4.14` Docker). The month-one gate is about **pilot
+readiness**, not whether extraction may begin in engineering:
+
+Continue to a partner / field pilot only when:
 
 - contract overhead is acceptable;
 - deterministic evidence is useful to reviewers;
 - execution security has an approved design;
-- the ledger and TPPR semantics are stable.
+- the ledger and TPPR semantics are stable;
+- human protocol and §21 scientific clearance path are agreed (see
+  `docs/24_PARTNER_PILOT_READY.md`).

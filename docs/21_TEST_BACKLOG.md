@@ -23,7 +23,7 @@ Short backlog of tests **not** covered by the current suite (**480 tests** as of
 - [x] Fuzz / property tests for `assert_safe_repo_relative` (Unicode, NTFS alternate streams, symlink escapes) — `test_path_adversarial_fuzz.py`.
 - [x] Secret-redaction corpus expansion (JWT, PEM/OpenSSH, Slack, GitLab, npm, Stripe, OpenAI/Anthropic, HF) + Lean-log non-over-redact — `test_redaction_corpus.py`.
 - [x] Supply-chain: Dependabot for pinned Actions SHAs + drift note (`docs/09`, `SECURITY.md`); periodic `pip-audit` in CI. Ongoing: review Dependabot Action PRs.
-- [ ] CODEOWNERS fail-closed CI (remove `LPE_CODEOWNERS_PLACEHOLDERS_OK`) after real owners land.
+- [x] CODEOWNERS fail-closed CI (placeholders removed; `@fraware`; no `LPE_CODEOWNERS_PLACEHOLDERS_OK` in CI).
 - [x] Ledger threat model tabletop: compromised host FS vs export verify — `docs/25_LEDGER_THREAT_MODEL.md`.
 
 ## Performance / longevity
