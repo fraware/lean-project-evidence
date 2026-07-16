@@ -105,3 +105,5 @@ Metrics such as generated declarations, compilation rate, proofs completed, revi
 This repository is an engineering scaffold and specification for the first implementation. The deterministic contract, evidence, ledger, and TPPR core are executable. Lean semantic extraction, dependency impact analysis, downstream replacement testing, and model-assisted checks are defined behind interfaces and belong to the staged backlog.
 
 **Partner shadow-pilot instrumentation:** engineering-ready via `docs/24_PARTNER_PILOT_READY.md` and `lpe pilot init-partner` — ready to *instrument*, not ready to *claim* §21 / causal utility. See also `docs/pilot_analysis_plan_template.md` (UNFROZEN until partner signs).
+
+**Explicit non-claims:** see [`docs/28_NON_CLAIMS.md`](docs/28_NON_CLAIMS.md) (canonical). M6/M7 training is blocked until §21 (`lpe research status`).

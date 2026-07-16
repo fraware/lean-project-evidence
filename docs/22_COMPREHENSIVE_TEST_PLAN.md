@@ -1,7 +1,7 @@
 # Comprehensive test plan — Lean Project Evidence
 
 **Status:** Week 4 executed (2026-07-16); audit gap closure in progress. Engineering test-complete criteria (§9.1) met for scaffold `0.1.x`; §9.2 research gates remain open. See `docs/23_TEST_EXECUTION_LOG.md`.  
-**Baseline:** `pytest -q -m "not slow"` — **543 tests passed**, **1 skipped** (env-gated GH Check E2E), **1 deselected** (`@pytest.mark.slow`). Prior: audit **480**; **455**; Week 3 **342**.  
+**Baseline:** `pytest -q -m "not slow"` — **575 tests passed**, **1 skipped** (env-gated GH Check E2E), **1 deselected** (`@pytest.mark.slow`). Prior: **543**; audit **480**; **455**; Week 3 **342**.  
 **Inputs:** `docs/21_TEST_BACKLOG.md`, `VALIDATION_REPORT.md`, `docs/ENGINEERING_SPEC.md` §15/§17/§20/§21, `docs/10_TESTING_AND_VALIDATION.md`, Phases 1–5 security remediation (AUDIT-001..032), `docs/26_SPEC_ROADMAP_AUDIT.md`.
 
 ---
@@ -222,7 +222,7 @@ lpe review record \
 | --- | --- | --- | --- |
 | Payload uses candidate `head_commit` as `head_sha` | Never `mock-sha` | `test_github_check.py` | P0 |
 | ESCALATE → `failure` by default | Configurable `escalate_as` | `test_github_check.py` | P0 |
-| Live API submission to throwaway repo | Check created; required-check fail-closed | **Gap** — `tests/integration/test_github_check_live.py` (secrets) | P2 |
+| Live API submission to throwaway repo | Check created; required-check fail-closed | Env-gated `tests/integration/test_github_check_e2e.py` + mocked `--post`; runbook `docs/github_check_e2e.md` | P2 |
 
 ---
 

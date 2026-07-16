@@ -15,8 +15,8 @@
 | Roadmap M3–M4 | Lean extract + semantic providers | **DONE (fixture-scoped)**; Mathlib out of scope | **Met** (fixture-excellence) |
 | Roadmap M5 | Shadow pilot 30–50 candidates | Partner kit + warehouse; **no live partner pilot** | **Partial** |
 | Roadmap M6–M7 | Learned routing / synthesis | Deterministic + fixture harness scaffolds only | **Gap** (blocked) |
-| Test / quality | Green suite; honest VALIDATION | **543 passed**, 1 env-gated skip, 1 slow deselected; month-one gate green | **Met** |
-| Security (docs/09) | Sandbox, allowlist, redaction, no R3/R4 auto-ACCEPT | Controls present; CODEOWNERS `@fraware`; ledger FS not WORM | **Partial** (WORM residual) |
+| Test / quality | Green suite; honest VALIDATION | **575 passed**, 1 env-gated skip, 1 slow deselected; month-one gate green | **Met** |
+| Security (docs/09) | Sandbox, allowlist, redaction, no R3/R4 auto-ACCEPT | Controls present; CODEOWNERS `@fraware`; sealed-ledger snapshot (not WORM) | **Partial** (no hardware WORM) |
 
 ## 2. Milestone matrix M0–M7
 
@@ -184,6 +184,7 @@ Version 0.1 is complete when:
 ### P0 (must not claim)
 
 1. **Do not claim** §21 clearance, causal pilot utility, R3/R4 production auto-ACCEPT, WORM ledger, or elaborator-complete Mathlib evidence.
+   Canonical list: [`docs/28_NON_CLAIMS.md`](28_NON_CLAIMS.md). CLI enforcement: `lpe pilot summary`/`dry-run` NON_CLAIMS block; `lpe routing` / `lpe research train` exit non-zero; ADR 0003 via `lpe doctor`.
 
 ### P1 (partner pilot deferred — see `docs/27_PARTNER_PILOT_HANDOFF.md`)
 

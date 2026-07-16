@@ -26,8 +26,10 @@ R3/R4 auto-ACCEPT) mid-pilot.
 | --- | --- |
 | Partner pilot execution (ISSUE-035–038) | Human experts + signed protocol |
 | §21 scientific clearance | Frozen analysis plan + field data |
-| M6 / M7 training | Blocked on §21 |
+| M6 / M7 training | Blocked on §21 (`lpe research status`; no training entrypoints) |
 | Mathlib-scale CI | Explicitly out of fixture-excellence |
+
+Canonical non-claims: [`docs/28_NON_CLAIMS.md`](28_NON_CLAIMS.md).
 
 ## First steps when reopening
 

@@ -4,6 +4,21 @@
 
 ### Changed
 
+- **Validation baseline:** `pytest -q -m "not slow"` — **575 passed**, 1 env-gated skip, 1 slow deselected (was 543).
+- **Anti-oversell + M6/M7 blocking:** canonical `docs/28_NON_CLAIMS.md`; mandatory
+  `NON_CLAIMS` on `lpe pilot summary` / `dry-run`; refuse oversell CLI flags;
+  `lpe research status` gate matrix; `lpe routing` / `research train` exit
+  non-zero until §21; `lpe lean status` + doctor extractor mode / ADR 0003
+  active check; regex-stub packet markdown banner; M6/M7 `.train()` raises
+  `ResearchGateBlocked` (training entrypoints do not exist).
+- **Live GitHub Check path (operator-ready):** `submit_check_run` / CLI clear
+  errors for missing `gh`, auth failures, and sentinel `head_sha` (`mock-sha`,
+  `unavailable-sha`); dry-run emits exact `argv` + `command_preview` + payload;
+  ESCALATE remains fail-closed (`conclusion=failure`). Optional CI job
+  `github-check-e2e-optional` gated by `vars.LPE_GH_CHECK_E2E=1` (skips cleanly
+  if repo/SHA unset); default `python` job never requires secrets. Expanded
+  runbook `docs/github_check_e2e.md` (throwaway repo, branch protection, ADR
+  0003). Mocked `--post` integration test; live POST still env-gated.
 - **Audit gap closure (honesty):** `VALIDATION_REPORT.md` baseline aligned to
   **543** non-slow tests (was 480); `docs/22` header refreshed; `ENGINEERING_SPEC` §4.2
   describes shipped M3–M4 interfaces with residual depth (not “fully deferred”);
@@ -26,6 +41,12 @@
 
 ### Added
 
+- **Ledger external seal:** `lpe ledger seal` / `lpe ledger verify-seal` write and
+  check a snapshot manifest (default `<ledger_dir>/.lpe/ledger.seal.json`) with
+  tip hashes, event count, export content hash, timestamp, and tool version.
+  Optional HMAC via `LPE_LEDGER_SEAL_KEY`; without it, content-hash-only custody
+  with explicit “not cryptographic custody / not WORM” wording. Doctor warns
+  when a configured ledger has no seal. Docs: `docs/09`, `docs/25`, `docs/06`.
 - **GitHub Check E2E (env-gated):** `LPE_GH_CHECK_E2E=1` + runbook
   `docs/github_check_e2e.md` (mock remains default CI).
 - **Property tests:** hashing + ledger chain invariants under `tests/property/`.

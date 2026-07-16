@@ -13,7 +13,7 @@ Mirror audit non-claims in `docs/26_SPEC_ROADMAP_AUDIT.md` §9.
 
 ## Completed checks (current)
 
-- **543 unit + integration + security + performance + longevity + pilot warehouse/dry-run + partner scaffold + durability/adapter + property tests** collected under default `pytest -q` (`-m "not slow"`; **543 passed**, 1 env-gated GitHub Check E2E skipped when unset, 1 slow deselected). Prior audit baseline was **480**. `@pytest.mark.lean` runs when Lake/Lean is installed; otherwise skips. `@pytest.mark.docker` retries `docker info` briefly before skipping when the daemon is down. Docker Lean E2E (`lpe-lean:4.14`) does not require host Lake for extract; prefers one combined sandbox invocation (`sandbox_invocations: 1`). See `docs/23_TEST_EXECUTION_LOG.md`.
+- **575 unit + integration + security + performance + longevity + pilot warehouse/dry-run + partner scaffold + durability/adapter + property tests** collected under default `pytest -q` (`-m "not slow"`; **575 passed**, 1 env-gated GitHub Check E2E skipped when unset, 1 slow deselected). Prior audit baseline was **480**. `@pytest.mark.lean` runs when Lake/Lean is installed; otherwise skips. `@pytest.mark.docker` retries `docker info` briefly before skipping when the daemon is down. Docker Lean E2E (`lpe-lean:4.14`) does not require host Lake for extract; prefers one combined sandbox invocation (`sandbox_invocations: 1`). See `docs/23_TEST_EXECUTION_LOG.md`.
 - **R0/R1 ACCEPT E2E (Docker):** with `lpe-lean:4.14`, sandboxed build+extract yields toolchain-complete packets; R0 docs-only can gate-`ACCEPT`; R1 policy-`ESCALATE` then authorized human ACCEPT; ledger + TPPR sustained path. R3/R4 ACCEPT still refused (ADR 0003).
 - **E2E Lean path (host):** real `lake build` without `--skip-build` on `tests/fixtures/lean_project/` via `--insecure-host-exec` produces toolchain-complete axiom/impact findings (schema 1.1). Default Docker image lacks Lean — isolation PASS under Docker does not imply typecheck.
 - **E2E Lean path (Docker):** with local image `LPE_DOCKER_IMAGE=lpe-lean:4.14` (`docker/lpe-lean/`, built on this host), `network_policy: deny` yields sandboxed Lake build+extract in one container, isolation PASS, and toolchain-complete findings. Image absent → test skips via `docker image inspect` (pytest never rebuilds).
@@ -50,7 +50,7 @@ Mirror audit non-claims in `docs/26_SPEC_ROADMAP_AUDIT.md` §9.
 | Review record + ledger | Authority-checked; hash-chained; ACCEPT may carry obligation_ids for TPPR |
 | Git enrichment (real commits) | Week 2 integration: overrides self-declared risk; invalid revs fail closed; short names mapped to FQNs for cones when extraction available |
 | Worktree isolation | Create/cleanup; dirty main tree excluded; post-build JSON captured before cleanup |
-| GitHub Check adapter | Payload render; `lpe github submit-check` dry-run / optional `--post` via `gh api` |
+| GitHub Check adapter | Payload render; `lpe github submit-check` dry-run / optional `--post` via `gh api`; clear errors; optional CI job; runbook `docs/github_check_e2e.md` |
 | Month-one gate CLI | Scaffold criteria only |
 | M3–M7 modules | Fixture-excellence M3/M4 depth; M5 instrument; M6/M7 scaffolds only — not science-cleared |
 | Pilot warehouse | Durable ledger append + `lpe pilot summary`; instrumentation only — not §21 |
@@ -99,12 +99,15 @@ Scaffold `0.1.x` meets the **engineering** exit criteria in `docs/22_COMPREHENSI
 
 ## Explicit non-claims (audit §9 mirror)
 
+Canonical list: [`docs/28_NON_CLAIMS.md`](docs/28_NON_CLAIMS.md).
+
 - No causal utility from dry-runs or warehouse metrics alone.
 - No Mathlib-complete elaborator truth.
 - No WORM / external root of trust for the utility ledger.
 - No R3/R4 auto-ACCEPT.
 - No opaque quality scalars (ADR 0002).
 - Partner pilot / §21 remain deferred until humans and frozen protocol exist.
+- M6/M7 training entrypoints do not exist (`lpe research status` / `lpe routing` exit non-zero).
 
 ## Execution boundary
 
