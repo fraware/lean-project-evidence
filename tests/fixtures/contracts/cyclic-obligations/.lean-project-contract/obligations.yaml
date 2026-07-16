@@ -1,0 +1,32 @@
+schema_version: 0.1.0
+obligations:
+  - obligation_id: O-01
+    description: Define the comparison functor
+    artifact_type: definition
+    weight: 3
+    milestone: comparison-equivalence
+    status: active
+    owner: domain-lead
+    downstream:
+      - O-02
+    acceptance_conditions: []
+  - obligation_id: O-02
+    description: Establish naturality of the comparison
+    artifact_type: theorem
+    weight: 3
+    milestone: comparison-equivalence
+    status: planned
+    owner: domain-lead
+    downstream:
+      - O-03
+    acceptance_conditions: []
+  - obligation_id: O-03
+    description: Prove the comparison is fully faithful
+    artifact_type: theorem
+    weight: 2
+    milestone: comparison-equivalence
+    status: planned
+    owner: domain-lead
+    downstream:
+      - O-01
+    acceptance_conditions: []

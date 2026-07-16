@@ -1,0 +1,18 @@
+schema_version: 0.1.0
+concepts:
+  comparison_functor:
+    lean_names:
+      - Example.comparisonFunctor
+    prohibited_substitutions: []
+    notes: The public construction connecting the two project categories.
+  natural_isomorphism:
+    lean_names:
+      - CategoryTheory.NatIso
+      - CategoryTheory.NatTrans.IsIso
+    prohibited_substitutions:
+      - CategoryTheory.NatTrans
+  fully_faithful_comparison:
+    lean_names:
+      - Example.fullyFaithfulComparison
+    prohibited_substitutions: []
+    notes: The milestone-closing fully-faithful statement for the comparison construction.

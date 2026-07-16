@@ -1,0 +1,29 @@
+schema_version: 9.9.9
+project_id: example-category-project
+title: Example category-theory formalization
+repository:
+  remote: https://github.com/example/example-category-project
+  default_branch: main
+  public_api_paths:
+    - Example/Public
+  protected_paths:
+    - lake-manifest.json
+execution:
+  build_command:
+    - lake
+    - build
+  timeout_seconds: 1800
+  max_output_bytes: 2000000
+  network_policy: deny
+  environment_allowlist:
+    - PATH
+    - HOME
+    - USER
+    - TMPDIR
+allowed_axioms:
+  - propext
+  - Classical.choice
+  - Quot.sound
+prohibited_tokens:
+  - sorry
+  - admit

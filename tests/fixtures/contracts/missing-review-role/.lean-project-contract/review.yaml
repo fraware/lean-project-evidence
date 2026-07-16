@@ -1,0 +1,20 @@
+schema_version: 0.1.0
+authorities:
+  - reviewer_id: domain-lead
+    roles:
+      - domain-lead
+    scopes:
+      - semantic
+      - definitions
+  - reviewer_id: repository-maintainer
+    roles:
+      - repository-maintainer
+    scopes:
+      - public-api
+      - architecture
+default_review_minutes:
+  R0: 5
+  R1: 10
+  R2: 20
+  R3: 30
+  R4: 45

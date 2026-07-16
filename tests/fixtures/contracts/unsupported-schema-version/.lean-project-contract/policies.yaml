@@ -1,0 +1,31 @@
+schema_version: 0.1.0
+risk_rules:
+  R0:
+    require_human_acceptance: false
+    required_roles: []
+    auto_accept_eligible: true
+  R1:
+    require_human_acceptance: true
+    required_roles:
+      - lean-engineer
+    auto_accept_eligible: false
+  R2:
+    require_human_acceptance: true
+    required_roles:
+      - repository-maintainer
+    auto_accept_eligible: false
+  R3:
+    require_human_acceptance: true
+    required_roles:
+      - domain-lead
+      - repository-maintainer
+    auto_accept_eligible: false
+  R4:
+    require_human_acceptance: true
+    required_roles:
+      - domain-lead
+      - architecture-maintainer
+    auto_accept_eligible: false
+changed_path_denylist:
+  - .github/workflows/release
+external_provider_policy: local_only

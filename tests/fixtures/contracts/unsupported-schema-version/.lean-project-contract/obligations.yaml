@@ -1,0 +1,46 @@
+schema_version: 0.1.0
+obligations:
+  - obligation_id: O-01
+    description: Define the comparison functor
+    artifact_type: definition
+    weight: 3
+    milestone: comparison-equivalence
+    status: active
+    owner: domain-lead
+    downstream:
+      - O-02
+    acceptance_conditions:
+      - condition_id: AC-01
+        description: Uses the weakest intended categorical assumptions
+        required: true
+      - condition_id: AC-02
+        description: Enables the naturality theorem
+        required: true
+  - obligation_id: O-02
+    description: Establish naturality of the comparison
+    artifact_type: theorem
+    weight: 3
+    milestone: comparison-equivalence
+    status: planned
+    owner: domain-lead
+    downstream:
+      - O-03
+    acceptance_conditions:
+      - condition_id: AC-03
+        description: Compiles against the accepted comparison functor
+        required: true
+  - obligation_id: O-03
+    description: Prove the comparison is fully faithful
+    artifact_type: theorem
+    weight: 2
+    milestone: comparison-equivalence
+    status: planned
+    owner: domain-lead
+    downstream: []
+    acceptance_conditions:
+      - condition_id: AC-04
+        description: Uses only assumptions accepted in O-01 and O-02
+        required: true
+      - condition_id: AC-05
+        description: Enables downstream naturality applications in public API modules
+        required: true

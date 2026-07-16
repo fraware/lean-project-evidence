@@ -1,0 +1,12 @@
+schema_version: 0.1.0
+obligations:
+  - obligation_id: O-01
+    description: Define the comparison functor
+    artifact_type: definition
+    weight: 3
+    milestone: comparison-equivalence
+    status: active
+    owner: domain-lead
+    downstream:
+      - O-99
+    acceptance_conditions: []
