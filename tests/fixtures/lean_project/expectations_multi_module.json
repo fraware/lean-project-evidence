@@ -1,0 +1,39 @@
+{
+  "description": "Hand-audited multi-module impact cones (LibA→LibB→LibC→Cross + Consumer fan-in). No Mathlib.",
+  "schema_note": "Edges are dependee→depender; cones are downstream dependents of the changed declaration.",
+  "cones": {
+    "LpeFixture.LibA.seed": {
+      "must_include": [
+        "LpeFixture.LibB.fromSeed",
+        "LpeFixture.LibB.fromSeedPlus",
+        "LpeFixture.LibC.deep",
+        "LpeFixture.Cross.bridge",
+        "LpeFixture.Cross.bridgeTwice"
+      ],
+      "must_exclude": [
+        "LpeFixture.Consumer.usesCore",
+        "LpeFixture.Consumer.usesUsesCore",
+        "LpeFixture.Core.helper",
+        "LpeFixture.Diamond.apex"
+      ]
+    },
+    "LpeFixture.Consumer.usesCore": {
+      "must_include": [
+        "LpeFixture.Consumer.usesUsesCore",
+        "LpeFixture.Cross.bridge",
+        "LpeFixture.Cross.bridgeTwice"
+      ],
+      "must_exclude": [
+        "LpeFixture.LibA.seed",
+        "LpeFixture.LibC.deep",
+        "LpeFixture.Diamond.apex"
+      ]
+    }
+  },
+  "import_edges_must_include": [
+    ["LpeFixture.LibA", "LpeFixture.LibB"],
+    ["LpeFixture.LibB", "LpeFixture.LibC"],
+    ["LpeFixture.LibC", "LpeFixture.Cross"],
+    ["LpeFixture.Consumer", "LpeFixture.Cross"]
+  ]
+}

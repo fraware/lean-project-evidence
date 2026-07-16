@@ -1,0 +1,21 @@
+{
+  "description": "Hand-audited impact cone expectations (AUDIT-012). Edges are dependee -> depender.",
+  "changed": ["Impact.Core.coreVal"],
+  "must_include": [
+    "Impact.Core.helper",
+    "Impact.Consumer.usesCore",
+    "Impact.Consumer.aboutCore",
+    "Impact.GrandConsumer.usesUsesCore"
+  ],
+  "must_exclude": [
+    "Impact.Unrelated.other"
+  ],
+  "axioms_clean_fixture": {
+    "path": "../axioms/Clean.lean",
+    "must_not_contain_axioms": ["prohibitedChoice"]
+  },
+  "axioms_prohibited_fixture": {
+    "path": "../axioms",
+    "must_detect": ["prohibitedChoice"]
+  }
+}

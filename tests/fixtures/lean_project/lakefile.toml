@@ -1,0 +1,11 @@
+name = "LpeFixture"
+version = "0.1.0"
+defaultTargets = ["LpeFixture"]
+
+[[lean_lib]]
+name = "LpeFixture"
+
+[[lean_exe]]
+name = "lpe_extract"
+root = "LpeExtract"
+supportInterpreter = true

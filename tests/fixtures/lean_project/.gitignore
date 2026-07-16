@@ -1,0 +1,8 @@
+# Lake / Lean build outputs (regenerated locally when Lean is installed)
+.lake/
+lake-manifest.json
+# Produced by `lake exe lpe_extract` — tests regenerate when Lean is available
+.lpe/lean-extraction.json
+*.olean
+*.ilean
+*.c
