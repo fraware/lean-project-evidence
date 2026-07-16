@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,27 @@ BUMP_PATH = (
     "SUPPORTED_SCHEMA_VERSIONS together, export schemas, migrate examples, "
     "then re-run pytest / lpe contract schema-check."
 )
+
+# Versioned rewrite handlers: (from_version, to_version) -> mutates raw dict in place.
+# Register field transformers here when adding the next supported minor.
+MigrationRewriter = Callable[[dict[str, Any], str, str], None]
+MIGRATION_REWRITERS: dict[tuple[str, str], MigrationRewriter] = {}
+
+
+def _rewrite_schema_version_field(
+    raw: dict[str, Any], _from_version: str, to_version: str
+) -> None:
+    """Default productized rewrite: set schema_version only (identity fields)."""
+    raw["schema_version"] = to_version
+
+
+def register_migration_rewriter(
+    from_version: str,
+    to_version: str,
+    rewriter: MigrationRewriter,
+) -> None:
+    """Register a field-level rewriter for a supported version pair."""
+    MIGRATION_REWRITERS[(from_version, to_version)] = rewriter
 
 
 def check_contract_schema_versions(project_path: Path) -> dict[str, Any]:
@@ -144,5 +166,62 @@ def dry_run_contract_migration(
         "message": (
             f"dry-run only: would set schema_version={target} on "
             f"{len(files_to_rewrite)} file(s); no files written"
+        ),
+    }
+
+
+def apply_contract_migration(
+    project_path: Path,
+    *,
+    target_version: str | None = None,
+    write: bool = False,
+) -> dict[str, Any]:
+    """Apply a versioned schema rewrite when ``write=True``.
+
+    Refuse-unknown: unsupported targets never write. When writing, uses a
+    registered ``MIGRATION_REWRITERS`` pair if present; otherwise the default
+    schema_version field rewrite for any supported→supported bump.
+    """
+    plan = dry_run_contract_migration(project_path, target_version=target_version)
+    if not write:
+        return {**plan, "written": False, "written_files": []}
+    if not plan.get("ok") or plan.get("action") == "would_refuse":
+        return {**plan, "written": False, "written_files": []}
+    if plan.get("action") == "no_op":
+        return {
+            **plan,
+            "written": False,
+            "written_files": [],
+            "message": plan["message"],
+        }
+
+    directory = Path(plan["directory"])
+    target = str(plan["target_version"])
+    written: list[str] = []
+    for filename in plan["files_to_rewrite"]:
+        path = directory / filename
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise ValueError(f"invalid contract YAML object in {path}")
+        from_version = str(raw.get("schema_version") or "")
+        rewriter = MIGRATION_REWRITERS.get((from_version, target))
+        if rewriter is None:
+            rewriter = _rewrite_schema_version_field
+        rewriter(raw, from_version, target)
+        path.write_text(
+            yaml.safe_dump(raw, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+        written.append(filename)
+
+    return {
+        **plan,
+        "action": "rewrote",
+        "mutated": True,
+        "written": True,
+        "written_files": written,
+        "message": (
+            f"wrote schema_version={target} on {len(written)} file(s); "
+            "re-run lpe contract validate / schema-check"
         ),
     }

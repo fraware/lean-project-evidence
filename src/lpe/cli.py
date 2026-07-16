@@ -12,6 +12,7 @@ import typer
 from lpe import __version__
 from lpe.contract.loader import load_contract, validate_candidate_obligations
 from lpe.contract.migration import (
+    apply_contract_migration,
     check_contract_schema_versions,
     dry_run_contract_migration,
 )
@@ -83,20 +84,89 @@ def _read_json(path: Path) -> dict:
 
 
 @app.command()
-def doctor() -> None:
+def doctor(
+    ledger: Annotated[
+        Path | None,
+        typer.Option(
+            "--ledger",
+            exists=True,
+            dir_okay=False,
+            help="Optional ledger SQLite path for permission warnings.",
+        ),
+    ] = None,
+) -> None:
     """Report local capabilities without changing the system."""
-    status = {
+    image = os.environ.get("LPE_DOCKER_IMAGE", DEFAULT_DOCKER_IMAGE)
+    lean_image_hint = None
+    if image == DEFAULT_DOCKER_IMAGE or "ubuntu:" in image:
+        lean_image_hint = (
+            "Default/ubuntu images are not Lean-capable. Set "
+            "LPE_DOCKER_IMAGE=lpe-lean:4.14 for typecheck+extract "
+            "(see docker/lpe-lean/)."
+        )
+    status: dict = {
         "lpe_version": __version__,
         "git": shutil.which("git"),
         "lake": shutil.which("lake"),
         "lean": shutil.which("lean"),
         "docker": shutil.which("docker"),
         "docker_sandbox_available": DockerSandboxExecutor.is_available(),
-        "docker_image": os.environ.get("LPE_DOCKER_IMAGE", DEFAULT_DOCKER_IMAGE),
+        "docker_image": image,
+        "docker_image_lean_capable_hint": lean_image_hint,
         "sqlite_version": sqlite3.sqlite_version,
     }
+    if ledger is not None:
+        status["ledger"] = _ledger_permission_report(ledger)
     typer.echo(json.dumps(status, indent=2))
 
+
+def _ledger_permission_report(path: Path) -> dict:
+    """Warn when ledger path looks world-writable (POSIX); honest on Windows."""
+    import stat
+
+    report: dict = {
+        "path": str(path.resolve()),
+        "exists": path.is_file(),
+        "warnings": [],
+        "ok": True,
+    }
+    if not path.is_file():
+        report["ok"] = False
+        report["warnings"].append("ledger path is not a file")
+        return report
+
+    if os.name == "nt":
+        report["platform"] = "windows"
+        report["warnings"].append(
+            "POSIX world-writable mode bits are not authoritative on Windows; "
+            "ensure the ledger directory ACLs restrict write to operators "
+            "(docs/25_LEDGER_THREAT_MODEL.md)"
+        )
+        report["supported_retention"] = (
+            "lpe ledger archive --output ARCHIVE.jsonl then verify; "
+            "optional fresh lpe ledger init for a new working set"
+        )
+        return report
+
+    mode = path.stat().st_mode
+    parent_mode = path.parent.stat().st_mode
+    report["mode"] = oct(stat.S_IMODE(mode))
+    report["parent_mode"] = oct(stat.S_IMODE(parent_mode))
+    if mode & stat.S_IWOTH:
+        report["ok"] = False
+        report["warnings"].append(
+            "ledger file is world-writable (other write bit set)"
+        )
+    if parent_mode & stat.S_IWOTH:
+        report["ok"] = False
+        report["warnings"].append(
+            "ledger parent directory is world-writable"
+        )
+    report["supported_retention"] = (
+        "lpe ledger archive --output ARCHIVE.jsonl then verify; "
+        "optional fresh lpe ledger init for a new working set"
+    )
+    return report
 
 @contract_app.command("validate")
 def contract_validate(
@@ -365,6 +435,37 @@ def contract_migrate_dry_run(
     """Plan a contract schema_version rewrite without mutating files."""
     try:
         report = dry_run_contract_migration(project, target_version=target)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(json.dumps(report, indent=2))
+    if not report.get("ok"):
+        raise typer.Exit(code=1)
+
+
+@contract_app.command("migrate")
+def contract_migrate(
+    project: Annotated[Path, typer.Argument(exists=True, file_okay=False)],
+    target: Annotated[
+        str | None,
+        typer.Option(
+            "--to",
+            help="Target schema_version (default: current SCHEMA_VERSION).",
+        ),
+    ] = None,
+    write: Annotated[
+        bool,
+        typer.Option(
+            "--write/--dry-run",
+            help="Apply rewrite (default: dry-run only).",
+        ),
+    ] = False,
+) -> None:
+    """Versioned contract schema rewrite (refuse-unknown; opt-in --write)."""
+    try:
+        report = apply_contract_migration(
+            project, target_version=target, write=write
+        )
     except ValueError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
