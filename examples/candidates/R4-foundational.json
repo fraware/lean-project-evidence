@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1.0",
+  "candidate_id": "candidate-r4-foundational",
+  "project_id": "example-category-project",
+  "obligation_ids": ["O-01"],
+  "base_commit": "0000000000000000000000000000000000000000",
+  "patch_text": "+structure Example.Foundation.Core where\n+  carrier : Type\n",
+  "claimed_intent": "Introduce foundational structure.",
+  "changed_paths": ["Example/Foundation/Core.lean"],
+  "changed_declarations": [
+    {
+      "name": "Example.Foundation.Core",
+      "kind": "structure",
+      "path": "Example/Foundation/Core.lean",
+      "signature_changed": true,
+      "public": true,
+      "foundational": true
+    }
+  ],
+  "generator": {"generator_type": "human", "name": "test"}
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1.0",
+  "candidate_id": "candidate-r1-private",
+  "project_id": "example-category-project",
+  "obligation_ids": ["O-01"],
+  "base_commit": "0000000000000000000000000000000000000000",
+  "patch_text": "+theorem Example.Internal.privateLemma : True := by trivial\n",
+  "claimed_intent": "Add private lemma.",
+  "changed_paths": ["Example/Internal/Helper.lean"],
+  "changed_declarations": [
+    {
+      "name": "Example.Internal.privateLemma",
+      "kind": "theorem",
+      "path": "Example/Internal/Helper.lean",
+      "signature_changed": false,
+      "public": false,
+      "foundational": false
+    }
+  ],
+  "generator": {"generator_type": "human", "name": "test"}
+}

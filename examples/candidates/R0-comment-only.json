@@ -1,0 +1,12 @@
+{
+  "schema_version": "0.1.0",
+  "candidate_id": "candidate-r0-comment",
+  "project_id": "example-category-project",
+  "obligation_ids": ["O-01"],
+  "base_commit": "0000000000000000000000000000000000000000",
+  "patch_text": "+<!-- documentation only -->\n",
+  "claimed_intent": "Add documentation comment only.",
+  "changed_paths": ["docs/notes.md"],
+  "changed_declarations": [],
+  "generator": {"generator_type": "human", "name": "test"}
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1.0",
+  "candidate_id": "candidate-r2-public",
+  "project_id": "example-category-project",
+  "obligation_ids": ["O-01"],
+  "base_commit": "0000000000000000000000000000000000000000",
+  "patch_text": "+theorem Example.Public.visible : True := by trivial\n",
+  "claimed_intent": "Expose a public theorem without signature change.",
+  "changed_paths": ["Example/Public/Visible.lean"],
+  "changed_declarations": [
+    {
+      "name": "Example.Public.visible",
+      "kind": "theorem",
+      "path": "Example/Public/Visible.lean",
+      "signature_changed": false,
+      "public": true,
+      "foundational": false
+    }
+  ],
+  "generator": {"generator_type": "human", "name": "test"}
+}

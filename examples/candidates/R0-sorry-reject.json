@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.1.0",
+  "candidate_id": "candidate-r0-sorry-reject",
+  "project_id": "example-category-project",
+  "obligation_ids": ["O-01"],
+  "base_commit": "0000000000000000000000000000000000000000",
+  "patch_text": "+theorem Example.broken : True := by sorry\n",
+  "claimed_intent": "Introduce a theorem with a prohibited placeholder.",
+  "changed_paths": ["Example/Broken.lean"],
+  "changed_declarations": [
+    {
+      "name": "Example.broken",
+      "kind": "theorem",
+      "path": "Example/Broken.lean",
+      "signature_changed": false,
+      "public": false,
+      "foundational": false
+    }
+  ],
+  "generator": {"generator_type": "human", "name": "test"}
+}

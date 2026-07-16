@@ -1,0 +1,33 @@
+{
+  "schema_version": "0.1.0",
+  "candidate_id": "candidate-example-001",
+  "project_id": "example-category-project",
+  "obligation_ids": [
+    "O-01"
+  ],
+  "base_commit": "0000000000000000000000000000000000000000",
+  "patch_path": "candidate.patch",
+  "claimed_intent": "Define the comparison functor required by O-01.",
+  "changed_paths": [
+    "Example/Public/Comparison.lean"
+  ],
+  "changed_declarations": [
+    {
+      "name": "Example.comparisonFunctor",
+      "kind": "definition",
+      "path": "Example/Public/Comparison.lean",
+      "signature_changed": true,
+      "public": true,
+      "foundational": false
+    }
+  ],
+  "patch_text": "+def Example.comparisonFunctor [Preadditive C] : C \u2964 D := by\n+  exact generatedConstruction\n",
+  "generator": {
+    "generator_type": "ai_assistant",
+    "name": "example-generator",
+    "version": "0",
+    "model": "example-model",
+    "prompt_hash": "example-prompt-hash",
+    "run_id": "example-run"
+  }
+}
