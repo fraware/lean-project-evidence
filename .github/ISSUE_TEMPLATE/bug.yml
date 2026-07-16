@@ -1,0 +1,23 @@
+name: Bug
+description: Report incorrect or unreproducible behavior
+title: "[Bug] "
+labels: ["type:bug"]
+body:
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction and hashes
+    validations:
+      required: true

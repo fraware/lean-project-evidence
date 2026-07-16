@@ -1,0 +1,27 @@
+name: Feature
+description: Implement a specified product capability
+title: "[Feature] "
+labels: ["type:feature"]
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+    validations:
+      required: true
+  - type: textarea
+    id: tppr
+    attributes:
+      label: Path to TPPR
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and non-goals

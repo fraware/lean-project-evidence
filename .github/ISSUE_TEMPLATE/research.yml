@@ -1,0 +1,23 @@
+name: Research task
+description: Resolve an empirical or architectural uncertainty
+title: "[Research] "
+labels: ["type:research"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Decision question
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence required
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision rule
+    validations:
+      required: true
