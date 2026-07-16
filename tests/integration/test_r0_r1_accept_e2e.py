@@ -91,7 +91,9 @@ def _seed_lean_project(dest: Path) -> Path:
     shutil.copytree(
         LEAN_PROJECT,
         dest,
-        ignore=shutil.ignore_patterns(".lake", "lake-manifest.json", ".lpe"),
+        ignore=shutil.ignore_patterns(
+            ".lake", "lake-manifest.json", ".lpe", ".lean-project-contract"
+        ),
     )
     shutil.copytree(EXAMPLE_CONTRACT, dest / ".lean-project-contract")
     project_yaml = dest / ".lean-project-contract" / "project.yaml"

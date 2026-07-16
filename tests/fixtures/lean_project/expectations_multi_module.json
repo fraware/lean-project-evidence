@@ -1,5 +1,5 @@
 {
-  "description": "Hand-audited multi-module impact cones (LibA→LibB→LibC→Cross + Consumer fan-in). No Mathlib.",
+  "description": "Hand-audited multi-module impact cones (LibA→LibB→LibC→Cross + Consumer fan-in; Diamond/Chain; OpaqueLimits). No Mathlib.",
   "schema_note": "Edges are dependee→depender; cones are downstream dependents of the changed declaration.",
   "cones": {
     "LpeFixture.LibA.seed": {
@@ -28,6 +28,42 @@
         "LpeFixture.LibC.deep",
         "LpeFixture.Diamond.apex"
       ]
+    },
+    "LpeFixture.Diamond.apex": {
+      "must_include": [
+        "LpeFixture.Diamond.leftBranch",
+        "LpeFixture.Diamond.rightBranch",
+        "LpeFixture.Diamond.bottom",
+        "LpeFixture.Chain.step1",
+        "LpeFixture.Chain.step2",
+        "LpeFixture.Chain.step3"
+      ],
+      "must_exclude": [
+        "LpeFixture.LibA.seed",
+        "LpeFixture.OpaqueLimits.usesOpaque"
+      ]
+    },
+    "LpeFixture.Chain.step1": {
+      "must_include": [
+        "LpeFixture.Chain.step2",
+        "LpeFixture.Chain.step3"
+      ],
+      "must_exclude": [
+        "LpeFixture.Diamond.apex",
+        "LpeFixture.LibA.seed"
+      ]
+    },
+    "LpeFixture.OpaqueLimits.secretOpaque": {
+      "must_include": [
+        "LpeFixture.OpaqueLimits.usesOpaque"
+      ],
+      "must_exclude": [
+        "LpeFixture.OpaqueLimits.hiddenHelper"
+      ],
+      "notes": [
+        "Opaque bodies do not invent edges to hiddenHelper beyond elaborator IR.",
+        "Tactic-erased consts and opaque residuals stay UNKNOWN/WARN — never silent PASS."
+      ]
     }
   },
   "import_edges_must_include": [
@@ -35,5 +71,10 @@
     ["LpeFixture.LibB", "LpeFixture.LibC"],
     ["LpeFixture.LibC", "LpeFixture.Cross"],
     ["LpeFixture.Consumer", "LpeFixture.Cross"]
-  ]
+  ],
+  "residuals": {
+    "opaque_bodies": "UNKNOWN/WARN with provenance; never silent PASS",
+    "tactic_erased_consts": "Not recovered by ConstantInfo.getUsedConstantsAsSet",
+    "mathlib": "Out of scope (fixture-excellence)"
+  }
 }

@@ -101,11 +101,19 @@ Without a toolchain artifact, LPE uses `regex-stub` and never claims axiom PASS.
 Even with elaborator Environment IR:
 
 - Tactic proofs may erase intermediate constants; only constants remaining in
-  the elaborated type/value are observed.
+  the elaborated type/value are observed — residual **UNKNOWN/WARN**, never
+  silent PASS.
 - Opaque / axiom / quotient constants expose only what Lean stores (no extra
-  body unfold).
+  body unfold). See `OpaqueLimits.lean` and `expectations_multi_module.json`.
 - Import edges are module→module, not per-declaration import provenance.
 - Impact cones intentionally use declaration edges, not coarse module import
   fan-out, when schema 1.1 decl edges are present.
+- Ambiguous short names across modules (`AmbiguousA`/`AmbiguousB` `twin`)
+  surface `resolution_warnings` rather than inventing a unique FQN.
 - Fixture is **not** Mathlib-scale; multi-module stress is still a small closed
   package without external dependencies.
+- Default Docker image `ubuntu:22.04` ≠ Lean; operators must set
+  `LPE_DOCKER_IMAGE=lpe-lean:4.14` for typecheck+extract (`lpe doctor` warns).
+- Declared `lpe_extract` projects are toolchain-first: regex-stub never PASS for
+  axioms/impact; stale `.lpe/lean-extraction.json` that misses modules is
+  refused or re-extracted.

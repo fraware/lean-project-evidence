@@ -511,7 +511,9 @@ class RegexLeanExtractor:
         paths = lean_paths or [
             str(p.relative_to(repository)).replace("\\", "/")
             for p in repository.rglob("*.lean")
-            if ".git" not in p.parts and ".lake" not in p.parts
+            if ".git" not in p.parts
+            and ".lake" not in p.parts
+            and ".lean-project-contract" not in p.parts
         ]
         file_results: list[LeanExtractionResult] = []
         for rel in sorted(paths):
@@ -679,11 +681,83 @@ def _apply_path_filters(
     return loaded
 
 
+# Extract helper / root modules that are not part of the product graph.
+_EXTRACT_HELPER_STEMS = frozenset({"LpeExtract", "lakefile"})
+
+
+def list_lean_source_modules(repository: Path) -> set[str]:
+    """Module names derived from ``*.lean`` sources (excluding Lake / extract helpers)."""
+    modules: set[str] = set()
+    if not repository.is_dir():
+        return modules
+    skip_parts = {".git", ".lake", ".lean-project-contract"}
+    for path in repository.rglob("*.lean"):
+        if skip_parts.intersection(path.parts):
+            continue
+        if path.stem in _EXTRACT_HELPER_STEMS:
+            continue
+        rel = str(path.relative_to(repository)).replace("\\", "/")
+        modules.add(_module_name_from_path(rel))
+    return modules
+
+
+def artifact_covers_lean_sources(
+    result: LeanExtractionResult,
+    repository: Path,
+) -> tuple[bool, list[str]]:
+    """Return whether a complete toolchain artifact covers current Lean modules.
+
+    Missing product modules → stale/incomplete for fixture-excellence; callers
+    must re-extract or fail closed (never silent PASS on a stale ``complete``).
+    """
+    sources = list_lean_source_modules(repository)
+    if not sources:
+        return True, []
+    covered: set[str] = set()
+    for decl in result.declarations:
+        if decl.path:
+            covered.add(_module_name_from_path(decl.path.replace("\\", "/")))
+        if "." in decl.name:
+            covered.add(decl.name.rsplit(".", 1)[0])
+    for a, b in result.import_edges:
+        covered.add(a)
+        covered.add(b)
+    missing = sorted(sources - covered)
+    return not missing, missing
+
+
+def project_requires_toolchain(repository: Path) -> bool:
+    """True when the repo declares ``lpe_extract`` or ships a schema≥1.1 artifact."""
+    from lpe.lean.toolchain import project_declares_lpe_extract
+
+    if project_declares_lpe_extract(repository):
+        return True
+    for rel in TOOLCHAIN_RESULT_CANDIDATES:
+        path = repository / rel
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        schema = str(data.get("extraction_schema_version") or "")
+        if schema >= EXTRACTION_SCHEMA_V1_1 and bool(data.get("complete")):
+            return True
+    return False
+
+
 class AdaptiveLeanExtractor:
-    """Prefer toolchain JSON / Lake ``lpe_extract`` when available; else regex-stub."""
+    """Prefer toolchain JSON / Lake ``lpe_extract`` when available; else regex-stub.
+
+    Toolchain-first policy (fixture-excellence): when a project declares
+    ``lpe_extract`` (or ships a complete schema≥1.1 artifact), the regex-stub
+    path is incomplete-only — never used to claim axiom/impact PASS. Stale
+    complete artifacts that miss current Lean modules are rejected and
+    re-extracted when Lake is available.
+    """
 
     provider_id = "lean.adaptive-extractor"
-    provider_version = "0.5.0"
+    provider_version = "0.6.0"
 
     def __init__(self) -> None:
         self._regex = RegexLeanExtractor()
@@ -703,31 +777,74 @@ class AdaptiveLeanExtractor:
         run_toolchain: bool = True,
     ) -> LeanExtractionResult:
         toolchain_available = lean_toolchain_available(repository)
-        # 1) Explicit toolchain artifact in the target repo.
+        requires_toolchain = project_requires_toolchain(repository)
+
+        def _regex_fallback(
+            *,
+            errors: list[str] | None = None,
+            notes: list[str] | None = None,
+        ) -> LeanExtractionResult:
+            regex_result = self._regex.extract_repository(
+                repository,
+                lean_paths=lean_paths,
+                baseline_imports=baseline_imports,
+            )
+            if errors:
+                regex_result.errors = list(errors) + list(regex_result.errors)
+            if notes:
+                regex_result.notes = list(dict.fromkeys([*notes, *regex_result.notes]))
+            regex_result.toolchain_available = toolchain_available or True
+            # Declared extract projects stay incomplete on stub fallback.
+            if requires_toolchain:
+                regex_result.complete = False
+                regex_result.notes.append(
+                    "toolchain required for declared lpe_extract / schema≥1.1 "
+                    "artifact; regex-stub must not PASS axiom or impact checks"
+                )
+            return regex_result
+
+        # 1) Explicit toolchain artifact in the target repo (freshness-gated).
         for rel in TOOLCHAIN_RESULT_CANDIDATES:
             loaded = load_toolchain_json(repository / rel)
-            if loaded is not None and loaded.extractor == TOOLCHAIN_EXTRACTOR and not loaded.errors:
-                return _apply_path_filters(
-                    loaded, lean_paths=lean_paths, baseline_imports=baseline_imports
-                )
             if loaded is not None and loaded.errors:
-                # Fail closed: surface errors, still fall back to regex for decls.
-                regex_result = self._regex.extract_repository(
-                    repository,
-                    lean_paths=lean_paths,
-                    baseline_imports=baseline_imports,
+                return _regex_fallback(
+                    errors=list(loaded.errors),
+                    notes=["toolchain JSON invalid; fell back to regex-stub"],
                 )
-                regex_result.errors = list(loaded.errors) + list(regex_result.errors)
-                regex_result.toolchain_available = True
-                regex_result.notes.append(
-                    "toolchain JSON invalid; fell back to regex-stub"
+            if (
+                loaded is not None
+                and loaded.extractor == TOOLCHAIN_EXTRACTOR
+                and not loaded.errors
+            ):
+                covers, missing = artifact_covers_lean_sources(loaded, repository)
+                if covers:
+                    return _apply_path_filters(
+                        loaded, lean_paths=lean_paths, baseline_imports=baseline_imports
+                    )
+                # Stale complete artifact — force re-extract when possible.
+                loaded.notes.append(
+                    "stale toolchain artifact missing modules: "
+                    + ", ".join(missing[:12])
+                    + ("" if len(missing) <= 12 else "…")
                 )
-                return regex_result
+                if not (run_toolchain and toolchain_available):
+                    loaded.complete = False
+                    loaded.errors = list(loaded.errors) + [
+                        "stale lean-extraction.json does not cover current Lean "
+                        f"modules: {missing}"
+                    ]
+                    loaded.notes.append(
+                        "refusing complete=true on stale artifact (fail closed)"
+                    )
+                    return _apply_path_filters(
+                        loaded, lean_paths=lean_paths, baseline_imports=baseline_imports
+                    )
+                # Fall through to Lake extract with force.
+                break
 
         # 2) Invoke Lake/Lean helper to produce toolchain JSON when available.
         lake_result: LeanExtractionResult | None = None
         if run_toolchain and toolchain_available:
-            # Local import avoids import cycle at module load.
             from lpe.lean.toolchain import try_run_lake_extract
 
             lake_result = try_run_lake_extract(repository, force=True)
@@ -737,23 +854,55 @@ class AdaptiveLeanExtractor:
                 and lake_result.complete
                 and not lake_result.errors
             ):
+                covers, missing = artifact_covers_lean_sources(lake_result, repository)
+                if covers:
+                    return _apply_path_filters(
+                        lake_result,
+                        lean_paths=lean_paths,
+                        baseline_imports=baseline_imports,
+                    )
+                lake_result.complete = False
+                lake_result.errors = list(lake_result.errors) + [
+                    f"fresh extract still missing modules: {missing}"
+                ]
                 return _apply_path_filters(
                     lake_result, lean_paths=lean_paths, baseline_imports=baseline_imports
                 )
             if lake_result is not None and lake_result.errors:
-                # Fail closed on extract errors: do not claim PASS via empty regex axioms.
-                regex_result = self._regex.extract_repository(
-                    repository,
-                    lean_paths=lean_paths,
-                    baseline_imports=baseline_imports,
+                if requires_toolchain:
+                    # Fail closed: do not soft-PASS via empty stub axioms.
+                    return _regex_fallback(
+                        errors=list(lake_result.errors),
+                        notes=[
+                            *list(lake_result.notes),
+                            "lake extract failed for declared toolchain project "
+                            "(incomplete; regex-stub not authoritative)",
+                        ],
+                    )
+                return _regex_fallback(
+                    errors=list(lake_result.errors),
+                    notes=[
+                        *list(lake_result.notes),
+                        "lake extract failed; fell back to regex-stub (incomplete)",
+                    ],
                 )
-                regex_result.errors = list(lake_result.errors) + list(regex_result.errors)
-                regex_result.toolchain_available = True
-                regex_result.notes.extend(lake_result.notes)
-                regex_result.notes.append(
-                    "lake extract failed; fell back to regex-stub (incomplete)"
-                )
-                return regex_result
+
+        # Declared toolchain projects without a usable extract stay UNKNOWN.
+        if requires_toolchain and not (
+            lake_result is not None
+            and lake_result.extractor == TOOLCHAIN_EXTRACTOR
+            and lake_result.complete
+            and not lake_result.errors
+        ):
+            return _regex_fallback(
+                errors=[
+                    "project declares lpe_extract or ships schema≥1.1 complete "
+                    "artifact but toolchain extraction is unavailable or incomplete"
+                ],
+                notes=[
+                    "toolchain-first policy: regex-stub path is incomplete only"
+                ],
+            )
 
         # 3) Lake env probe — confirms toolchain, does not fabricate decls.
         probe = _try_lake_extract_env(repository)
@@ -808,17 +957,29 @@ def resolve_changed_names_for_cone(
 ) -> set[str]:
     """Map git short names to module FQNs when extraction names are available.
 
-    Git classification emits short identifiers (``helper``). Toolchain /
-    regex-stub graphs use module FQNs (``LpeFixture.Core.helper``). When
-    extraction is present, resolve via:
+    See ``resolve_changed_names_detailed`` for ambiguity warnings.
+    """
+    resolved, _warnings = resolve_changed_names_detailed(
+        changed_declarations, extraction
+    )
+    return resolved
+
+
+def resolve_changed_names_detailed(
+    changed_declarations: list[Any],
+    extraction: LeanExtractionResult,
+) -> tuple[set[str], list[str]]:
+    """Map git short names to FQNs; return ``(resolved, warnings)``.
+
+    Resolution order:
 
     1. Exact match against known declaration / edge endpoint names
     2. Path-derived module FQN (``LpeFixture/Core.lean`` + ``helper``)
     3. Unique short-name suffix match among known names
     4. Path-derived FQN (best effort) or the original name
 
-    Without extraction names, still prefers path→FQN when a ``.lean`` path is
-    present so cones can align once edges appear.
+    Ambiguous suffix matches are recorded in ``warnings`` and fall back to
+    path-derived / original names (never invent a unique FQN silently).
     """
     known: set[str] = {d.name for d in extraction.declarations}
     for a, b in extraction.effective_declaration_edges():
@@ -829,6 +990,7 @@ def resolve_changed_names_for_cone(
         known.add(b)
 
     resolved: set[str] = set()
+    warnings: list[str] = []
     for decl in changed_declarations:
         name = str(getattr(decl, "name", "") or "")
         path = str(getattr(decl, "path", "") or "")
@@ -851,12 +1013,17 @@ def resolve_changed_names_for_cone(
             if len(matches) == 1:
                 resolved.add(matches[0])
                 continue
+            if len(matches) > 1:
+                warnings.append(
+                    f"ambiguous short name {name!r} matches {matches}; "
+                    "using path-derived or original name"
+                )
 
         if path_fqn is not None:
             resolved.add(path_fqn)
         else:
             resolved.add(name)
-    return resolved
+    return resolved, warnings
 
 
 def expand_imports(imports: list[str], known_modules: set[str]) -> list[str]:

@@ -32,6 +32,7 @@ from lpe.lean.extractor import (
     extract_lean_repository,
     impact_cone,
     import_expansion,
+    resolve_changed_names_detailed,
     resolve_changed_names_for_cone,
 )
 from lpe.lean.toolchain import (
@@ -827,7 +828,7 @@ def compile_evidence(
         findings.append(_check_axioms(contract, extraction, started=axiom_started))
 
         graph = build_dependency_graph(extraction)
-        changed_names = resolve_changed_names_for_cone(
+        changed_names, resolution_warnings = resolve_changed_names_detailed(
             candidate.changed_declarations, extraction
         )
         cone = impact_cone(graph, changed=changed_names)
@@ -870,6 +871,7 @@ def compile_evidence(
                     "notes": list(getattr(extraction, "notes", []) or []),
                     "extract_executor": _extract_executor_from_notes(extraction),
                     "graph_semantics": "dependee->depender (downstream impact)",
+                    "resolution_warnings": resolution_warnings,
                 },
                 started=impact_now,
                 finished=impact_now,

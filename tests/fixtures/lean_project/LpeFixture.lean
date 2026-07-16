@@ -7,3 +7,5 @@ import LpeFixture.LibB
 import LpeFixture.LibC
 import LpeFixture.Cross
 import LpeFixture.OpaqueLimits
+import LpeFixture.AmbiguousA
+import LpeFixture.AmbiguousB
