@@ -2,11 +2,19 @@ from __future__ import annotations
 
 from typing import Any
 
+from lpe.lean.extractor import REGEX_STUB_EXTRACTOR
 from lpe.models import EvidencePacket
 
 # Build logs belong in evidence JSON / side log files; embedding full stdout/stderr
 # in Markdown balloons review-packet size without aiding decision review.
 _LOG_DETAIL_KEYS = frozenset({"stdout", "stderr"})
+
+REGEX_STUB_PACKET_BANNER = (
+    "> **EXTRACTOR HONESTY:** This packet used the **regex-stub** extractor "
+    "(lexical AST-lite). Kernel / axiom / impact findings are **incomplete** and "
+    "must not be treated as elaborator axiom closure or Mathlib-scale truth. "
+    "See `docs/28_NON_CLAIMS.md`."
+)
 
 
 def _details_for_markdown(details: dict[str, Any]) -> dict[str, Any]:
@@ -20,25 +28,45 @@ def _details_for_markdown(details: dict[str, Any]) -> dict[str, Any]:
     return rendered
 
 
+def _packet_uses_regex_stub(packet: EvidencePacket) -> bool:
+    """True when any finding provenance/details reports the regex-stub extractor."""
+    for finding in packet.findings:
+        extractor = finding.details.get("extractor")
+        if extractor is None:
+            extractor = finding.provenance.provider_metadata.get("extractor")
+        if extractor is None:
+            continue
+        text = str(extractor).lower()
+        if text == REGEX_STUB_EXTRACTOR or "regex" in text:
+            return True
+    return False
+
+
 def render_packet(packet: EvidencePacket) -> str:
     lines = [
         f"# Evidence packet {packet.packet_id}",
         "",
-        f"- Project: `{packet.project_id}`",
-        f"- Run: `{packet.run_id}`",
-        f"- Contract hash: `{packet.contract_hash}`",
-        f"- Candidate: `{packet.candidate.candidate_id}`",
-        f"- Risk: `{packet.risk_class.value}`",
-        f"- Hard gate passed: `{packet.hard_gate_passed}`",
-        (
-            "  - Note: `hard_gate_passed` is true only when every hard-relevant check "
-            "is PASS; UNKNOWN on axioms/placeholders/build does **not** mean axiom-safe."
-        ),
-        f"- Recommendation: **{packet.recommendation.value}**",
-        "",
-        "## Recommendation reasons",
-        "",
     ]
+    if _packet_uses_regex_stub(packet):
+        lines.extend([REGEX_STUB_PACKET_BANNER, ""])
+    lines.extend(
+        [
+            f"- Project: `{packet.project_id}`",
+            f"- Run: `{packet.run_id}`",
+            f"- Contract hash: `{packet.contract_hash}`",
+            f"- Candidate: `{packet.candidate.candidate_id}`",
+            f"- Risk: `{packet.risk_class.value}`",
+            f"- Hard gate passed: `{packet.hard_gate_passed}`",
+            (
+                "  - Note: `hard_gate_passed` is true only when every hard-relevant check "
+                "is PASS; UNKNOWN on axioms/placeholders/build does **not** mean axiom-safe."
+            ),
+            f"- Recommendation: **{packet.recommendation.value}**",
+            "",
+            "## Recommendation reasons",
+            "",
+        ]
+    )
     for reason in packet.recommendation_reasons:
         lines.append(f"- {reason}")
 

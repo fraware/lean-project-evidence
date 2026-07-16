@@ -31,6 +31,12 @@ from lpe.github.submit import (
     parse_owner_repo,
     submit_check_run,
 )
+from lpe.ledger.seal import (
+    LedgerSealError,
+    default_seal_path,
+    verify_seal,
+    write_seal,
+)
 from lpe.ledger.store import LedgerAuthError, LedgerIntegrityError, LedgerStore
 from lpe.metrics.tppr import compute_tppr
 from lpe.models import (
@@ -66,6 +72,15 @@ pilot_app = typer.Typer(
         "not §21 / no causal claims)"
     )
 )
+research_app = typer.Typer(
+    help=(
+        "Research gate status (M6/M7 / EPIC-039/040 blocked until §21; "
+        "no training entrypoints)"
+    )
+)
+routing_app = typer.Typer(
+    help="M6 routing (BLOCKED until §21 — exits non-zero)"
+)
 
 app.add_typer(contract_app, name="contract")
 app.add_typer(candidate_app, name="candidate")
@@ -77,7 +92,36 @@ app.add_typer(gate_app, name="gate")
 app.add_typer(lean_app, name="lean")
 app.add_typer(github_app, name="github")
 app.add_typer(pilot_app, name="pilot")
+app.add_typer(research_app, name="research")
+app.add_typer(routing_app, name="routing")
 
+
+def _refuse_pilot_oversell_options(
+    *,
+    claim_section_21: bool = False,
+    claim_causal: bool = False,
+    claim_mathlib: bool = False,
+) -> None:
+    """Fail closed if CLI flags imply §21 / causal / Mathlib clearance."""
+    from lpe.honesty.non_claims import OversellClaimError, refuse_oversell_flags
+
+    try:
+        refuse_oversell_flags(
+            claim_section_21=claim_section_21,
+            section_21_cleared=claim_section_21,
+            claim_causal=claim_causal,
+            causal_claims=claim_causal,
+            claim_mathlib=claim_mathlib,
+            mathlib_complete=claim_mathlib,
+        )
+    except OversellClaimError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+
+_PILOT_OVERSELL_FLAG_HELP = (
+    "FORBIDDEN: implies §21 / causal clearance. Always refused (exit 1)."
+)
 
 def _read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -94,8 +138,22 @@ def doctor(
             help="Optional ledger SQLite path for permission warnings.",
         ),
     ] = None,
+    repo: Annotated[
+        Path | None,
+        typer.Option(
+            "--repo",
+            exists=True,
+            file_okay=False,
+            help="Optional Lean repo for extractor artifact detection.",
+        ),
+    ] = None,
 ) -> None:
     """Report local capabilities without changing the system."""
+    from lpe.honesty.adr import adr_0003_status
+    from lpe.honesty.lean_status import lean_extractor_status
+    from lpe.honesty.non_claims import NON_CLAIMS_DOC_PATH, non_claims_payload
+    from lpe.honesty.research_gates import research_status_payload
+
     image = os.environ.get("LPE_DOCKER_IMAGE", DEFAULT_DOCKER_IMAGE)
     lean_image_hint = None
     if image == DEFAULT_DOCKER_IMAGE or "ubuntu:" in image:
@@ -104,6 +162,8 @@ def doctor(
             "LPE_DOCKER_IMAGE=lpe-lean:4.14 for typecheck+extract "
             "(see docker/lpe-lean/)."
         )
+    lean_status = lean_extractor_status(repo)
+    adr = adr_0003_status()
     status: dict = {
         "lpe_version": __version__,
         "git": shutil.which("git"),
@@ -114,11 +174,18 @@ def doctor(
         "docker_image": image,
         "docker_image_lean_capable_hint": lean_image_hint,
         "sqlite_version": sqlite3.sqlite_version,
+        "lean_extractor": lean_status,
+        "adr_0003": adr,
+        "research_gates": research_status_payload(),
+        "NON_CLAIMS": non_claims_payload(),
+        "non_claims_doc": NON_CLAIMS_DOC_PATH,
     }
     if ledger is not None:
         status["ledger"] = _ledger_permission_report(ledger)
     typer.echo(json.dumps(status, indent=2))
-
+    if not adr.get("active"):
+        typer.echo("ADR 0003 enforcement inactive — unexpected", err=True)
+        raise typer.Exit(code=1)
 
 def _ledger_permission_report(path: Path) -> dict:
     """Warn when ledger path looks world-writable (POSIX); honest on Windows."""
@@ -135,6 +202,17 @@ def _ledger_permission_report(path: Path) -> dict:
         report["warnings"].append("ledger path is not a file")
         return report
 
+    seal_path = default_seal_path(path)
+    report["seal_path"] = str(seal_path)
+    report["seal_exists"] = seal_path.is_file()
+    if not seal_path.is_file():
+        report["warnings"].append(
+            "no ledger seal found; run `lpe ledger seal` then store the seal "
+            "separately or read-only. Seal detects silent SQLite mutation only "
+            "if the seal is protected; not hardware WORM "
+            "(docs/25_LEDGER_THREAT_MODEL.md)"
+        )
+
     if os.name == "nt":
         report["platform"] = "windows"
         report["warnings"].append(
@@ -145,6 +223,10 @@ def _ledger_permission_report(path: Path) -> dict:
         report["supported_retention"] = (
             "lpe ledger archive --output ARCHIVE.jsonl then verify; "
             "optional fresh lpe ledger init for a new working set"
+        )
+        report["supported_seal"] = (
+            "lpe ledger seal / lpe ledger verify-seal; optional "
+            "LPE_LEDGER_SEAL_KEY HMAC (not WORM)"
         )
         return report
 
@@ -165,6 +247,10 @@ def _ledger_permission_report(path: Path) -> dict:
     report["supported_retention"] = (
         "lpe ledger archive --output ARCHIVE.jsonl then verify; "
         "optional fresh lpe ledger init for a new working set"
+    )
+    report["supported_seal"] = (
+        "lpe ledger seal / lpe ledger verify-seal; optional "
+        "LPE_LEDGER_SEAL_KEY HMAC (not WORM)"
     )
     return report
 
@@ -393,6 +479,71 @@ def ledger_archive(
     )
 
 
+@ledger_app.command("seal")
+def ledger_seal(
+    path: Annotated[Path, typer.Argument(exists=True, dir_okay=False)],
+    seal: Annotated[
+        Path | None,
+        typer.Option(
+            "--seal",
+            help=(
+                "Seal manifest path (default: <ledger_dir>/.lpe/ledger.seal.json)."
+            ),
+        ),
+    ] = None,
+) -> None:
+    """Verify the live chain, then write an external seal snapshot.
+
+    Optional HMAC when ``LPE_LEDGER_SEAL_KEY`` is set. Detects silent SQLite
+    mutation only if the seal is stored separately or read-only. Not WORM.
+    """
+    store = LedgerStore(path)
+    try:
+        result = write_seal(store, seal)
+    except (LedgerIntegrityError, LedgerSealError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    manifest = result["manifest"]
+    typer.echo(
+        json.dumps(
+            {
+                "ok": True,
+                "seal_path": result["seal_path"],
+                "event_count": manifest["event_count"],
+                "global_tip": manifest["global_tip"],
+                "export_content_hash": manifest["export_content_hash"],
+                "custody": manifest["custody"],
+                "not_worm": True,
+                "custody_note": manifest["custody_note"],
+            },
+            indent=2,
+        )
+    )
+
+
+@ledger_app.command("verify-seal")
+def ledger_verify_seal(
+    path: Annotated[Path, typer.Argument(exists=True, dir_okay=False)],
+    seal: Annotated[
+        Path | None,
+        typer.Option(
+            "--seal",
+            help=(
+                "Seal manifest path (default: <ledger_dir>/.lpe/ledger.seal.json)."
+            ),
+        ),
+    ] = None,
+) -> None:
+    """Recompute live ledger state and compare against a seal file (fail closed)."""
+    store = LedgerStore(path)
+    try:
+        result = verify_seal(store, seal)
+    except (LedgerIntegrityError, LedgerSealError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(json.dumps(result, indent=2))
+
+
 @contract_app.command("schema-check")
 def contract_schema_check(
     project: Annotated[Path, typer.Argument(exists=True, file_okay=False)],
@@ -495,13 +646,18 @@ def github_submit_check(
         str,
         typer.Option(
             "--escalate-as",
-            help="ESCALATE conclusion: failure|neutral|action_required.",
+            help=(
+                "ESCALATE conclusion: failure|neutral|action_required "
+                "(default failure = required-check fail-closed)."
+            ),
         ),
     ] = "failure",
 ) -> None:
     """Adapt a packet to a Checks API payload and optionally POST via gh.
 
-    Default is dry-run: prints argv + payload without calling GitHub.
+    Default is dry-run: prints exact ``gh api`` argv + JSON payload plan
+    without calling GitHub. Use ``--post`` only after inspecting the plan.
+    ESCALATE defaults to conclusion ``failure`` (fail-closed for required checks).
     """
     from lpe.models import EvidencePacket
 
@@ -520,6 +676,7 @@ def github_submit_check(
     except (GitHubSubmitError, ValueError) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
+    # Dry-run and POST both emit the full plan (argv, payload, command_preview).
     typer.echo(json.dumps(result.to_dict(), indent=2))
 
 @tppr_app.command("compute")
@@ -644,6 +801,10 @@ def lean_extract(
         "errors": result.errors,
         "notes": result.notes,
         "artifact": str((repo / ".lpe" / "lean-extraction.json").resolve()),
+        "mathlib_scale": False,
+        "note": (
+            "not Mathlib-scale; toolchain completeness is project/fixture scope only"
+        ),
     }
     typer.echo(json.dumps(summary, indent=2))
     if output is not None:
@@ -652,6 +813,93 @@ def lean_extract(
         typer.echo(str(output))
     if result.errors and not result.complete:
         raise typer.Exit(code=1)
+
+
+@lean_app.command("status")
+def lean_status(
+    repo: Annotated[
+        Path | None,
+        typer.Option(
+            "--repo",
+            exists=True,
+            file_okay=False,
+            help="Optional Lean repo for artifact detection.",
+        ),
+    ] = None,
+) -> None:
+    """Print extractor mode (toolchain vs regex-stub) and Mathlib-scale warning."""
+    from lpe.honesty.lean_status import lean_extractor_status
+
+    status = lean_extractor_status(repo)
+    typer.echo(json.dumps(status, indent=2))
+    for warning in status.get("warnings") or []:
+        typer.echo(f"warning: {warning}", err=True)
+
+
+@research_app.command("status")
+def research_status(
+    format: Annotated[
+        str,
+        typer.Option("--format", help="json | markdown | text"),
+    ] = "json",
+) -> None:
+    """Print the M6–M7 / EPIC-039/040 / §21 research gate matrix."""
+    from lpe.honesty.research_gates import (
+        format_research_status,
+        research_status_payload,
+    )
+
+    fmt = format.strip().lower()
+    if fmt == "json":
+        typer.echo(json.dumps(research_status_payload(), indent=2))
+    elif fmt == "markdown":
+        typer.echo(format_research_status(as_markdown=True))
+    elif fmt == "text":
+        typer.echo(format_research_status(as_markdown=False))
+    else:
+        typer.echo(f"unknown --format {format!r}", err=True)
+        raise typer.Exit(code=1)
+
+
+@routing_app.callback(invoke_without_command=True)
+def routing_blocked(
+    ctx: typer.Context,
+) -> None:
+    """EPIC-039 blocked until §21 — no learned routing CLI."""
+    from lpe.honesty.research_gates import ResearchGateBlocked, refuse_research_entrypoint
+
+    # Allow `--help` without failing.
+    if ctx.invoked_subcommand is not None:
+        return
+    try:
+        refuse_research_entrypoint("routing")
+    except ResearchGateBlocked as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+
+@routing_app.command("train")
+def routing_train() -> None:
+    """Blocked: M6 training does not exist until §21."""
+    from lpe.honesty.research_gates import ResearchGateBlocked, refuse_research_entrypoint
+
+    try:
+        refuse_research_entrypoint("routing.train")
+    except ResearchGateBlocked as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+
+@research_app.command("train")
+def research_train() -> None:
+    """Blocked: no M6/M7 training entrypoint until §21."""
+    from lpe.honesty.research_gates import ResearchGateBlocked, refuse_research_entrypoint
+
+    try:
+        refuse_research_entrypoint("train")
+    except ResearchGateBlocked as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
 
 
 @pilot_app.command("record")
@@ -880,14 +1128,39 @@ def pilot_summary(
             help="Include non-warehouse project events in aggregations.",
         ),
     ] = False,
+    claim_section_21: Annotated[
+        bool,
+        typer.Option(
+            "--claim-section-21",
+            help=_PILOT_OVERSELL_FLAG_HELP,
+            hidden=True,
+        ),
+    ] = False,
+    claim_causal: Annotated[
+        bool,
+        typer.Option(
+            "--claim-causal",
+            help=_PILOT_OVERSELL_FLAG_HELP,
+            hidden=True,
+        ),
+    ] = False,
 ) -> None:
-    """Aggregate durable pilot metrics from the utility ledger (not in-memory)."""
+    """Aggregate durable pilot metrics from the utility ledger (not in-memory).
+
+    Always emits a NON_CLAIMS block. Software metrics ≠ causal / §21 clearance.
+    """
+    from lpe.honesty.non_claims import OversellClaimError, non_claims_payload
     from lpe.pilot.report import (
         render_summary_json,
         render_summary_markdown,
         write_summary_reports,
     )
     from lpe.pilot.summary import summarize_pilot
+
+    _refuse_pilot_oversell_options(
+        claim_section_21=claim_section_21,
+        claim_causal=claim_causal,
+    )
 
     store = LedgerStore(ledger)
     try:
@@ -901,30 +1174,47 @@ def pilot_summary(
         project_id=project_id,
         pilot_events_only=not include_non_pilot,
     )
-    fmt = format.strip().lower()
-    if fmt == "json":
-        text = render_summary_json(summary)
-        if output is not None:
-            output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_text(text, encoding="utf-8")
-            typer.echo(str(output))
+    try:
+        fmt = format.strip().lower()
+        if fmt == "json":
+            text = render_summary_json(summary)
+            if output is not None:
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(text, encoding="utf-8")
+                typer.echo(str(output))
+            else:
+                typer.echo(text, nl=False)
+        elif fmt == "markdown":
+            text = render_summary_markdown(summary)
+            if output is not None:
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_text(text, encoding="utf-8")
+                typer.echo(str(output))
+            else:
+                typer.echo(text)
+        elif fmt == "both":
+            out_dir = output or Path("pilot_summary_out")
+            json_path, md_path = write_summary_reports(summary, out_dir)
+            typer.echo(
+                json.dumps(
+                    {
+                        "json": str(json_path),
+                        "markdown": str(md_path),
+                        "NON_CLAIMS": non_claims_payload(),
+                        "section_21_cleared": False,
+                        "causal_claims": False,
+                    },
+                    indent=2,
+                )
+            )
         else:
-            typer.echo(text, nl=False)
-    elif fmt == "markdown":
-        text = render_summary_markdown(summary)
-        if output is not None:
-            output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_text(text, encoding="utf-8")
-            typer.echo(str(output))
-        else:
-            typer.echo(text)
-    elif fmt == "both":
-        out_dir = output or Path("pilot_summary_out")
-        json_path, md_path = write_summary_reports(summary, out_dir)
-        typer.echo(json.dumps({"json": str(json_path), "markdown": str(md_path)}, indent=2))
-    else:
-        typer.echo(f"unknown --format {format!r}; expected json|markdown|both", err=True)
-        raise typer.Exit(code=1)
+            typer.echo(
+                f"unknown --format {format!r}; expected json|markdown|both", err=True
+            )
+            raise typer.Exit(code=1)
+    except OversellClaimError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
 
 
 @pilot_app.command("dry-run")
@@ -951,12 +1241,35 @@ def pilot_dry_run(
         str,
         typer.Option("--actor", help="Non-anonymous pilot operator identity."),
     ] = "pilot-dry-run-operator",
+    claim_section_21: Annotated[
+        bool,
+        typer.Option(
+            "--claim-section-21",
+            help=_PILOT_OVERSELL_FLAG_HELP,
+            hidden=True,
+        ),
+    ] = False,
+    claim_causal: Annotated[
+        bool,
+        typer.Option(
+            "--claim-causal",
+            help=_PILOT_OVERSELL_FLAG_HELP,
+            hidden=True,
+        ),
+    ] = False,
 ) -> None:
     """Frozen corpus dry-run: durable warehouse events + summary reports.
 
     Instrumentation only — does not clear §21 or authorize causal claims.
+    Always emits a NON_CLAIMS block (software metrics ≠ causal).
     """
+    from lpe.honesty.non_claims import non_claims_payload
     from lpe.pilot.dry_run import run_frozen_corpus_dry_run
+
+    _refuse_pilot_oversell_options(
+        claim_section_21=claim_section_21,
+        claim_causal=claim_causal,
+    )
 
     root = repository_root or Path.cwd()
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -987,6 +1300,7 @@ def pilot_dry_run(
                 "section_21_cleared": False,
                 "causal_claims": False,
                 "durable": True,
+                "NON_CLAIMS": non_claims_payload(),
             },
             indent=2,
         )

@@ -103,22 +103,13 @@ See `PROTOCOL_LINKS.md` and `NON_CLAIMS.md` in this directory.
 
 
 def _non_claims() -> str:
-    return """# Explicit non-claims (partner pilot)
+    from lpe.honesty.non_claims import NON_CLAIMS_MARKDOWN
 
-Copy this block into any external report until the analysis plan is frozen and
-domain-lead + research-lead gates clear.
-
-1. **ENGINEERING_SPEC §21 is not passed.** This working directory supports
-   instrumentation only.
-2. **No causal utility claims.** Automation rate, reproduction rate, overhead,
-   and TPPR snapshots from this ledger do not prove LPE improves outcomes.
-3. **No R3/R4 production ACCEPT authority** (ADR 0003). Authoritative ACCEPT for
-   high-risk changes remains a human decision outside this scaffold.
-4. **Analysis plan is UNFROZEN** until the partner signs
-   `analysis_plan.md` and archives a dated frozen copy.
-5. **Dry-run / warehouse tests are not a study.** Fixture corpora do not
-   substitute for prospective human expert review.
-"""
+    return (
+        NON_CLAIMS_MARKDOWN
+        + "\nCopy this block into any external report until the analysis plan "
+        "is frozen and domain-lead + research-lead gates clear.\n"
+    )
 
 
 def _protocol_links() -> str:
@@ -134,6 +125,7 @@ Paths are relative to the **repository root** (not this working directory).
 | Report template | `docs/pilot_report_template.md` | Software vs causal split |
 | Dry-run honesty | `docs/pilot_dry_run.md` | Instrumentation-only dry-run |
 | Human authority | `docs/adr/0003-human-authority.md` | No R3/R4 auto-accept |
+| Explicit non-claims | `docs/28_NON_CLAIMS.md` | Canonical anti-oversell list |
 | Ledger durability | `docs/adr/0004-append-only-ledger.md` | Append-only events |
 | Lean image | `docker/lpe-lean/README.md` | `lpe-lean:4.14` sandbox |
 | Scientific gate | `docs/ENGINEERING_SPEC.md` §21 | Research clearance (not claimed) |

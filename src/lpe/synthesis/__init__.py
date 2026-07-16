@@ -1,9 +1,20 @@
 """Project-targeted synthesis eval harness (M7 scaffold).
 
-Gate-blocked: no model training. Fixture comparison only until
-ENGINEERING_SPEC §21 science gates pass (AUDIT-031).
+**EPIC-040 blocked until ENGINEERING_SPEC §21 (and M6).** No model training
+entrypoint exists in this package. ``SynthesisEvalHarness`` compares fixture
+numbers only (AUDIT-031). Calling ``train`` raises ``ResearchGateBlocked``.
 """
 
-from lpe.synthesis.eval_harness import SynthesisEvalCase, SynthesisEvalHarness, SynthesisEvalResult
+from lpe.synthesis.eval_harness import (
+    SynthesisEvalCase,
+    SynthesisEvalHarness,
+    SynthesisEvalResult,
+    TrainingBlockedError,
+)
 
-__all__ = ["SynthesisEvalCase", "SynthesisEvalHarness", "SynthesisEvalResult"]
+__all__ = [
+    "SynthesisEvalCase",
+    "SynthesisEvalHarness",
+    "SynthesisEvalResult",
+    "TrainingBlockedError",
+]

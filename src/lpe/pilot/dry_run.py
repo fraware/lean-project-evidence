@@ -13,6 +13,11 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
+from lpe.honesty.non_claims import (
+    format_non_claims_block,
+    non_claims_payload,
+    refuse_oversell_flags,
+)
 from lpe.ledger.store import LedgerStore
 from lpe.models import EventType, UtilityEvent
 from lpe.pilot.overhead import OverheadReport
@@ -131,6 +136,7 @@ def run_frozen_corpus_dry_run(
     metrics from causal / §21 claims.
     """
     assert SECTION_21_CLEARED is False
+    refuse_oversell_flags(section_21_cleared=SECTION_21_CLEARED, causal_claims=False)
     # Lazy import avoids circular dependency with ``lpe.cli`` (which mounts pilot).
     from lpe.cli import app
 
@@ -321,6 +327,11 @@ def run_frozen_corpus_dry_run(
         summary, reports_dir, stem="pilot_summary"
     )
 
+    refuse_oversell_flags(
+        section_21_cleared=summary.section_21_cleared,
+        causal_claims=summary.causal_claims,
+    )
+    nc = non_claims_payload()
     artifact = {
         "kind": "pilot_dry_run",
         "section_21_cleared": False,
@@ -342,10 +353,12 @@ def run_frozen_corpus_dry_run(
             ),
         },
         "summary": summary.to_dict(),
+        "NON_CLAIMS": nc,
         "non_claims": {
             "section_21": "not passed",
             "causal_utility": "not claimed",
             "partner_shadow_pilot": "instrumentation path only",
+            "software_metrics_are_not_causal": True,
         },
     }
     report_json = reports_dir / "pilot_dry_run_report.json"
@@ -355,6 +368,8 @@ def run_frozen_corpus_dry_run(
         "\n".join(
             [
                 "# Pilot dry-run report",
+                "",
+                format_non_claims_block(as_markdown=True).rstrip(),
                 "",
                 "## Classification",
                 "",

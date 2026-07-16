@@ -5,14 +5,29 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from lpe.honesty.non_claims import (
+    format_non_claims_block,
+    non_claims_payload,
+    refuse_oversell_flags,
+)
 from lpe.pilot.summary import PilotSummary
 
 
 def render_summary_json(summary: PilotSummary) -> str:
-    return json.dumps(summary.to_dict(), indent=2) + "\n"
+    refuse_oversell_flags(
+        section_21_cleared=summary.section_21_cleared,
+        causal_claims=summary.causal_claims,
+    )
+    payload = summary.to_dict()
+    payload["NON_CLAIMS"] = non_claims_payload()
+    return json.dumps(payload, indent=2) + "\n"
 
 
 def render_summary_markdown(summary: PilotSummary) -> str:
+    refuse_oversell_flags(
+        section_21_cleared=summary.section_21_cleared,
+        causal_claims=summary.causal_claims,
+    )
     lines = [
         "# Pilot warehouse summary",
         "",
@@ -20,7 +35,9 @@ def render_summary_markdown(summary: PilotSummary) -> str:
         f"**Metric class:** {summary.metric_class}",
         f"**Events (scoped):** {summary.event_count}",
         "",
-        "## Explicit non-claims",
+        format_non_claims_block(as_markdown=True).rstrip(),
+        "",
+        "## Explicit non-claims (summary flags)",
         "",
         f"- section_21_cleared: **{summary.section_21_cleared}**",
         f"- causal_claims: **{summary.causal_claims}**",

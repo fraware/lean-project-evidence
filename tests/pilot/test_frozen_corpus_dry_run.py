@@ -56,16 +56,20 @@ def test_pilot_frozen_corpus_dry_run_durable_warehouse(
     assert artifact["metric_class"] == "software_instrumentation"
     assert artifact["non_claims"]["section_21"] == "not passed"
     assert artifact["non_claims"]["causal_utility"] == "not claimed"
+    assert "NON_CLAIMS" in artifact
+    assert artifact["NON_CLAIMS"]["section_21_cleared"] is False
+    assert artifact["NON_CLAIMS"]["software_metrics_are_not_causal"] is True
 
     report_md = result.report_md.read_text(encoding="utf-8")
+    assert "NON_CLAIMS" in report_md
     assert "software_instrumentation" in report_md
     assert "Software metrics" in report_md
     assert "Causal" in report_md or "§21" in report_md
     assert "section_21_cleared" in report_md.lower() or "section_21_cleared" in report_md
     summary_md = result.summary_md.read_text(encoding="utf-8")
+    assert "NON_CLAIMS" in summary_md
     assert "software_instrumentation" in summary_md or "Software metrics" in summary_md
     assert "causal" in summary_md.lower() or "§21" in summary_md
-
     # Fresh store instance (process-restart durability).
     store = LedgerStore(result.ledger_path)
     store.verify()
@@ -130,6 +134,8 @@ def test_pilot_dry_run_cli(
     assert payload["durable"] is True
     assert payload["section_21_cleared"] is False
     assert payload["causal_claims"] is False
+    assert "NON_CLAIMS" in payload
+    assert payload["NON_CLAIMS"]["software_metrics_are_not_causal"] is True
     assert Path(payload["ledger"]).is_file()
     assert Path(payload["summary_json"]).is_file()
 

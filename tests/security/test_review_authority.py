@@ -148,3 +148,54 @@ def test_cli_rejects_r3_accept_even_for_authorized_reviewer(
     assert result.exit_code == 1
     combined = (result.stderr or "") + (result.stdout or "")
     assert "ACCEPT" in combined or "ADR" in combined or "R3" in combined
+
+
+def test_cli_rejects_r4_accept_regression(
+    tmp_path: Path, example_project: Path
+) -> None:
+    """Regression: ADR 0003 R4 ACCEPT must remain unrecordable via CLI."""
+    decision_path = tmp_path / "decision.json"
+    decision_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "0.1.0",
+                "review_id": "review-r4-accept-sec",
+                "packet_id": "packet_r4",
+                "reviewer_id": "r4-reviewer",
+                "reviewer_roles": [],
+                "decision": "ACCEPT",
+                "confidence": 99,
+                "rationale": "R4 ACCEPT refused (ADR 0003)",
+                "review_minutes": 1.0,
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app,
+        [
+            "review",
+            "record",
+            "--project",
+            str(example_project),
+            "--decision",
+            str(decision_path),
+            "--ledger",
+            str(tmp_path / "ledger-r4.db"),
+            "--risk-class",
+            "R4",
+        ],
+    )
+    assert result.exit_code == 1
+    combined = (result.stderr or "") + (result.stdout or "")
+    assert "ACCEPT" in combined or "ADR" in combined or "R4" in combined
+
+
+def test_doctor_adr_0003_active_check() -> None:
+    """Doctor surfaces ADR 0003 as active (R3/R4 ACCEPT refused)."""
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["adr_0003"]["active"] is True
+    assert payload["adr_0003"]["can_record_acceptance"]["R3"] is False
+    assert payload["adr_0003"]["can_record_acceptance"]["R4"] is False
