@@ -1,0 +1,46 @@
+schema_version: 0.1.0
+authorities:
+  - reviewer_id: domain-lead
+    roles:
+      - domain-lead
+    scopes:
+      - semantic
+      - definitions
+  - reviewer_id: repository-maintainer
+    roles:
+      - repository-maintainer
+    scopes:
+      - public-api
+      - architecture
+  - reviewer_id: lean-engineer
+    roles:
+      - lean-engineer
+    scopes:
+      - toolchain
+      - build
+  - reviewer_id: architecture-maintainer
+    roles:
+      - architecture-maintainer
+    scopes:
+      - dependency-graph
+      - public-api
+  - reviewer_id: r3-reviewer
+    roles:
+      - domain-lead
+      - repository-maintainer
+    scopes:
+      - semantic
+      - public-api
+  - reviewer_id: r4-reviewer
+    roles:
+      - domain-lead
+      - architecture-maintainer
+    scopes:
+      - semantic
+      - dependency-graph
+default_review_minutes:
+  R0: 5
+  R1: 10
+  R2: 20
+  R3: 30
+  R4: 45

@@ -1,0 +1,6 @@
+{
+  "name": "comparison-identity",
+  "obligation_id": "O-01",
+  "distinguishes": "identity morphism preservation under comparison functor",
+  "expected": "holds"
+}

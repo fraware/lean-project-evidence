@@ -1,0 +1,7 @@
+{
+  "name": "non-functorial-map",
+  "should_fail": true,
+  "expected_error": "missing composition law",
+  "invalid": true,
+  "obligation_id": "O-01"
+}
