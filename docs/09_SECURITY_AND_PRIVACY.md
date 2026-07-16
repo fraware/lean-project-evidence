@@ -32,7 +32,11 @@ External model providers may retain submitted content.
 
 The utility ledger is **append-only SQLite on the local filesystem**. SQLite triggers block UPDATE/DELETE on `events`, and each row carries a per-artifact hash chain (`previous_hash` / `event_hash`). `lpe ledger verify` and export JSONL verification recompute that chain.
 
-This is **not** a WORM device or tamper-evident root of trust: anyone with filesystem access can replace the database file, drop triggers, or rewrite bytes outside the application. Treat exports as audit artifacts; protect the host and backup policy accordingly. Retention/compaction prototype: `lpe ledger archive` (verify → verified JSONL; live chain untouched) then optional `lpe ledger init` for a fresh working set — see [06_UTILITY_LEDGER_SPEC.md](06_UTILITY_LEDGER_SPEC.md) and [25_LEDGER_THREAT_MODEL.md](25_LEDGER_THREAT_MODEL.md).
+This is **not** a WORM device. Anyone with filesystem access can replace the database file, drop triggers, or rewrite bytes outside the application. Protect the host and backup policy accordingly.
+
+**External seal (practical attestation):** `lpe ledger seal` verifies the live chain, then writes a seal manifest (default `<ledger_dir>/.lpe/ledger.seal.json`) with tip hashes per artifact, event count, export content hash, timestamp, and tool version. `lpe ledger verify-seal` recomputes live state and fails closed on mismatch. Optional HMAC when `LPE_LEDGER_SEAL_KEY` is set; without the key the seal is content-hash-only and is **not** cryptographic custody. A seal detects silent SQLite mutation **only if the seal is stored separately or read-only** — co-located writable seals can be rewritten with a forged ledger. Still not hardware WORM.
+
+Retention/compaction prototype: `lpe ledger archive` (verify → verified JSONL; live chain untouched) then optional `lpe ledger init` for a fresh working set — see [06_UTILITY_LEDGER_SPEC.md](06_UTILITY_LEDGER_SPEC.md) and [25_LEDGER_THREAT_MODEL.md](25_LEDGER_THREAT_MODEL.md).
 
 ## Supply-chain notes (AUDIT-024)
 

@@ -38,3 +38,14 @@ The live SQLite file is **never** rewritten, truncated, or compacted in place. R
 Compensating `CORRECTION_RECORDED` events remain the only in-chain way to retract meaning. Soft-delete by DELETE is rejected by triggers and is not a supported policy.
 
 Threat-model residual risk (compromised host FS vs export verify): [25_LEDGER_THREAT_MODEL.md](25_LEDGER_THREAT_MODEL.md).
+
+## External seal (snapshot attestation)
+
+After a successful verify, operators may write a seal manifest:
+
+```text
+lpe ledger seal <live.sqlite3>
+lpe ledger verify-seal <live.sqlite3>
+```
+
+Default path: `<ledger_dir>/.lpe/ledger.seal.json`. The seal records tip hashes, event count, export content hash, timestamp, and tool version. Optional HMAC when `LPE_LEDGER_SEAL_KEY` is set. This detects silent SQLite mutation only if the seal is stored separately or read-only; it is **not** hardware WORM and does not rewrite the append-only chain.

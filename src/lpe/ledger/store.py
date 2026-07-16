@@ -280,7 +280,9 @@ class LedgerStore:
         self.initialize()
         output.parent.mkdir(parents=True, exist_ok=True)
         count = 0
-        with self.connect() as connection, output.open("w", encoding="utf-8") as handle:
+        with self.connect() as connection, output.open(
+            "w", encoding="utf-8", newline="\n"
+        ) as handle:
             cursor = connection.execute("SELECT * FROM events ORDER BY sequence")
             for row in cursor:
                 record = self._row_to_export_record(row)

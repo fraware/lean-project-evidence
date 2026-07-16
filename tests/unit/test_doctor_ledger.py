@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 from typer.testing import CliRunner
 
 from lpe.cli import app
 from lpe.execution.sandbox import DEFAULT_DOCKER_IMAGE
+from lpe.ledger.seal import write_seal
 from lpe.ledger.store import LedgerStore
 from lpe.models import EventType, UtilityEvent
-from datetime import datetime, timezone
 
 runner = CliRunner()
 
@@ -37,7 +38,7 @@ def test_doctor_ledger_report(tmp_path: Path) -> None:
             project_id="project",
             artifact_id="artifact",
             obligation_id="O-01",
-            occurred_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            occurred_at=datetime(2026, 1, 1, tzinfo=UTC),
             actor_id="tester",
             payload={"x": 1},
         )
@@ -48,3 +49,29 @@ def test_doctor_ledger_report(tmp_path: Path) -> None:
     assert "ledger" in payload
     assert payload["ledger"]["exists"] is True
     assert "supported_retention" in payload["ledger"]
+    assert payload["ledger"]["seal_exists"] is False
+    assert any("no ledger seal found" in w for w in payload["ledger"]["warnings"])
+    assert "supported_seal" in payload["ledger"]
+
+
+def test_doctor_ledger_seal_present_clears_missing_warning(tmp_path: Path) -> None:
+    ledger = tmp_path / "ledger.sqlite3"
+    store = LedgerStore(ledger)
+    store.append(
+        UtilityEvent(
+            event_id="evt-doc-2",
+            event_type=EventType.CANDIDATE_REGISTERED,
+            project_id="project",
+            artifact_id="artifact",
+            obligation_id="O-01",
+            occurred_at=datetime(2026, 1, 1, tzinfo=UTC),
+            actor_id="tester",
+            payload={"x": 1},
+        )
+    )
+    write_seal(store)
+    result = runner.invoke(app, ["doctor", "--ledger", str(ledger)])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["ledger"]["seal_exists"] is True
+    assert not any("no ledger seal found" in w for w in payload["ledger"]["warnings"])
