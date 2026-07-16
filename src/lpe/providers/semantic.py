@@ -24,7 +24,7 @@ from lpe.lean.extractor import (
     extract_lean_repository,
     impact_cone,
     lean_toolchain_available,
-    resolve_changed_names_for_cone,
+    resolve_changed_names_detailed,
     signature_for_hash,
 )
 from lpe.lean.toolchain import has_lakefile
@@ -96,6 +96,61 @@ def _normalize_signature(signature: str) -> str:
     return " ".join(signature_for_hash(signature).split())
 
 
+def parse_signature_structure(signature: str) -> dict[str, str | None]:
+    """Split a Lean-ish declaration header into binder/domain/conclusion fields.
+
+    Heuristic structural parse only — not an elaborator. Used when toolchain
+    extraction exposes signature text (ISSUE-029 fixture depth).
+    """
+    normalized = _normalize_signature(signature)
+    # Drop leading kind keyword when present.
+    rest = normalized
+    for kind in (
+        "theorem",
+        "lemma",
+        "def",
+        "abbrev",
+        "instance",
+        "structure",
+        "class",
+        "axiom",
+        "opaque",
+    ):
+        prefix = kind + " "
+        if rest.lower().startswith(prefix):
+            rest = rest[len(prefix) :]
+            break
+    # Name is first token; remainder may include binders then ``:`` type.
+    parts = rest.split(None, 1)
+    name = parts[0] if parts else None
+    after_name = parts[1] if len(parts) > 1 else ""
+    binders: str | None = None
+    domain: str | None = None
+    conclusion: str | None = None
+    if ":" in after_name:
+        before_colon, after_colon = after_name.split(":", 1)
+        binders = before_colon.strip() or None
+        type_part = after_colon.strip()
+        # Arrow conclusions: treat last ``→`` / ``->`` segment as conclusion.
+        for arrow in (" → ", " -> ", "→", "->"):
+            if arrow in type_part:
+                idx = type_part.rfind(arrow)
+                domain = type_part[:idx].strip() or None
+                conclusion = type_part[idx + len(arrow) :].strip() or None
+                break
+        else:
+            conclusion = type_part or None
+    else:
+        binders = after_name.strip() or None
+    return {
+        "decl_name": name,
+        "binders": binders,
+        "domain": domain,
+        "conclusion": conclusion,
+        "normalized_signature": normalized,
+    }
+
+
 def short_name_in_line(full_name: str, line: str) -> bool:
     short = full_name.split(".")[-1]
     return short in line
@@ -117,6 +172,52 @@ def _list_structured_fixtures(directory: Path) -> list[Path]:
         if path.suffix.lower() in _STRUCTURED_SUFFIXES:
             files.append(path)
     return files
+
+
+def _redact_log_snippet(text: str, *, limit: int = 400) -> str:
+    """Trim and lightly redact obvious secret-shaped tokens from Lake logs."""
+    from lpe.execution.redact import redact_secrets
+
+    cleaned = redact_secrets(text or "")
+    return cleaned[:limit]
+
+
+def _try_lake_env_lean(project_path: Path, rel_lean: str) -> dict[str, Any]:
+    """Run ``lake env lean <rel>``; return ok/exit/stderr (redacted)."""
+    import shutil
+    import subprocess
+
+    lake = shutil.which("lake")
+    if lake is None:
+        return {
+            "ok": False,
+            "reason": "lake_unavailable",
+            "exit_code": None,
+            "stderr": "",
+        }
+    try:
+        proc = subprocess.run(
+            [lake, "env", "lean", rel_lean.replace("\\", "/")],
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            timeout=180,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {
+            "ok": False,
+            "reason": "lake_invoke_error",
+            "exit_code": None,
+            "stderr": _redact_log_snippet(str(exc)),
+        }
+    ok = proc.returncode == 0
+    return {
+        "ok": ok,
+        "reason": "lake_env_ok" if ok else "lake_env_failed",
+        "exit_code": proc.returncode,
+        "stderr": _redact_log_snippet(proc.stderr or proc.stdout or ""),
+    }
 
 
 def _load_structured_document(path: Path) -> dict[str, Any] | list[Any] | str | None:
@@ -281,14 +382,17 @@ class StatementDiffProvider:
 
             extracted_hash = extracted.signature_hash
             candidate_hash = sha256_text(candidate_sig) if candidate_sig else None
+            structure = parse_signature_structure(extracted.signature)
             entry = {
                 "name": decl.name,
+                "resolved_name": extracted.name,
                 "extracted_signature": extracted.signature,
                 "extracted_signature_hash": extracted_hash,
                 "candidate_signature": candidate_sig,
                 "candidate_signature_hash": candidate_hash,
                 "path": extracted.path,
                 "toolchain_backed": toolchain_complete,
+                "structure": structure,
             }
             compared.append(entry)
             if candidate_hash and candidate_hash != extracted_hash:
@@ -385,14 +489,16 @@ class StatementDiffProvider:
 
 
 class ExampleRunnerProvider:
-    """Structured project-example protocol under contract tests/examples.
+    """Project-example protocol under contract tests/examples.
 
-    Heuristic only: reads and structurally validates fixtures. Does **not**
-    execute Lean/Lake. Missing or non-structured suites → UNKNOWN (never PASS).
+    JSON/YAML fixtures are validated structurally. ``.lean`` fixtures prefer
+    sandboxed ``lake env lean`` when a lakefile is present; provider failure
+    stays UNKNOWN (never silent PASS). Heuristic structural PASS remains for
+    non-Lean fixtures when Lake is unavailable.
     """
 
     provider_id = "semantic.example-runner"
-    provider_version = "0.2.0"
+    provider_version = "0.3.0"
 
     def collect(
         self,
@@ -403,10 +509,18 @@ class ExampleRunnerProvider:
         del contract
         started = datetime.now(timezone.utc)
         examples_dir = _contract_tests_root(project_path) / "examples"
+        lake_capable = has_lakefile(project_path) and lean_toolchain_available(
+            project_path
+        )
         protocol = {
-            "kind": "structured-fixture-scan",
-            "toolchain_backed": False,
-            "note": "heuristic structural check; Lean examples are not executed",
+            "kind": "structured-fixture-scan+optional-lake-env",
+            "toolchain_backed": lake_capable,
+            "note": (
+                "Lean examples executed via lake env lean when available; "
+                "JSON/YAML remain structural"
+                if lake_capable
+                else "heuristic structural check; Lean examples not executed"
+            ),
         }
 
         if not examples_dir.is_dir():
@@ -455,8 +569,18 @@ class ExampleRunnerProvider:
         results: list[dict[str, Any]] = []
         failures: list[str] = []
         load_errors: list[str] = []
+        lake_attempted = False
+        lake_ok = True
         for path in fixtures:
             rel = str(path.relative_to(project_path)).replace("\\", "/")
+            if path.suffix.lower() == ".lean" and lake_capable:
+                lake_attempted = True
+                lake_result = _try_lake_env_lean(project_path, rel)
+                results.append({"path": rel, "ok": lake_result["ok"], **lake_result})
+                if not lake_result["ok"]:
+                    lake_ok = False
+                    failures.append(rel)
+                continue
             doc = _load_structured_document(path)
             if doc is None:
                 load_errors.append(rel)
@@ -474,8 +598,32 @@ class ExampleRunnerProvider:
             "fixture_count": len(fixtures),
             "protocol": protocol,
             "attempted": True,
+            "lake_attempted": lake_attempted,
             "provenance_paths": [r["path"] for r in results],
         }
+
+        lean_only = all(p.suffix.lower() == ".lean" for p in fixtures)
+        if lake_attempted and not lake_ok and lean_only and not load_errors:
+            # Prefer FAIL for executable Lean failures; UNKNOWN if Lake crashed.
+            exec_errors = [
+                r for r in results if r.get("reason") == "lake_invoke_error"
+            ]
+            status = FindingStatus.UNKNOWN if exec_errors else FindingStatus.FAIL
+            return [
+                _finding(
+                    check_id="semantic.project_examples",
+                    dimension=EvidenceDimension.SEMANTIC,
+                    status=status,
+                    severity=Severity.L2,
+                    summary=(
+                        "Project example Lake execution failed: "
+                        f"{failures}"
+                    ),
+                    details=details,
+                    started=started,
+                    finished=finished,
+                )
+            ]
 
         if load_errors or failures:
             return [
@@ -501,8 +649,12 @@ class ExampleRunnerProvider:
                 status=FindingStatus.PASS,
                 severity=Severity.INFO,
                 summary=(
-                    f"Structured project examples validated ({len(fixtures)} fixtures); "
-                    "Lean execution not performed"
+                    f"Project examples validated ({len(fixtures)} fixtures"
+                    + (
+                        "; Lake env lean executed)"
+                        if lake_attempted
+                        else "; structural only, Lean execution not performed)"
+                    )
                 ),
                 details=details,
                 started=started,
@@ -514,12 +666,12 @@ class ExampleRunnerProvider:
 class CounterexampleProvider:
     """Counterexample protocol under contract tests/counterexamples.
 
-    Records an explicit attempt. Missing fixtures → UNKNOWN. Present fixtures are
-    evaluated structurally (heuristic, not elaborator-backed).
+    Records an explicit attempt. Missing fixtures → UNKNOWN. ``.lean`` fixtures
+    prefer ``lake env lean`` when available; structural JSON/YAML otherwise.
     """
 
     provider_id = "semantic.counterexample"
-    provider_version = "0.2.0"
+    provider_version = "0.3.0"
 
     def collect(
         self,
@@ -530,11 +682,18 @@ class CounterexampleProvider:
         del contract, candidate
         started = datetime.now(timezone.utc)
         counter_dir = _contract_tests_root(project_path) / "counterexamples"
+        lake_capable = has_lakefile(project_path) and lean_toolchain_available(
+            project_path
+        )
         protocol = {
-            "kind": "structured-counterexample-scan",
-            "toolchain_backed": False,
-            "failure_policy": "UNKNOWN when missing or unreadable; FAIL on structural errors",
-            "note": "heuristic structural check; counterexamples are not executed in Lean",
+            "kind": "structured-counterexample-scan+optional-lake-env",
+            "toolchain_backed": lake_capable,
+            "failure_policy": "UNKNOWN when missing or unreadable; FAIL on structural/Lake errors",
+            "note": (
+                "Lean counterexamples executed via lake env lean when available"
+                if lake_capable
+                else "heuristic structural check; counterexamples are not executed in Lean"
+            ),
         }
 
         if not counter_dir.is_dir():
@@ -584,8 +743,16 @@ class CounterexampleProvider:
         results: list[dict[str, Any]] = []
         failures: list[str] = []
         load_errors: list[str] = []
+        lake_attempted = False
         for path in fixtures:
             rel = str(path.relative_to(project_path)).replace("\\", "/")
+            if path.suffix.lower() == ".lean" and lake_capable:
+                lake_attempted = True
+                lake_result = _try_lake_env_lean(project_path, rel)
+                results.append({"path": rel, "ok": lake_result["ok"], **lake_result})
+                if not lake_result["ok"]:
+                    failures.append(rel)
+                continue
             doc = _load_structured_document(path)
             if doc is None:
                 load_errors.append(rel)
@@ -603,18 +770,27 @@ class CounterexampleProvider:
             "fixture_count": len(fixtures),
             "protocol": protocol,
             "attempted": True,
+            "lake_attempted": lake_attempted,
             "provenance_paths": [r["path"] for r in results],
         }
 
         if load_errors or failures:
+            lean_failures = [
+                r for r in results if r.get("path") in failures and "exit_code" in r
+            ]
+            status = FindingStatus.FAIL
+            if lake_attempted and lean_failures and all(
+                r.get("reason") == "lake_invoke_error" for r in lean_failures
+            ):
+                status = FindingStatus.UNKNOWN
             return [
                 _finding(
                     check_id="semantic.counterexamples",
                     dimension=EvidenceDimension.SEMANTIC,
-                    status=FindingStatus.FAIL,
+                    status=status,
                     severity=Severity.L2,
                     summary=(
-                        "Counterexample structural checks failed: "
+                        "Counterexample checks failed: "
                         f"{load_errors + failures}"
                     ),
                     details=details,
@@ -630,8 +806,12 @@ class CounterexampleProvider:
                 status=FindingStatus.PASS,
                 severity=Severity.INFO,
                 summary=(
-                    f"Structured counterexamples validated ({len(fixtures)} fixtures); "
-                    "Lean execution not performed"
+                    f"Counterexamples validated ({len(fixtures)} fixtures"
+                    + (
+                        "; Lake env lean executed)"
+                        if lake_attempted
+                        else "; structural only, Lean execution not performed)"
+                    )
                 ),
                 details=details,
                 started=started,
@@ -772,6 +952,11 @@ class DuplicateRetrievalProvider:
 
         finished = datetime.now(timezone.utc)
         high = [c for c in closest if float(c["score"]) >= 0.5]
+        missing_hashes = [
+            name
+            for name, digest in candidate_sig_hashes.items()
+            if toolchain_complete and not digest
+        ]
         details: dict[str, Any] = {
             "candidate_declarations": names,
             "corpus_size": len(corpus),
@@ -782,10 +967,28 @@ class DuplicateRetrievalProvider:
             "extractor": extraction.extractor,
             "complete": getattr(extraction, "complete", False),
             "toolchain_backed": toolchain_complete,
+            "missing_toolchain_hashes": missing_hashes,
             "provenance": {
                 "paths": sorted({c["match_path"] for c in closest if c.get("match_path")}),
             },
         }
+
+        if toolchain_complete and missing_hashes:
+            return [
+                _finding(
+                    check_id="semantic.duplicate_retrieval",
+                    dimension=EvidenceDimension.SEMANTIC,
+                    status=FindingStatus.UNKNOWN,
+                    severity=Severity.L2,
+                    summary=(
+                        "Duplicate retrieval unresolved: toolchain-complete corpus "
+                        f"missing signature hashes for {missing_hashes}"
+                    ),
+                    details=details,
+                    started=started,
+                    finished=finished,
+                )
+            ]
 
         if high:
             return [
@@ -878,7 +1081,7 @@ class DownstreamReplacementProvider:
             ]
 
         extraction = extract_lean_repository(project_path)
-        changed_names = resolve_changed_names_for_cone(
+        changed_names, resolution_warnings = resolve_changed_names_detailed(
             candidate.changed_declarations, extraction
         )
         graph = build_dependency_graph(extraction)
@@ -943,6 +1146,7 @@ class DownstreamReplacementProvider:
             "protocol": protocol,
             "attempted": True,
             "graph_semantics": "dependee->depender (downstream impact)",
+            "resolution_warnings": resolution_warnings,
         }
 
         if not toolchain_complete:
