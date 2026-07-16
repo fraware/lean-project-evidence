@@ -1,23 +1,23 @@
 # Code ownership for Lean Project Evidence
-# Replace placeholders with real @users or @org/teams — see MAINTAINERS.md
+# Local-owner assignments — see MAINTAINERS.md
 
-# Schemas and canonical domain model (two approvals required)
-/schemas/ @REPLACE_WITH_SCHEMA_OWNER
-/src/lpe/models.py @REPLACE_WITH_SCHEMA_OWNER
+# Schemas and canonical domain model
+/schemas/ @fraware
+/src/lpe/models.py @fraware
 
-# Lean execution, Git adapters, and extraction surfaces (two approvals required)
-/src/lpe/execution/ @REPLACE_WITH_LEAN_SYSTEMS_OWNER
-/src/lpe/git/ @REPLACE_WITH_LEAN_SYSTEMS_OWNER
+# Lean execution, Git adapters, and extraction surfaces
+/src/lpe/execution/ @fraware
+/src/lpe/git/ @fraware
 
-# Append-only ledger and TPPR metrics (two approvals required)
-/src/lpe/ledger/ @REPLACE_WITH_DATA_OWNER
-/src/lpe/metrics/ @REPLACE_WITH_DATA_OWNER
+# Append-only ledger and TPPR metrics
+/src/lpe/ledger/ @fraware
+/src/lpe/metrics/ @fraware
 
-# Architecture decisions and North Star policy (two approvals required)
-/docs/adr/ @REPLACE_WITH_RESEARCH_LEAD
+# Architecture decisions and North Star policy
+/docs/adr/ @fraware
 
 # Sandboxing, workflow security boundaries
-/.github/workflows/ @REPLACE_WITH_SECURITY_OWNER @REPLACE_WITH_LEAN_SYSTEMS_OWNER
+/.github/workflows/ @fraware
 
 # Default owners for remaining orchestration code
-/src/lpe/ @REPLACE_WITH_SCHEMA_OWNER @REPLACE_WITH_LEAN_SYSTEMS_OWNER
+/src/lpe/ @fraware

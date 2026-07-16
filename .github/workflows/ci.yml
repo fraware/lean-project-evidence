@@ -28,9 +28,7 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e ".[dev]"
       - name: CODEOWNERS placeholder check
-        # Warning until launch replaces placeholders; remove env to fail-closed (AUDIT-022).
-        env:
-          LPE_CODEOWNERS_PLACEHOLDERS_OK: "1"
+        # Fail-closed: no LPE_CODEOWNERS_PLACEHOLDERS_OK escape in CI (AUDIT-022 closed).
         run: python scripts/check_codeowners_placeholders.py
       - name: Dependency vulnerability audit
         run: python -m pip install pip-audit && pip-audit
