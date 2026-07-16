@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lean-project-evidence"
+version = "0.1.0"
+description = "Project-grounded evidence and review infrastructure for AI-assisted Lean development"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Lean Project Evidence contributors" }]
+dependencies = [
+  "jsonschema>=4.23",
+  "pydantic>=2.10",
+  "PyYAML>=6.0",
+  "typer>=0.15",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3",
+  "pytest-cov>=6.0",
+  "ruff>=0.9",
+  "mypy>=1.14",
+]
+
+[project.scripts]
+lpe = "lpe.cli:app"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Exclude @pytest.mark.slow (e.g. 100k ledger) from default CI; run with:
+#   pytest -q -m slow
+# or to include everything:
+#   pytest -q -m ""
+addopts = ["-ra", "-m", "not slow"]
+markers = [
+  "docker: requires a working Docker daemon (skipped when unavailable)",
+  "lean: requires Lean/Lake on PATH (skipped when unavailable)",
+  "performance: soft §17 budget checks (fail only on >2× regressions)",
+  "longevity: scale / migration / historical drills (10k ledger in default CI)",
+  "slow: long-running drills such as 100k ledger (excluded from default CI)",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["lpe"]
