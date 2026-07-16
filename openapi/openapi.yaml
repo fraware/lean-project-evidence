@@ -1,0 +1,54 @@
+openapi: 3.1.0
+info:
+  title: Lean Project Evidence API
+  version: 0.1.0
+  description: Future thin HTTP wrapper over the local application services.
+paths:
+  /v1/contracts/validate:
+    post:
+      operationId: validateContract
+      responses:
+        "200":
+          description: Validation result
+  /v1/evidence:
+    post:
+      operationId: compileEvidence
+      responses:
+        "202":
+          description: Evidence compilation accepted
+  /v1/evidence/{packet_id}:
+    get:
+      operationId: getEvidencePacket
+      parameters:
+        - in: path
+          name: packet_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Evidence packet
+  /v1/reviews:
+    post:
+      operationId: submitReview
+      responses:
+        "201":
+          description: Review recorded
+  /v1/events:
+    post:
+      operationId: appendUtilityEvent
+      responses:
+        "201":
+          description: Event appended
+  /v1/metrics/tppr:
+    get:
+      operationId: getTPPR
+      parameters:
+        - in: query
+          name: project_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: TPPR report
