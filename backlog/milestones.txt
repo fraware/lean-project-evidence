@@ -1,0 +1,8 @@
+M0 Foundation
+M1 Deterministic Evidence
+M2 Review Operation
+M3 Lean-Aware Evidence
+M4 Semantic Evidence
+M5 Shadow Pilot
+M6 Learned Routing
+M7 Project-Targeted Synthesis

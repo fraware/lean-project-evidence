@@ -1,0 +1,41 @@
+milestone,issue_id,title,labels,depends_on,acceptance_criteria
+M0,EPIC-001,Create repository foundation and CI,"type:epic,area:foundation",,CI passes; packaging and contributor docs exist.
+M0,ISSUE-002,Implement canonical Pydantic domain models,"type:feature,area:schema",EPIC-001,Models reject unknown fields and export versioned schemas.
+M0,ISSUE-003,Implement split project-contract loader,"type:feature,area:contract",ISSUE-002,"Example contract loads, hashes, and validates references."
+M0,ISSUE-004,Implement stable IDs and canonical hashing,"type:feature,area:provenance",ISSUE-002,Hashes are deterministic across runs and ordering.
+M0,ISSUE-005,Implement append-only hash-chained SQLite ledger,"type:feature,area:ledger",ISSUE-004,"Append, verify, export, and mutation-denial tests pass."
+M0,ISSUE-006,Implement TPPR calculation,"type:feature,area:metrics",ISSUE-005,Known event fixture produces expected TPPR and pending persistence list.
+M1,EPIC-007,Build deterministic evidence compiler,"type:epic,area:evidence",EPIC-001,Candidate produces schema-valid packet and recommendation.
+M1,ISSUE-008,Implement Git revision normalization,"type:feature,area:git",EPIC-007,Invalid revisions fail with actionable errors.
+M1,ISSUE-009,Implement conservative Lean diff classifier,"type:feature,area:git",ISSUE-008,Golden diffs classify declarations and escalate unknown changes.
+M1,ISSUE-010,Implement isolated exact-environment runner,"type:feature,area:execution",EPIC-007,"Timeout, environment allowlist, output limit, and logs are tested."
+M1,ISSUE-011,Add container sandbox backend,"type:feature,area:security",ISSUE-010,Build runs without network or CI secrets.
+M1,ISSUE-012,Implement placeholder and prohibited-token checks,"type:feature,area:evidence",EPIC-007,Configured tokens cause deterministic hard failure.
+M1,ISSUE-013,Implement changed-path policy gate,"type:feature,area:evidence",EPIC-007,Denied paths reject the candidate.
+M1,ISSUE-014,Implement risk classifier R0–R4,"type:feature,area:policy",EPIC-007,Representative fixtures map to expected risk classes.
+M1,ISSUE-015,Implement decision gate policy,"type:feature,area:policy",ISSUE-014,"Hard fail, accept-eligible, and escalation branches are covered."
+M1,ISSUE-016,Render JSON and Markdown evidence packets,"type:feature,area:reporting",EPIC-007,Outputs preserve every finding and provenance field.
+M2,EPIC-017,Implement review operation,"type:epic,area:review",EPIC-007,"Review question, decision, and time events work end to end."
+M2,ISSUE-018,Implement deterministic review-question routing,"type:feature,area:review",EPIC-017,Semantic uncertainty outranks stylistic issues.
+M2,ISSUE-019,Implement reviewer authority checks,"type:feature,area:review",EPIC-017,R3/R4 decisions require configured roles.
+M2,ISSUE-020,Implement review decision recording,"type:feature,area:review",EPIC-017,Decision and review minutes append to ledger.
+M2,ISSUE-021,Implement GitHub Check output adapter,"type:feature,area:github",ISSUE-016,Packet summary and review question appear as a check.
+M3,EPIC-022,Build Lean extraction adapter,"type:epic,area:lean",ISSUE-010,Adapter works inside the target toolchain and emits protocol JSON.
+M3,ISSUE-023,Extract declaration metadata and signature hashes,"type:feature,area:lean",EPIC-022,Changed declarations are resolved without lexical heuristics.
+M3,ISSUE-024,Extract axiom dependencies and placeholders,"type:feature,area:lean",EPIC-022,Report matches known fixtures.
+M3,ISSUE-025,Extract direct dependency graph,"type:feature,area:lean",EPIC-022,Edges are stable and content-addressed.
+M3,ISSUE-026,Compute transitive impact cone,"type:feature,area:lean",ISSUE-025,Impact cone matches a hand-audited fixture.
+M3,ISSUE-027,Detect import and dependency expansion,"type:feature,area:repository",ISSUE-025,Packet reports new and removed dependencies.
+M4,EPIC-028,Implement semantic evidence providers,"type:epic,area:semantic",EPIC-022,"Providers emit independent, provenance-complete findings."
+M4,ISSUE-029,Implement statement signature diff,"type:feature,area:semantic",EPIC-028,"Binder, assumptions, domains, and conclusions are compared."
+M4,ISSUE-030,Implement project example runner,"type:feature,area:semantic",EPIC-028,Declared examples generate structured evidence.
+M4,ISSUE-031,Implement counterexample-provider protocol,"type:feature,area:semantic",EPIC-028,Provider failure remains UNKNOWN and never silently passes.
+M4,ISSUE-032,Implement repository duplicate retrieval,"type:feature,area:repository",EPIC-028,Closest declarations and provenance are reported.
+M4,ISSUE-033,Implement downstream replacement tests,"type:feature,area:downstream",ISSUE-026,Selected successor declarations compile against candidate.
+M5,EPIC-034,Run first shadow-mode project pilot,"type:epic,area:research","EPIC-017,EPIC-028",30–50 prospective candidates with complete expert-time data.
+M5,ISSUE-035,Select and instrument first active repository,"type:research,area:pilot",EPIC-034,Contract and obligations are accepted by project lead.
+M5,ISSUE-036,Freeze review experiment and analysis,"type:research,area:pilot",EPIC-034,Three conditions and decision gates are preregistered.
+M5,ISSUE-037,Measure contract and instrumentation overhead,"type:research,area:metrics",EPIC-034,Overhead is below 10% or protocol is narrowed.
+M5,ISSUE-038,Publish pilot evidence and limitations,"type:docs,area:research",EPIC-034,Results distinguish software performance from causal conclusions.
+M6,EPIC-039,Learn review routing from utility outcomes,"type:epic,area:ml",EPIC-034,Held-out TPPR proxy improves over deterministic routing.
+M7,EPIC-040,Evaluate project-targeted data synthesis,"type:epic,area:synthesis",EPIC-039,Equal-budget training improves held-out TPPR.
