@@ -9,10 +9,19 @@ create check runs.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
+
+# Sentinels that must never be POSTed as head_sha (dry-run plan also refuses).
+_REFUSED_HEAD_SHAS = frozenset({"", "mock-sha", "unavailable-sha"})
+
+_AUTH_HINT_RE = re.compile(
+    r"(auth|authenticat|login|credential|token|HTTP\s*40[13]|forbidden)",
+    re.IGNORECASE,
+)
 
 
 class GitHubSubmitError(RuntimeError):
@@ -42,6 +51,8 @@ class CheckSubmitPlan:
             "payload": self.payload,
             "dry_run": self.dry_run,
             "posted": False,
+            "stdin_json": True,
+            "command_preview": format_gh_api_command_preview(self.argv),
         }
 
 
@@ -60,6 +71,35 @@ class CheckSubmitResult:
         data["stdout"] = self.stdout
         data["stderr"] = self.stderr
         return data
+
+
+def format_gh_api_command_preview(argv: tuple[str, ...] | list[str]) -> str:
+    """Shell-ish preview of the planned ``gh api`` argv (payload on stdin)."""
+    return " ".join(argv) + "  # JSON body on stdin (--input -)"
+
+
+def ensure_gh_on_path() -> str:
+    """Return path to ``gh`` or raise a clear operator error."""
+    path = shutil.which("gh")
+    if path is None:
+        raise GitHubSubmitError(
+            "gh CLI not found on PATH. Install GitHub CLI "
+            "(https://cli.github.com/) and authenticate with `gh auth login`, "
+            "or omit --post to keep dry-run only."
+        )
+    return path
+
+
+def classify_gh_api_failure(*, returncode: int, stdout: str, stderr: str) -> str:
+    """Build an operator-facing error message from a failed ``gh api`` run."""
+    detail = (stderr or stdout or "").strip() or "(no stderr/stdout)"
+    if _AUTH_HINT_RE.search(detail) or returncode in {4, 127}:
+        return (
+            f"gh api authentication/authorization failed (exit {returncode}): "
+            f"{detail}. Run `gh auth status` and ensure the token can write "
+            "Checks (`checks:write`) on the target repo."
+        )
+    return f"gh api check-run failed (exit {returncode}): {detail}"
 
 
 def build_check_run_api_argv(
@@ -102,10 +142,12 @@ def plan_check_run_submit(
     missing = [key for key in required if key not in payload]
     if missing:
         raise GitHubSubmitError(f"check payload missing required keys: {missing}")
-    if payload.get("head_sha") in {None, "", "mock-sha"}:
+    head_sha = payload.get("head_sha")
+    if head_sha is None or head_sha in _REFUSED_HEAD_SHAS:
         raise GitHubSubmitError(
-            "refusing to submit check with missing or mock head_sha "
-            f"(got {payload.get('head_sha')!r})"
+            "refusing to submit check with missing or sentinel head_sha "
+            f"(got {head_sha!r}; use a real commit SHA, never mock-sha / "
+            "unavailable-sha)"
         )
     argv = build_check_run_api_argv(owner=owner, repo=repo)
     body = dict(payload)
@@ -136,10 +178,8 @@ def submit_check_run(
     if not post:
         return CheckSubmitResult(plan=plan, posted=False)
 
-    if shutil.which("gh") is None and runner is None:
-        raise GitHubSubmitError(
-            "gh CLI not found on PATH; install GitHub CLI or keep --dry-run"
-        )
+    if runner is None:
+        ensure_gh_on_path()
 
     execute: Runner = runner or subprocess.run
     completed = execute(
@@ -151,8 +191,11 @@ def submit_check_run(
     )
     if completed.returncode != 0:
         raise GitHubSubmitError(
-            f"gh api check-run failed (exit {completed.returncode}): "
-            f"{(completed.stderr or completed.stdout or '').strip()}"
+            classify_gh_api_failure(
+                returncode=completed.returncode,
+                stdout=completed.stdout or "",
+                stderr=completed.stderr or "",
+            )
         )
     return CheckSubmitResult(
         plan=plan,
