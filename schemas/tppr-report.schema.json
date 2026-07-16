@@ -1,0 +1,96 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "0.1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "weighted_accepted_sustained_obligations": {
+      "title": "Weighted Accepted Sustained Obligations",
+      "type": "number"
+    },
+    "specification_hours": {
+      "title": "Specification Hours",
+      "type": "number"
+    },
+    "review_hours": {
+      "title": "Review Hours",
+      "type": "number"
+    },
+    "repair_hours": {
+      "title": "Repair Hours",
+      "type": "number"
+    },
+    "integration_hours": {
+      "title": "Integration Hours",
+      "type": "number"
+    },
+    "expert_hours_total": {
+      "title": "Expert Hours Total",
+      "type": "number"
+    },
+    "tppr": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Tppr"
+    },
+    "compute_cost_usd": {
+      "title": "Compute Cost Usd",
+      "type": "number"
+    },
+    "wall_clock_hours": {
+      "title": "Wall Clock Hours",
+      "type": "number"
+    },
+    "credited_obligations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Credited Obligations",
+      "type": "array"
+    },
+    "pending_persistence_obligations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Pending Persistence Obligations",
+      "type": "array"
+    },
+    "exclusions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Exclusions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "project_id",
+    "weighted_accepted_sustained_obligations",
+    "specification_hours",
+    "review_hours",
+    "repair_hours",
+    "integration_hours",
+    "expert_hours_total",
+    "tppr",
+    "compute_cost_usd",
+    "wall_clock_hours",
+    "credited_obligations",
+    "pending_persistence_obligations"
+  ],
+  "title": "TPPRReport",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.1.0/tppr-report.schema.json"
+}

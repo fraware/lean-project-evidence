@@ -1,0 +1,78 @@
+{
+  "$defs": {
+    "RiskClass": {
+      "enum": [
+        "R0",
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "title": "RiskClass",
+      "type": "string"
+    },
+    "RiskRule": {
+      "additionalProperties": false,
+      "properties": {
+        "require_human_acceptance": {
+          "title": "Require Human Acceptance",
+          "type": "boolean"
+        },
+        "required_roles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Roles",
+          "type": "array"
+        },
+        "auto_accept_eligible": {
+          "default": false,
+          "title": "Auto Accept Eligible",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "require_human_acceptance"
+      ],
+      "title": "RiskRule",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "0.1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "risk_rules": {
+      "additionalProperties": {
+        "$ref": "#/$defs/RiskRule"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/RiskClass"
+      },
+      "title": "Risk Rules",
+      "type": "object"
+    },
+    "changed_path_denylist": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Changed Path Denylist",
+      "type": "array"
+    },
+    "external_provider_policy": {
+      "default": "local_only",
+      "title": "External Provider Policy",
+      "type": "string"
+    }
+  },
+  "required": [
+    "risk_rules"
+  ],
+  "title": "PoliciesFile",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.1.0/policies.schema.json"
+}

@@ -1,0 +1,60 @@
+{
+  "$defs": {
+    "TerminologyConcept": {
+      "additionalProperties": false,
+      "properties": {
+        "lean_names": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Lean Names",
+          "type": "array"
+        },
+        "prohibited_substitutions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Prohibited Substitutions",
+          "type": "array"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        }
+      },
+      "required": [
+        "lean_names"
+      ],
+      "title": "TerminologyConcept",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "0.1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "concepts": {
+      "additionalProperties": {
+        "$ref": "#/$defs/TerminologyConcept"
+      },
+      "title": "Concepts",
+      "type": "object"
+    }
+  },
+  "title": "TerminologyFile",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.1.0/terminology.schema.json"
+}

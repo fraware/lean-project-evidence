@@ -1,0 +1,122 @@
+{
+  "$defs": {
+    "ExecutionPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "build_command": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Build Command",
+          "type": "array"
+        },
+        "timeout_seconds": {
+          "default": 1800,
+          "maximum": 86400,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "max_output_bytes": {
+          "default": 2000000,
+          "minimum": 1024,
+          "title": "Max Output Bytes",
+          "type": "integer"
+        },
+        "network_policy": {
+          "default": "deny",
+          "title": "Network Policy",
+          "type": "string"
+        },
+        "environment_allowlist": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Environment Allowlist",
+          "type": "array"
+        }
+      },
+      "title": "ExecutionPolicy",
+      "type": "object"
+    },
+    "RepositoryConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "remote": {
+          "title": "Remote",
+          "type": "string"
+        },
+        "default_branch": {
+          "default": "main",
+          "title": "Default Branch",
+          "type": "string"
+        },
+        "public_api_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Public Api Paths",
+          "type": "array"
+        },
+        "protected_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Protected Paths",
+          "type": "array"
+        }
+      },
+      "required": [
+        "remote"
+      ],
+      "title": "RepositoryConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "0.1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "project_id": {
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$",
+      "title": "Project Id",
+      "type": "string"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "repository": {
+      "$ref": "#/$defs/RepositoryConfig"
+    },
+    "execution": {
+      "$ref": "#/$defs/ExecutionPolicy"
+    },
+    "allowed_axioms": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Allowed Axioms",
+      "type": "array"
+    },
+    "prohibited_tokens": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Prohibited Tokens",
+      "type": "array"
+    }
+  },
+  "required": [
+    "project_id",
+    "title",
+    "repository"
+  ],
+  "title": "ProjectConfig",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.1.0/project-config.schema.json"
+}

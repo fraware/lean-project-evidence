@@ -1,0 +1,222 @@
+{
+  "$defs": {
+    "ArtifactType": {
+      "enum": [
+        "proof",
+        "theorem",
+        "definition",
+        "instance",
+        "structure",
+        "class",
+        "abbrev",
+        "import",
+        "repository_patch"
+      ],
+      "title": "ArtifactType",
+      "type": "string"
+    },
+    "ChangedDeclaration": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ArtifactType"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "signature_changed": {
+          "default": false,
+          "title": "Signature Changed",
+          "type": "boolean"
+        },
+        "public": {
+          "default": false,
+          "title": "Public",
+          "type": "boolean"
+        },
+        "foundational": {
+          "default": false,
+          "title": "Foundational",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "path"
+      ],
+      "title": "ChangedDeclaration",
+      "type": "object"
+    },
+    "GeneratorProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "generator_type": {
+          "title": "Generator Type",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "prompt_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt Hash"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        }
+      },
+      "required": [
+        "generator_type",
+        "name"
+      ],
+      "title": "GeneratorProvenance",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "0.1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "candidate_id": {
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{2,127}$",
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "obligation_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Obligation Ids",
+      "type": "array"
+    },
+    "base_commit": {
+      "title": "Base Commit",
+      "type": "string"
+    },
+    "head_commit": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Head Commit"
+    },
+    "patch_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Patch Path"
+    },
+    "claimed_intent": {
+      "title": "Claimed Intent",
+      "type": "string"
+    },
+    "changed_paths": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Changed Paths",
+      "type": "array"
+    },
+    "changed_declarations": {
+      "items": {
+        "$ref": "#/$defs/ChangedDeclaration"
+      },
+      "title": "Changed Declarations",
+      "type": "array"
+    },
+    "patch_text": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Patch Text"
+    },
+    "generator": {
+      "$ref": "#/$defs/GeneratorProvenance"
+    }
+  },
+  "required": [
+    "candidate_id",
+    "project_id",
+    "obligation_ids",
+    "base_commit",
+    "claimed_intent",
+    "generator"
+  ],
+  "title": "CandidateDescriptor",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.1.0/candidate.schema.json"
+}

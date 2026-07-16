@@ -1,0 +1,486 @@
+{
+  "$defs": {
+    "AcceptanceCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "condition_id": {
+          "title": "Condition Id",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "condition_id",
+        "description"
+      ],
+      "title": "AcceptanceCondition",
+      "type": "object"
+    },
+    "ArtifactType": {
+      "enum": [
+        "proof",
+        "theorem",
+        "definition",
+        "instance",
+        "structure",
+        "class",
+        "abbrev",
+        "import",
+        "repository_patch"
+      ],
+      "title": "ArtifactType",
+      "type": "string"
+    },
+    "ExecutionPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "build_command": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Build Command",
+          "type": "array"
+        },
+        "timeout_seconds": {
+          "default": 1800,
+          "maximum": 86400,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "max_output_bytes": {
+          "default": 2000000,
+          "minimum": 1024,
+          "title": "Max Output Bytes",
+          "type": "integer"
+        },
+        "network_policy": {
+          "default": "deny",
+          "title": "Network Policy",
+          "type": "string"
+        },
+        "environment_allowlist": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Environment Allowlist",
+          "type": "array"
+        }
+      },
+      "title": "ExecutionPolicy",
+      "type": "object"
+    },
+    "Obligation": {
+      "additionalProperties": false,
+      "properties": {
+        "obligation_id": {
+          "pattern": "^[A-Z][A-Z0-9_-]{1,63}$",
+          "title": "Obligation Id",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "artifact_type": {
+          "$ref": "#/$defs/ArtifactType"
+        },
+        "weight": {
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Weight",
+          "type": "integer"
+        },
+        "milestone": {
+          "title": "Milestone",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ObligationStatus",
+          "default": "planned"
+        },
+        "owner": {
+          "title": "Owner",
+          "type": "string"
+        },
+        "downstream": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Downstream",
+          "type": "array"
+        },
+        "acceptance_conditions": {
+          "items": {
+            "$ref": "#/$defs/AcceptanceCondition"
+          },
+          "title": "Acceptance Conditions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "obligation_id",
+        "description",
+        "artifact_type",
+        "weight",
+        "milestone",
+        "owner"
+      ],
+      "title": "Obligation",
+      "type": "object"
+    },
+    "ObligationStatus": {
+      "enum": [
+        "planned",
+        "active",
+        "blocked",
+        "completed",
+        "cancelled"
+      ],
+      "title": "ObligationStatus",
+      "type": "string"
+    },
+    "ObligationsFile": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "default": "0.1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "obligations": {
+          "items": {
+            "$ref": "#/$defs/Obligation"
+          },
+          "minItems": 1,
+          "title": "Obligations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "obligations"
+      ],
+      "title": "ObligationsFile",
+      "type": "object"
+    },
+    "PoliciesFile": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "default": "0.1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "risk_rules": {
+          "additionalProperties": {
+            "$ref": "#/$defs/RiskRule"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/RiskClass"
+          },
+          "title": "Risk Rules",
+          "type": "object"
+        },
+        "changed_path_denylist": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Changed Path Denylist",
+          "type": "array"
+        },
+        "external_provider_policy": {
+          "default": "local_only",
+          "title": "External Provider Policy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "risk_rules"
+      ],
+      "title": "PoliciesFile",
+      "type": "object"
+    },
+    "ProjectConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "default": "0.1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "project_id": {
+          "pattern": "^[a-z0-9][a-z0-9._-]{2,127}$",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "repository": {
+          "$ref": "#/$defs/RepositoryConfig"
+        },
+        "execution": {
+          "$ref": "#/$defs/ExecutionPolicy"
+        },
+        "allowed_axioms": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Axioms",
+          "type": "array"
+        },
+        "prohibited_tokens": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Prohibited Tokens",
+          "type": "array"
+        }
+      },
+      "required": [
+        "project_id",
+        "title",
+        "repository"
+      ],
+      "title": "ProjectConfig",
+      "type": "object"
+    },
+    "RepositoryConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "remote": {
+          "title": "Remote",
+          "type": "string"
+        },
+        "default_branch": {
+          "default": "main",
+          "title": "Default Branch",
+          "type": "string"
+        },
+        "public_api_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Public Api Paths",
+          "type": "array"
+        },
+        "protected_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Protected Paths",
+          "type": "array"
+        }
+      },
+      "required": [
+        "remote"
+      ],
+      "title": "RepositoryConfig",
+      "type": "object"
+    },
+    "ReviewFile": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "default": "0.1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "authorities": {
+          "items": {
+            "$ref": "#/$defs/ReviewerAuthority"
+          },
+          "title": "Authorities",
+          "type": "array"
+        },
+        "default_review_minutes": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/RiskClass"
+          },
+          "title": "Default Review Minutes",
+          "type": "object"
+        }
+      },
+      "title": "ReviewFile",
+      "type": "object"
+    },
+    "ReviewerAuthority": {
+      "additionalProperties": false,
+      "properties": {
+        "reviewer_id": {
+          "title": "Reviewer Id",
+          "type": "string"
+        },
+        "roles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "scopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Scopes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "reviewer_id",
+        "roles"
+      ],
+      "title": "ReviewerAuthority",
+      "type": "object"
+    },
+    "RiskClass": {
+      "enum": [
+        "R0",
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "title": "RiskClass",
+      "type": "string"
+    },
+    "RiskRule": {
+      "additionalProperties": false,
+      "properties": {
+        "require_human_acceptance": {
+          "title": "Require Human Acceptance",
+          "type": "boolean"
+        },
+        "required_roles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Roles",
+          "type": "array"
+        },
+        "auto_accept_eligible": {
+          "default": false,
+          "title": "Auto Accept Eligible",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "require_human_acceptance"
+      ],
+      "title": "RiskRule",
+      "type": "object"
+    },
+    "TerminologyConcept": {
+      "additionalProperties": false,
+      "properties": {
+        "lean_names": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Lean Names",
+          "type": "array"
+        },
+        "prohibited_substitutions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Prohibited Substitutions",
+          "type": "array"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        }
+      },
+      "required": [
+        "lean_names"
+      ],
+      "title": "TerminologyConcept",
+      "type": "object"
+    },
+    "TerminologyFile": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "default": "0.1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "concepts": {
+          "additionalProperties": {
+            "$ref": "#/$defs/TerminologyConcept"
+          },
+          "title": "Concepts",
+          "type": "object"
+        }
+      },
+      "title": "TerminologyFile",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "0.1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "project": {
+      "$ref": "#/$defs/ProjectConfig"
+    },
+    "intent_markdown": {
+      "title": "Intent Markdown",
+      "type": "string"
+    },
+    "terminology": {
+      "$ref": "#/$defs/TerminologyFile"
+    },
+    "obligations": {
+      "$ref": "#/$defs/ObligationsFile"
+    },
+    "policies": {
+      "$ref": "#/$defs/PoliciesFile"
+    },
+    "review": {
+      "$ref": "#/$defs/ReviewFile"
+    },
+    "contract_hash": {
+      "title": "Contract Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "project",
+    "intent_markdown",
+    "terminology",
+    "obligations",
+    "policies",
+    "review",
+    "contract_hash"
+  ],
+  "title": "ProjectContract",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.1.0/project-contract.schema.json"
+}

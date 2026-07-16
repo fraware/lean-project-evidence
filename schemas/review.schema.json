@@ -1,0 +1,73 @@
+{
+  "$defs": {
+    "ReviewerAuthority": {
+      "additionalProperties": false,
+      "properties": {
+        "reviewer_id": {
+          "title": "Reviewer Id",
+          "type": "string"
+        },
+        "roles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "scopes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Scopes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "reviewer_id",
+        "roles"
+      ],
+      "title": "ReviewerAuthority",
+      "type": "object"
+    },
+    "RiskClass": {
+      "enum": [
+        "R0",
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "title": "RiskClass",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "0.1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "authorities": {
+      "items": {
+        "$ref": "#/$defs/ReviewerAuthority"
+      },
+      "title": "Authorities",
+      "type": "array"
+    },
+    "default_review_minutes": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/RiskClass"
+      },
+      "title": "Default Review Minutes",
+      "type": "object"
+    }
+  },
+  "title": "ReviewFile",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.1.0/review.schema.json"
+}

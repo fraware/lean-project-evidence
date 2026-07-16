@@ -1,0 +1,95 @@
+{
+  "$defs": {
+    "ReviewDecisionValue": {
+      "enum": [
+        "ACCEPT",
+        "REJECT",
+        "REQUEST_REPAIR",
+        "INDETERMINATE"
+      ],
+      "title": "ReviewDecisionValue",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "0.1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "review_id": {
+      "title": "Review Id",
+      "type": "string"
+    },
+    "packet_id": {
+      "title": "Packet Id",
+      "type": "string"
+    },
+    "reviewer_id": {
+      "title": "Reviewer Id",
+      "type": "string"
+    },
+    "reviewer_roles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reviewer Roles",
+      "type": "array"
+    },
+    "decision": {
+      "$ref": "#/$defs/ReviewDecisionValue"
+    },
+    "confidence": {
+      "maximum": 100,
+      "minimum": 0,
+      "title": "Confidence",
+      "type": "integer"
+    },
+    "rationale": {
+      "title": "Rationale",
+      "type": "string"
+    },
+    "answer": {
+      "additionalProperties": true,
+      "title": "Answer",
+      "type": "object"
+    },
+    "required_repair": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Required Repair"
+    },
+    "review_minutes": {
+      "exclusiveMinimum": 0,
+      "title": "Review Minutes",
+      "type": "number"
+    },
+    "submitted_at": {
+      "format": "date-time",
+      "title": "Submitted At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "review_id",
+    "packet_id",
+    "reviewer_id",
+    "reviewer_roles",
+    "decision",
+    "confidence",
+    "rationale",
+    "review_minutes"
+  ],
+  "title": "ReviewDecision",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.1.0/review-decision.schema.json"
+}

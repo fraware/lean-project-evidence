@@ -1,0 +1,537 @@
+{
+  "$defs": {
+    "ArtifactType": {
+      "enum": [
+        "proof",
+        "theorem",
+        "definition",
+        "instance",
+        "structure",
+        "class",
+        "abbrev",
+        "import",
+        "repository_patch"
+      ],
+      "title": "ArtifactType",
+      "type": "string"
+    },
+    "CandidateDescriptor": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "default": "0.1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "candidate_id": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{2,127}$",
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "project_id": {
+          "title": "Project Id",
+          "type": "string"
+        },
+        "obligation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Obligation Ids",
+          "type": "array"
+        },
+        "base_commit": {
+          "title": "Base Commit",
+          "type": "string"
+        },
+        "head_commit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Head Commit"
+        },
+        "patch_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Patch Path"
+        },
+        "claimed_intent": {
+          "title": "Claimed Intent",
+          "type": "string"
+        },
+        "changed_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Changed Paths",
+          "type": "array"
+        },
+        "changed_declarations": {
+          "items": {
+            "$ref": "#/$defs/ChangedDeclaration"
+          },
+          "title": "Changed Declarations",
+          "type": "array"
+        },
+        "patch_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Patch Text"
+        },
+        "generator": {
+          "$ref": "#/$defs/GeneratorProvenance"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "project_id",
+        "obligation_ids",
+        "base_commit",
+        "claimed_intent",
+        "generator"
+      ],
+      "title": "CandidateDescriptor",
+      "type": "object"
+    },
+    "ChangedDeclaration": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ArtifactType"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "signature_changed": {
+          "default": false,
+          "title": "Signature Changed",
+          "type": "boolean"
+        },
+        "public": {
+          "default": false,
+          "title": "Public",
+          "type": "boolean"
+        },
+        "foundational": {
+          "default": false,
+          "title": "Foundational",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "path"
+      ],
+      "title": "ChangedDeclaration",
+      "type": "object"
+    },
+    "EvidenceDimension": {
+      "enum": [
+        "kernel",
+        "semantic",
+        "repository",
+        "downstream",
+        "persistence",
+        "uncertainty"
+      ],
+      "title": "EvidenceDimension",
+      "type": "string"
+    },
+    "EvidenceFinding": {
+      "additionalProperties": false,
+      "properties": {
+        "finding_id": {
+          "title": "Finding Id",
+          "type": "string"
+        },
+        "check_id": {
+          "title": "Check Id",
+          "type": "string"
+        },
+        "check_version": {
+          "title": "Check Version",
+          "type": "string"
+        },
+        "dimension": {
+          "$ref": "#/$defs/EvidenceDimension"
+        },
+        "status": {
+          "$ref": "#/$defs/FindingStatus"
+        },
+        "severity": {
+          "$ref": "#/$defs/Severity"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": true,
+          "title": "Details",
+          "type": "object"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        }
+      },
+      "required": [
+        "finding_id",
+        "check_id",
+        "check_version",
+        "dimension",
+        "status",
+        "severity",
+        "summary",
+        "provenance"
+      ],
+      "title": "EvidenceFinding",
+      "type": "object"
+    },
+    "FindingStatus": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "WARN",
+        "UNKNOWN",
+        "NOT_APPLICABLE"
+      ],
+      "title": "FindingStatus",
+      "type": "string"
+    },
+    "GeneratorProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "generator_type": {
+          "title": "Generator Type",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Version"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "prompt_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt Hash"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Run Id"
+        }
+      },
+      "required": [
+        "generator_type",
+        "name"
+      ],
+      "title": "GeneratorProvenance",
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        },
+        "tool_version": {
+          "title": "Tool Version",
+          "type": "string"
+        },
+        "command": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Command",
+          "type": "array"
+        },
+        "input_hash": {
+          "title": "Input Hash",
+          "type": "string"
+        },
+        "output_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Output Hash"
+        },
+        "started_at": {
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        },
+        "finished_at": {
+          "format": "date-time",
+          "title": "Finished At",
+          "type": "string"
+        },
+        "elapsed_ms": {
+          "minimum": 0,
+          "title": "Elapsed Ms",
+          "type": "integer"
+        },
+        "deterministic": {
+          "default": true,
+          "title": "Deterministic",
+          "type": "boolean"
+        },
+        "provider_metadata": {
+          "additionalProperties": true,
+          "title": "Provider Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "tool",
+        "tool_version",
+        "input_hash",
+        "started_at",
+        "finished_at",
+        "elapsed_ms"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "Recommendation": {
+      "enum": [
+        "ACCEPT",
+        "REJECT",
+        "ESCALATE"
+      ],
+      "title": "Recommendation",
+      "type": "string"
+    },
+    "ReviewQuestion": {
+      "additionalProperties": false,
+      "properties": {
+        "question_id": {
+          "title": "Question Id",
+          "type": "string"
+        },
+        "question": {
+          "title": "Question",
+          "type": "string"
+        },
+        "decision_relevance": {
+          "title": "Decision Relevance",
+          "type": "string"
+        },
+        "answer_type": {
+          "title": "Answer Type",
+          "type": "string"
+        },
+        "required_roles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Roles",
+          "type": "array"
+        },
+        "estimated_minutes": {
+          "maximum": 240,
+          "minimum": 1,
+          "title": "Estimated Minutes",
+          "type": "integer"
+        },
+        "supporting_finding_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Supporting Finding Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "question_id",
+        "question",
+        "decision_relevance",
+        "answer_type",
+        "required_roles",
+        "estimated_minutes"
+      ],
+      "title": "ReviewQuestion",
+      "type": "object"
+    },
+    "RiskClass": {
+      "enum": [
+        "R0",
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "title": "RiskClass",
+      "type": "string"
+    },
+    "Severity": {
+      "enum": [
+        "INFO",
+        "L1",
+        "L2",
+        "L3"
+      ],
+      "title": "Severity",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "0.1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "packet_id": {
+      "title": "Packet Id",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "contract_hash": {
+      "title": "Contract Hash",
+      "type": "string"
+    },
+    "candidate": {
+      "$ref": "#/$defs/CandidateDescriptor"
+    },
+    "risk_class": {
+      "$ref": "#/$defs/RiskClass"
+    },
+    "findings": {
+      "items": {
+        "$ref": "#/$defs/EvidenceFinding"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "hard_gate_passed": {
+      "title": "Hard Gate Passed",
+      "type": "boolean"
+    },
+    "recommendation": {
+      "$ref": "#/$defs/Recommendation"
+    },
+    "recommendation_reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Recommendation Reasons",
+      "type": "array"
+    },
+    "unresolved_uncertainty": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Unresolved Uncertainty",
+      "type": "array"
+    },
+    "review_question": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReviewQuestion"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "packet_id",
+    "run_id",
+    "project_id",
+    "contract_hash",
+    "candidate",
+    "risk_class",
+    "findings",
+    "hard_gate_passed",
+    "recommendation",
+    "recommendation_reasons"
+  ],
+  "title": "EvidencePacket",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.1.0/evidence-packet.schema.json"
+}

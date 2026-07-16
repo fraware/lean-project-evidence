@@ -1,0 +1,97 @@
+{
+  "$defs": {
+    "EventType": {
+      "enum": [
+        "OBLIGATION_REGISTERED",
+        "CANDIDATE_REGISTERED",
+        "EVIDENCE_COMPILED",
+        "REVIEW_REQUESTED",
+        "REVIEW_SUBMITTED",
+        "REPAIR_STARTED",
+        "REPAIR_COMPLETED",
+        "ARTIFACT_ACCEPTED",
+        "ARTIFACT_REJECTED",
+        "ARTIFACT_INTEGRATED",
+        "DOWNSTREAM_ENABLED",
+        "PERSISTENCE_CONFIRMED",
+        "REGRESSION_DETECTED",
+        "EXPERT_TIME_RECORDED",
+        "CORRECTION_RECORDED"
+      ],
+      "title": "EventType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "0.1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "event_id": {
+      "title": "Event Id",
+      "type": "string"
+    },
+    "event_type": {
+      "$ref": "#/$defs/EventType"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "artifact_id": {
+      "title": "Artifact Id",
+      "type": "string"
+    },
+    "obligation_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Obligation Id"
+    },
+    "occurred_at": {
+      "format": "date-time",
+      "title": "Occurred At",
+      "type": "string"
+    },
+    "actor_id": {
+      "title": "Actor Id",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    },
+    "supersedes_event_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersedes Event Id"
+    }
+  },
+  "required": [
+    "event_id",
+    "event_type",
+    "project_id",
+    "artifact_id",
+    "actor_id"
+  ],
+  "title": "UtilityEvent",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.1.0/utility-event.schema.json"
+}

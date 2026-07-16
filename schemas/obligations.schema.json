@@ -1,0 +1,136 @@
+{
+  "$defs": {
+    "AcceptanceCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "condition_id": {
+          "title": "Condition Id",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "condition_id",
+        "description"
+      ],
+      "title": "AcceptanceCondition",
+      "type": "object"
+    },
+    "ArtifactType": {
+      "enum": [
+        "proof",
+        "theorem",
+        "definition",
+        "instance",
+        "structure",
+        "class",
+        "abbrev",
+        "import",
+        "repository_patch"
+      ],
+      "title": "ArtifactType",
+      "type": "string"
+    },
+    "Obligation": {
+      "additionalProperties": false,
+      "properties": {
+        "obligation_id": {
+          "pattern": "^[A-Z][A-Z0-9_-]{1,63}$",
+          "title": "Obligation Id",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "artifact_type": {
+          "$ref": "#/$defs/ArtifactType"
+        },
+        "weight": {
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Weight",
+          "type": "integer"
+        },
+        "milestone": {
+          "title": "Milestone",
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/ObligationStatus",
+          "default": "planned"
+        },
+        "owner": {
+          "title": "Owner",
+          "type": "string"
+        },
+        "downstream": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Downstream",
+          "type": "array"
+        },
+        "acceptance_conditions": {
+          "items": {
+            "$ref": "#/$defs/AcceptanceCondition"
+          },
+          "title": "Acceptance Conditions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "obligation_id",
+        "description",
+        "artifact_type",
+        "weight",
+        "milestone",
+        "owner"
+      ],
+      "title": "Obligation",
+      "type": "object"
+    },
+    "ObligationStatus": {
+      "enum": [
+        "planned",
+        "active",
+        "blocked",
+        "completed",
+        "cancelled"
+      ],
+      "title": "ObligationStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "default": "0.1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "obligations": {
+      "items": {
+        "$ref": "#/$defs/Obligation"
+      },
+      "minItems": 1,
+      "title": "Obligations",
+      "type": "array"
+    }
+  },
+  "required": [
+    "obligations"
+  ],
+  "title": "ObligationsFile",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.1.0/obligations.schema.json"
+}
