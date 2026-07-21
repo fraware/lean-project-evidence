@@ -1,21 +1,61 @@
+# Virtual environments
 .venv/
+venv/
+
+# Python bytecode / caches
 __pycache__/
 *.py[cod]
+*$py.class
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.tox/
+.nox/
+.cache/
+
+# Build / packaging
 dist/
 build/
 *.egg-info/
-.lpe/
-.coverage
-htmlcov/
-.DS_Store
-
-# Build / packaging artifacts
+*.egg
 *.whl
-.lake/
-.ruff_cache/
+.eggs/
 
-# Local test runner noise
+# Coverage / test reports (local dumps must not ship)
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+coverage*.json
+coverage*_out.txt
+coverage_missing.txt
+coverage_climb*.txt
+residual_test_out.txt
+section19_test_out.txt
 .pytest_last.txt
+.hypothesis/
+
+# Local LPE runtime / CAS (never commit)
+.lpe/
+
+# Lean / Lake local state
+.lake/
+
+# Generated local artifacts (SBOM dumps, digests, etc.)
+artifacts/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+!.vscode/extensions.json
+
+# Env / secrets (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
