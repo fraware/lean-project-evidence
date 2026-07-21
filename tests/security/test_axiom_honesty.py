@@ -20,9 +20,7 @@ def test_axiom_unknown_never_pass_on_regex_stub_empty_axioms(
         axioms_used=[],
         extractor=REGEX_STUB_EXTRACTOR,
     )
-    finding = _check_axioms(
-        contract, extraction, started=datetime.now(timezone.utc)
-    )
+    finding = _check_axioms(contract, extraction, started=datetime.now(timezone.utc))
     assert finding.status is FindingStatus.UNKNOWN
     assert finding.status is not FindingStatus.PASS
     assert finding.check_id == "lean.prohibited_axioms"
@@ -34,9 +32,7 @@ def test_axiom_unknown_on_legacy_regex_extractor_id(example_project: Path) -> No
         axioms_used=[],
         extractor="lean.regex-extractor",
     )
-    finding = _check_axioms(
-        contract, extraction, started=datetime.now(timezone.utc)
-    )
+    finding = _check_axioms(contract, extraction, started=datetime.now(timezone.utc))
     assert finding.status is FindingStatus.UNKNOWN
 
 
@@ -58,9 +54,7 @@ def test_prohibited_axiom_still_fails_on_regex_stub(example_project: Path) -> No
         axioms_used=["Definitely.Prohibited.Axiom"],
         extractor=REGEX_STUB_EXTRACTOR,
     )
-    finding = _check_axioms(
-        contract, extraction, started=datetime.now(timezone.utc)
-    )
+    finding = _check_axioms(contract, extraction, started=datetime.now(timezone.utc))
     assert finding.status is FindingStatus.FAIL
 
 

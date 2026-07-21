@@ -24,8 +24,8 @@ from lpe.honesty.research_gates import (
 __all__ = [
     "NON_CLAIMS_ITEMS",
     "NON_CLAIMS_MARKDOWN",
-    "OversellClaimError",
     "RESEARCH_GATE_MATRIX",
+    "OversellClaimError",
     "ResearchGateBlocked",
     "adr_0003_status",
     "format_non_claims_block",

@@ -90,9 +90,7 @@ def test_doctor_reports_adr_and_extractor() -> None:
     assert payload["adr_0003"]["can_record_acceptance"]["R3"] is False
     assert "lean_extractor" in payload
     assert payload["lean_extractor"]["mathlib_scale"] is False
-    assert any(
-        "not Mathlib-scale" in w for w in payload["lean_extractor"]["warnings"]
-    )
+    assert any("not Mathlib-scale" in w for w in payload["lean_extractor"]["warnings"])
     assert payload["NON_CLAIMS"]["section_21_cleared"] is False
     assert payload["research_gates"]["training_entrypoints_exist"] is False
 
@@ -152,9 +150,7 @@ def test_m6_m7_train_methods_raise() -> None:
         refuse_research_entrypoint("synthesis.train")
 
 
-def test_pilot_summary_refuses_claim_flags(
-    tmp_path: Path, example_project: Path
-) -> None:
+def test_pilot_summary_refuses_claim_flags(tmp_path: Path, example_project: Path) -> None:
     from lpe.ledger.store import LedgerStore
 
     ledger = tmp_path / "ledger.sqlite3"

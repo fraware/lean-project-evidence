@@ -15,8 +15,10 @@ ENGINEERING_SPEC §21 and do **not** prove LPE improves outcomes.
    criteria are unmet. Instrumentation and fixture dry-runs do not clear them.
 2. **No causal utility / causal TPPR** from dry-runs or `lpe pilot summary`
    warehouse metrics alone.
-3. **No R3/R4 production ACCEPT** (ADR 0003). `lpe review record` refuses
-   recording ACCEPT for R3/R4; gates escalate high-risk candidates.
+3. **No R3/R4 auto-ACCEPT or single-reviewer production ACCEPT** (ADR 0003).
+   `lpe review record` refuses ACCEPT for R3/R4; auto-accept remains impossible.
+   Qualified human acceptance uses `lpe review attest` + `lpe review accept-quorum`
+   only (still not §21 clearance). Gates escalate high-risk candidates.
 4. **No Mathlib-scale elaborator-complete kernel truth.** Fixture/project
    toolchain extraction is not Mathlib-scale. Regex-stub findings are
    incomplete; empty `axioms_used` is not axiom closure.
