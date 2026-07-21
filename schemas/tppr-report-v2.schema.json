@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.3.0/tppr-report-v2.schema.json",
+  "title": "TPPRReportV2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "project_id",
+    "weighted_credited",
+    "expert_hours_primary",
+    "tppr_complete_case",
+    "numerator_audit",
+    "time_audit",
+    "credited_obligations"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.3.0" },
+    "project_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "evaluator_version": { "type": "string" },
+    "weighted_credited": { "type": "number" },
+    "specification_hours": { "type": "number" },
+    "review_hours": { "type": "number" },
+    "repair_hours": { "type": "number" },
+    "integration_hours": { "type": "number" },
+    "expert_hours_primary": { "type": "number" },
+    "retrospective_hours": { "type": "number" },
+    "tppr_complete_case": { "type": ["number", "null"] },
+    "tppr_conservative_lower": { "type": ["number", "null"] },
+    "denominator_completeness_rate": { "type": "number" },
+    "missing_persistence_outcomes": { "type": "integer" },
+    "unresolved_legacy_events": { "type": "integer" },
+    "credited_obligations": { "type": "array", "items": { "type": "string" } },
+    "pending_persistence_obligations": { "type": "array", "items": { "type": "string" } },
+    "numerator_audit": { "type": "array" },
+    "time_audit": { "type": "array" },
+    "cohorts": { "type": "array" },
+    "exclusions": { "type": "array", "items": { "type": "string" } },
+    "anti_gaming_rejects": { "type": "array", "items": { "type": "string" } }
+  }
+}
