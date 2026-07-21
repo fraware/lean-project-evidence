@@ -1,6 +1,6 @@
 """Schema migration drill: unknown refused; supported loads; bump path documented.
 
-See ``docs/18_CONTRACT_MIGRATION.md``. This test does **not** mutate
+See ``docs/CONTRACT.md`` (migration protocol). This test does **not** mutate
 ``SUPPORTED_SCHEMA_VERSIONS`` — it proves fail-closed refusal and documents
 how a future minor bump would be accepted.
 """
@@ -21,7 +21,7 @@ from lpe.models import SCHEMA_VERSION, SUPPORTED_SCHEMA_VERSIONS
 
 runner = CliRunner()
 
-BUMP_PATH_HINT = "docs/18_CONTRACT_MIGRATION.md"
+BUMP_PATH_HINT = "docs/CONTRACT.md"
 
 
 @pytest.mark.longevity
@@ -59,12 +59,12 @@ def test_schema_bump_path_documented_and_future_minor_refused_until_listed(
 ) -> None:
     """A future minor (e.g. 0.3.0) is refused until listed in SUPPORTED_SCHEMA_VERSIONS.
 
-    Documented bump steps (``docs/18_CONTRACT_MIGRATION.md``):
+    Documented bump steps (``docs/CONTRACT.md`` migration protocol):
     1. Export schemas via ``scripts/export_schemas.py``.
     2. Add the new version to ``SCHEMA_VERSION`` / ``SUPPORTED_SCHEMA_VERSIONS``.
     3. Migrate example contracts; re-run ``lpe contract schema-check``.
     """
-    migration_doc = repository_root / "docs" / "18_CONTRACT_MIGRATION.md"
+    migration_doc = repository_root / "docs" / "CONTRACT.md"
     assert migration_doc.is_file()
     doc_text = migration_doc.read_text(encoding="utf-8")
     assert "SUPPORTED_SCHEMA_VERSIONS" in doc_text
@@ -97,4 +97,4 @@ def test_schema_bump_path_documented_and_future_minor_refused_until_listed(
     assert future in combined
     assert "unsupported schema_version" in combined.lower()
     assert "SUPPORTED_SCHEMA_VERSIONS" in combined or "bump path" in combined.lower()
-    assert "18_CONTRACT_MIGRATION" in combined or BUMP_PATH_HINT in combined
+    assert "CONTRACT.md" in combined or BUMP_PATH_HINT in combined

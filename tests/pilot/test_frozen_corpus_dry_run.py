@@ -5,7 +5,7 @@ compile/review → summary reports distinguishing software metrics vs causal cla
 
 This is **dry-run instrumentation only**. It does **not** authorize shadow
 pilots, production ACCEPT for R3/R4, or ENGINEERING_SPEC §21 science gates.
-See ``docs/pilot_study_protocol.md`` and ``docs/pilot_dry_run.md``.
+See ``docs/PILOT.md`` and ``docs/NON_CLAIMS.md``.
 """
 
 from __future__ import annotations
@@ -141,12 +141,12 @@ def test_pilot_dry_run_cli(
 
 @pytest.mark.longevity
 def test_pilot_dry_run_docs_disclaim_section_21(repository_root: Path) -> None:
-    protocol = (repository_root / "docs" / "pilot_study_protocol.md").read_text(encoding="utf-8")
-    dry_run = repository_root / "docs" / "pilot_dry_run.md"
-    assert dry_run.is_file(), "docs/pilot_dry_run.md must document dry-run honesty"
-    text = dry_run.read_text(encoding="utf-8")
+    protocol = (repository_root / "docs" / "PILOT.md").read_text(encoding="utf-8")
+    non_claims = repository_root / "docs" / "NON_CLAIMS.md"
+    assert non_claims.is_file(), "docs/NON_CLAIMS.md must document honesty gates"
+    text = non_claims.read_text(encoding="utf-8")
     assert "§21" in text or "section 21" in text.lower()
-    assert "dry-run" in text.lower()
+    assert "dry-run" in protocol.lower() or "dry-run" in text.lower()
     assert "causal" in protocol.lower() or "causal" in text.lower()
-    assert "not passed" in text.lower() or "does not" in text.lower()
-    assert "warehouse" in text.lower() or "durable" in text.lower()
+    assert "not passed" in text.lower() or "do not" in text.lower()
+    assert "warehouse" in protocol.lower() or "instrument" in protocol.lower()

@@ -1,6 +1,6 @@
 """Trusted Project Progress Rate (TPPR) aggregation.
 
-Event semantics follow ``docs/07_TPPR_SPEC.md``:
+Event semantics follow ``docs/LEDGER_AND_TPPR.md``:
 
 - ``OBLIGATION_REGISTERED`` registers obligation weight before candidate work.
 - ``ARTIFACT_ACCEPTED`` requires both ``semantic_fidelity`` and ``repository_accepted``.

@@ -232,14 +232,14 @@ def _ledger_permission_report(path: Path) -> dict[str, Any]:
             "no ledger seal found; run `lpe ledger seal --seal <off-host-path>` "
             "(or default then copy) and store the seal separately or read-only. "
             "Seal detects silent SQLite mutation only if the seal is protected; "
-            "not hardware WORM (docs/25_LEDGER_THREAT_MODEL.md)"
+            "not hardware WORM (docs/LEDGER_AND_TPPR.md)"
         )
     elif is_seal_colocated(path, seal_path):
         report["warnings"].append(
             "ledger seal is co-located with the ledger directory; prefer "
             "`lpe ledger seal --seal <separate-path>` and verify with "
             "`lpe ledger verify-seal --seal <separate-path>` from read-only/"
-            "off-host storage (docs/25_LEDGER_THREAT_MODEL.md)"
+            "off-host storage (docs/LEDGER_AND_TPPR.md)"
         )
 
     if os.name == "nt":
@@ -247,7 +247,7 @@ def _ledger_permission_report(path: Path) -> dict[str, Any]:
         report["warnings"].append(
             "POSIX world-writable mode bits are not authoritative on Windows; "
             "ensure the ledger directory ACLs restrict write to operators "
-            "(docs/25_LEDGER_THREAT_MODEL.md)"
+            "(docs/LEDGER_AND_TPPR.md)"
         )
         report["supported_retention"] = (
             "lpe ledger archive --output ARCHIVE.jsonl then verify; "
@@ -501,8 +501,7 @@ def ledger_archive(
 
     Retention/compaction prototype: archive is the offline audit artifact.
     To shrink the working set, ``lpe ledger init`` a fresh SQLite path and keep
-    the JSONL. See docs/06_UTILITY_LEDGER_SPEC.md (retention) and
-    docs/25_LEDGER_THREAT_MODEL.md.
+    the JSONL. See docs/LEDGER_AND_TPPR.md (retention and threat model).
     """
     store = LedgerStore(path)
     try:
@@ -671,7 +670,7 @@ def contract_schema_check(
                 "supported": sorted(SUPPORTED_SCHEMA_VERSIONS),
                 "current": SCHEMA_VERSION,
                 "bump_path": (
-                    "See docs/18_CONTRACT_MIGRATION.md: bump SCHEMA_VERSION and "
+                    "See docs/CONTRACT.md (migration protocol): bump SCHEMA_VERSION and "
                     "SUPPORTED_SCHEMA_VERSIONS together, export schemas, migrate "
                     "examples, then re-run pytest."
                 ),

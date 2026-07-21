@@ -61,17 +61,31 @@ The initial implementation is a modular Python application with:
 - an append-only SQLite utility ledger;
 - provider interfaces for later semantic and retrieval systems.
 
+## Documentation
+
+| Doc | Purpose |
+| --- | --- |
+| [`docs/ENGINEERING_SPEC.md`](docs/ENGINEERING_SPEC.md) | Full product engineering specification |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Modules and deployment model |
+| [`docs/CONTRACT.md`](docs/CONTRACT.md) | Project contract + schema migration |
+| [`docs/EVIDENCE_AND_REVIEW.md`](docs/EVIDENCE_AND_REVIEW.md) | Evidence compiler and review router |
+| [`docs/CLI.md`](docs/CLI.md) | CLI conventions and common workflows |
+| [`docs/LEDGER_AND_TPPR.md`](docs/LEDGER_AND_TPPR.md) | Utility ledger, seals, TPPR |
+| [`docs/SECURITY_AND_PRIVACY.md`](docs/SECURITY_AND_PRIVACY.md) | Threat model and mandatory controls |
+| [`docs/NON_CLAIMS.md`](docs/NON_CLAIMS.md) | Canonical anti-oversell list |
+| [`docs/PILOT.md`](docs/PILOT.md) | Partner instrumentation and pilot protocol |
+| [`docs/closure/PILOT_OPERATOR_RUNBOOK.md`](docs/closure/PILOT_OPERATOR_RUNBOOK.md) | Live partner operator steps |
+| [`docs/adr/`](docs/adr/) | Architecture decision records |
+
 ## Repository layout
 
-- `docs/ENGINEERING_SPEC.md` — complete standalone specification.
-- `docs/` — focused subsystem and operating documents.
+- `docs/` — product and operator documentation.
 - `schemas/` — canonical JSON Schemas.
 - `src/lpe/` — Python orchestration package.
 - `examples/` — example project contract and candidate.
-- `backlog/issues.csv` — issue-importable engineering plan.
 - `openapi/openapi.yaml` — future service interface.
 - `.github/workflows/` — CI.
-- `scripts/` — bootstrap, checks, demo, and GitHub launch helpers (`github_launch.py`, `verify_clean_clone.py`).
+- `scripts/` — bootstrap, checks, demo, and GitHub helpers.
 
 ## Local setup
 
@@ -124,6 +138,6 @@ instrumentation; Mathlib-scale / external compatibility pins remain
 `pilot-protocol/`, and the operator runbook — **not** ready to *claim* §21 /
 causal utility. Analysis plans stay UNFROZEN until a partner signs.
 
-**Explicit non-claims:** [`docs/28_NON_CLAIMS.md`](docs/28_NON_CLAIMS.md).
+**Explicit non-claims:** [`docs/NON_CLAIMS.md`](docs/NON_CLAIMS.md).
 M6/M7 training stays blocked until `learned_routing_authorized` /
 `synthesis_authorized` (`lpe research status`, `lpe research evaluate-gates`).

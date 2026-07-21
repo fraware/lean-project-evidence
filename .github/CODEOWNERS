@@ -1,5 +1,5 @@
 # Code ownership for Lean Project Evidence
-# Local-owner assignments — see MAINTAINERS.md
+# Local-owner assignments — see .github/CODEOWNERS handles below
 
 # Schemas and canonical domain model
 /schemas/ @fraware

@@ -24,7 +24,7 @@ CONTRACT_FILES = (
 )
 
 BUMP_PATH = (
-    "See docs/18_CONTRACT_MIGRATION.md: bump SCHEMA_VERSION and "
+    "See docs/CONTRACT.md (migration protocol): bump SCHEMA_VERSION and "
     "SUPPORTED_SCHEMA_VERSIONS together, export schemas, migrate examples, "
     "then re-run pytest / lpe contract schema-check."
 )
@@ -53,7 +53,7 @@ def check_contract_schema_versions(project_path: Path) -> dict[str, Any]:
     """Scan contract YAML files; refuse unknown ``schema_version`` values.
 
     Returns a report of detected versions. Does not mutate files — migration
-    remains a documented bump (see ``docs/18_CONTRACT_MIGRATION.md``).
+    remains a documented bump (see ``docs/CONTRACT.md``).
     """
     directory = contract_directory(project_path.resolve())
     versions: dict[str, str] = {}
@@ -76,7 +76,7 @@ def check_contract_schema_versions(project_path: Path) -> dict[str, Any]:
                 f"supported: {supported}. "
                 "Bump path: update SCHEMA_VERSION + SUPPORTED_SCHEMA_VERSIONS in "
                 "src/lpe/models.py, export schemas, migrate examples "
-                "(docs/18_CONTRACT_MIGRATION.md)."
+                "(docs/CONTRACT.md)."
             ) from exc
         versions[filename] = version
     return {"directory": str(directory), "versions": versions}
@@ -94,7 +94,7 @@ def dry_run_contract_migration(
     - Otherwise → ``would_rewrite`` listing files that would change.
 
     Never writes YAML. Real migration still requires listing the version in
-    ``SUPPORTED_SCHEMA_VERSIONS`` and following ``docs/18_CONTRACT_MIGRATION.md``.
+    ``SUPPORTED_SCHEMA_VERSIONS`` and following ``docs/CONTRACT.md``.
     """
     target = (target_version or SCHEMA_VERSION).strip()
     if not target:

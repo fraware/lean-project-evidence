@@ -4,7 +4,7 @@ This runbook describes the **operator workflows** for a live partner pilot.
 It does **not** claim that a pilot has been executed, sealed, or cleared under
 ENGINEERING_SPEC §21. Release `0.4.0` remains **needs live partner execution**.
 
-Non-claims: see `docs/28_NON_CLAIMS.md`. M6/M7 stay blocked until
+Non-claims: see `docs/NON_CLAIMS.md`. M6/M7 stay blocked until
 `learned_routing_authorized` / `synthesis_authorized` are true in a
 machine-readable `Section21GateReport`.
 
@@ -21,8 +21,8 @@ machine-readable `Section21GateReport`.
 
 ## CLOSURE-033 — Partner freeze
 
-1. Select partner repository + domain lead; record ownership in
-   `docs/closure/OWNERSHIP.md`.
+1. Select partner repository + domain lead; record ownership in the partner
+   custody store (outside this repository).
 2. Copy `pilot-protocol/` to a partner working directory (or regenerate via
    Python `write_example_bundle` and replace every field with real values).
 3. Fill **all** required files; freeze refuses blanks / `TODO` / `TBD`:

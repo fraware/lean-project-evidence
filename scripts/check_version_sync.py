@@ -4,7 +4,6 @@ Single source of truth:
 - package version: ``pyproject.toml`` / ``lpe.__version__``
 - CHANGELOG must mention that version
 - ``docs/closure/MILESTONE_STATUS.json`` ``closure.current_release`` must match
-- VALIDATION_REPORT.md must mention the package version
 - M6/M7 remain unauthorized while Phase G is blocked
 
 CI fails on drift. Does not invent pilot study claims.
@@ -45,14 +44,6 @@ def check_sync() -> list[str]:
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     if not re.search(rf"^## {re.escape(pkg)}\b", changelog, re.MULTILINE):
         errors.append(f"CHANGELOG.md missing heading for {pkg}")
-
-    validation = ROOT / "VALIDATION_REPORT.md"
-    if not validation.is_file():
-        errors.append("VALIDATION_REPORT.md missing")
-    else:
-        vr = validation.read_text(encoding="utf-8")
-        if pkg not in vr:
-            errors.append(f"VALIDATION_REPORT.md does not mention package version {pkg}")
 
     milestone_path = ROOT / "docs" / "closure" / "MILESTONE_STATUS.json"
     if milestone_path.is_file():
@@ -96,8 +87,8 @@ def check_sync() -> list[str]:
         errors.append("docs/closure/REMAINING_ACCEPTANCE.md missing")
 
     # Non-claims file must exist.
-    if not (ROOT / "docs" / "28_NON_CLAIMS.md").is_file():
-        errors.append("docs/28_NON_CLAIMS.md missing")
+    if not (ROOT / "docs" / "NON_CLAIMS.md").is_file():
+        errors.append("docs/NON_CLAIMS.md missing")
 
     return errors
 

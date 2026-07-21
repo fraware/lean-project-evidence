@@ -76,7 +76,7 @@ def expert_time_event(
 ) -> UtilityEvent:
     """Build an ``EXPERT_TIME_RECORDED`` event.
 
-    TPPR denominators use ``hours`` (see ``docs/07_TPPR_SPEC.md``). Review decisions
+    TPPR denominators use ``hours`` (see ``docs/LEDGER_AND_TPPR.md``). Review decisions
     are authored in minutes; we convert and store both so ledger consumers stay honest.
     """
     payload: dict[str, Any] = {

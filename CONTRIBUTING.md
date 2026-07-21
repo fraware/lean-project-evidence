@@ -1,6 +1,7 @@
 # Contributing
 
-Read `docs/ENGINEERING_SPEC.md` and the relevant ADR before implementation.
+Read [`docs/ENGINEERING_SPEC.md`](docs/ENGINEERING_SPEC.md) and the relevant ADR
+under [`docs/adr/`](docs/adr/) before implementation.
 
 ## Development
 
@@ -20,25 +21,13 @@ python scripts/verify_clean_clone.py
 
 Each pull request must:
 
-- link one backlog issue from `backlog/issues.csv`;
 - state its path to TPPR;
 - include tests for behavior changes;
 - preserve evidence and provenance;
 - document uncertainty where providers return `UNKNOWN`.
 
-Use `.github/PULL_REQUEST_TEMPLATE.md` and follow `docs/13_DEFINITION_OF_DONE.md`.
-
-## Code ownership
-
-Update `.github/CODEOWNERS` placeholders before the first engineering merge (`MAINTAINERS.md`). Changes to schemas, execution, ledger, or ADRs require CODEOWNERS approval.
-
-## Repository launch
-
-For initial GitHub setup (labels, milestones, backlog import, branch protection), follow:
-
-- `docs/16_REPOSITORY_LAUNCH.md`
-- `docs/20_LAUNCH_CHECKLIST.md`
-- `scripts/github_launch.py` (dry-run by default; pass `--apply` when `gh` is authenticated)
+Use `.github/PULL_REQUEST_TEMPLATE.md`. Changes to schemas, execution, ledger,
+or ADRs require CODEOWNERS approval (see `.github/CODEOWNERS`).
 
 ## Changes that require an ADR
 

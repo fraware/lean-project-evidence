@@ -1,6 +1,6 @@
 """Historical packet load: save packet JSON, reload/validate after simulated time.
 
-Packets are never rewritten (``docs/18_CONTRACT_MIGRATION.md``). This drill
+Packets are never rewritten (``docs/CONTRACT.md``). This drill
 proves that a committed-on-disk evidence packet still validates against the
 current ``EvidencePacket`` model and exported JSON Schema after a delay.
 """

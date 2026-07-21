@@ -9,7 +9,7 @@ for Phases A–E is present on the tree; that does **not** authorize bumping to
 `0.3.0` / `0.4.0` or cutting release tags until the items below are closed by
 humans (and, where noted, by live partner / secrets).
 
-Non-claims remain in force: [`docs/28_NON_CLAIMS.md`](../28_NON_CLAIMS.md).
+Non-claims remain in force: [`docs/NON_CLAIMS.md`](../NON_CLAIMS.md).
 
 ---
 
@@ -58,7 +58,7 @@ Engineering for CLOSURE-001–017 is present. Formal checklist still open:
 | Schema 0.2.0 migration from 0.1.0 | Migration code + tests present; release notes packaging pending |
 | Full CI matrix (Python/OS, Docker/Lean, lint, typing, security, schemas) | Ubuntu 3.12/3.13 + OS best-effort + scheduled Lean/Docker/SBOM/longevity; coverage lines ≥90% + critical packages ≥95% + branch ≥85% hard; full `src/lpe` ruff/mypy merge-gated |
 | README / version / changelog / validation report / tree / manifest agree | Drift scripts enforce version + inventory; keep green in CI |
-| Explicit non-claims intact | `docs/28_NON_CLAIMS.md` present; preserve on every release |
+| Explicit non-claims intact | `docs/NON_CLAIMS.md` present; preserve on every release |
 | Compatibility / scale gates (§9.10–9.11) | Fixture done; external pins selected as candidates but `pending_live_validation` |
 
 **Do not tag `0.2.0` until** the acceptance checklist boxes above are human-checked
@@ -156,5 +156,5 @@ Working-tree cleanup before human review/push (not a formal acceptance change):
 - Removed generate-only caches (`.mypy_cache/`, `.pytest_cache/`, `.ruff_cache/`, `__pycache__/`, `*.egg-info/`, `artifacts/`).
 - Removed accidental local CAS under `examples/**/.lpe` and fixture `.lpe/` trees.
 - Expanded `.gitignore` so coverage climb/residual dumps, `.coverage.*`, wheels, caches, `.lpe/`, and `artifacts/` do not return.
-- Root remains product/docs surface only (README, LICENSE, CHANGELOG, VALIDATION_REPORT, inventory, Makefile, pyproject, CONTRIBUTING, SECURITY, MAINTAINERS, TEAM_INSTRUCTIONS).
+- Root remains product/docs surface only (README, LICENSE, CHANGELOG, inventory, Makefile, pyproject, CONTRIBUTING, SECURITY).
 - Closure specs under `docs/closure/v1/` untouched; no source/test deletions; no invented pilot data; **not pushed**.

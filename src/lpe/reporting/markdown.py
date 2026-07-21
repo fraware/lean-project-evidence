@@ -13,7 +13,7 @@ REGEX_STUB_PACKET_BANNER = (
     "> **EXTRACTOR HONESTY:** This packet used the **regex-stub** extractor "
     "(lexical AST-lite). Kernel / axiom / impact findings are **incomplete** and "
     "must not be treated as elaborator axiom closure or Mathlib-scale truth. "
-    "See `docs/28_NON_CLAIMS.md`."
+    "See `docs/NON_CLAIMS.md`."
 )
 
 

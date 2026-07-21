@@ -75,7 +75,7 @@ def _schema_files_present(repo_root: Path) -> bool:
 
 
 def _migration_doc_present(repo_root: Path) -> bool:
-    return (repo_root / "docs" / "18_CONTRACT_MIGRATION.md").exists()
+    return (repo_root / "docs" / "CONTRACT.md").exists()
 
 
 def _validate_example_contract(repo_root: Path) -> tuple[bool, str]:

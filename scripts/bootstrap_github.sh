@@ -26,9 +26,9 @@ gh repo create "${GITHUB_OWNER}/${REPO_NAME}" \
 
 echo "Repository created."
 echo "Next steps:"
-echo "  1. Replace placeholders in .github/CODEOWNERS (see MAINTAINERS.md)"
+echo "  1. Replace placeholders in .github/CODEOWNERS"
 echo "  2. python scripts/github_launch.py labels --apply"
 echo "  3. python scripts/github_launch.py milestones --apply"
 echo "  4. python scripts/github_launch.py import-issues --apply"
-echo "  5. Configure branch protection per docs/16_REPOSITORY_LAUNCH.md"
+echo "  5. Configure branch protection on the default branch"
 echo "  6. python scripts/verify_clean_clone.py"

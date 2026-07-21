@@ -63,7 +63,7 @@ def test_refuse_oversell_flags() -> None:
 
 
 def test_docs_28_non_claims_exists(repository_root: Path) -> None:
-    path = repository_root / "docs" / "28_NON_CLAIMS.md"
+    path = repository_root / "docs" / "NON_CLAIMS.md"
     assert path.is_file()
     text = path.read_text(encoding="utf-8")
     assert "§21" in text or "section 21" in text.lower() or "ENGINEERING_SPEC" in text
@@ -220,7 +220,7 @@ def test_markdown_regex_stub_banner(example_project, example_candidate) -> None:
     # skip_build path uses regex-stub → mandatory honesty banner
     assert "regex-stub" in md.lower() or REGEX_STUB_PACKET_BANNER.split("\n")[0] in md
     assert "incomplete" in md.lower()
-    assert "Mathlib" in md or "28_NON_CLAIMS" in md
+    assert "Mathlib" in md or "NON_CLAIMS" in md
 
 
 def test_lean_extractor_status_shape() -> None:

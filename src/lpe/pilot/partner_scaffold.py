@@ -94,11 +94,10 @@ lpe pilot summary ledger/{ledger_name} --project-id {project_id} \\
 
 ## Required reading
 
-- [docs/24_PARTNER_PILOT_READY.md](../../docs/24_PARTNER_PILOT_READY.md) (from repo root)
-- [docs/pilot_study_protocol.md](../../docs/pilot_study_protocol.md)
-- [docs/pilot_analysis_plan_template.md](../../docs/pilot_analysis_plan_template.md)
-- [docs/pilot_dry_run.md](../../docs/pilot_dry_run.md)
+- [docs/PILOT.md](../../docs/PILOT.md) (from repo root)
+- [docs/closure/PILOT_OPERATOR_RUNBOOK.md](../../docs/closure/PILOT_OPERATOR_RUNBOOK.md)
 - [docs/adr/0003-human-authority.md](../../docs/adr/0003-human-authority.md)
+- [docs/NON_CLAIMS.md](../../docs/NON_CLAIMS.md)
 
 See `PROTOCOL_LINKS.md` and `NON_CLAIMS.md` in this directory.
 """
@@ -120,13 +119,10 @@ Paths are relative to the **repository root** (not this working directory).
 
 | Document | Path | Role |
 | --- | --- | --- |
-| Partner readiness checklist | `docs/24_PARTNER_PILOT_READY.md` | Operational go / no-go |
-| Study protocol template | `docs/pilot_study_protocol.md` | Shadow-pilot design |
-| Analysis plan template | `docs/pilot_analysis_plan_template.md` | Preregistration fields |
-| Report template | `docs/pilot_report_template.md` | Software vs causal split |
-| Dry-run honesty | `docs/pilot_dry_run.md` | Instrumentation-only dry-run |
+| Pilot protocol + readiness | `docs/PILOT.md` | Instrumentation and study design |
+| Operator runbook | `docs/closure/PILOT_OPERATOR_RUNBOOK.md` | Live partner freeze / lock / analyze |
 | Human authority | `docs/adr/0003-human-authority.md` | No R3/R4 auto-accept |
-| Explicit non-claims | `docs/28_NON_CLAIMS.md` | Canonical anti-oversell list |
+| Explicit non-claims | `docs/NON_CLAIMS.md` | Canonical anti-oversell list |
 | Ledger durability | `docs/adr/0004-append-only-ledger.md` | Append-only events |
 | Lean image | `docker/lpe-lean/README.md` | `lpe-lean:4.14` sandbox |
 | Scientific gate | `docs/ENGINEERING_SPEC.md` §21 | Research clearance (not claimed) |
@@ -185,7 +181,7 @@ def _analysis_plan_stub(project_id: str) -> str:
 > Do not treat this file as preregistration until a signed, dated freeze replaces
 > `{ANALYSIS_PLAN_STATUS_UNFROZEN}` with `FROZEN` and an archive copy is stored.
 
-Copy fields from `docs/pilot_analysis_plan_template.md` (repository root).
+Copy fields from `docs/PILOT.md` (repository root).
 
 ## Identity
 
@@ -283,14 +279,20 @@ def init_partner_pilot(
     (root / "analysis_plan.md").write_text(_analysis_plan_stub(project_id), encoding="utf-8")
     (reports_dir / "field_log_template.md").write_text(_field_log_template(), encoding="utf-8")
 
-    # Prefer copying the canonical report template when the repo layout is known.
-    report_src = _find_repo_doc("docs/pilot_report_template.md")
+    # Prefer copying report guidance from the consolidated pilot doc when available.
+    report_src = _find_repo_doc("docs/PILOT.md")
     report_dst = reports_dir / "pilot_report_template.md"
     if report_src is not None:
-        report_dst.write_text(report_src.read_text(encoding="utf-8"), encoding="utf-8")
+        report_dst.write_text(
+            "# Pilot report guidance\n\n"
+            "See repository `docs/PILOT.md` (report guidance section).\n\n"
+            + report_src.read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
     else:
         report_dst.write_text(
-            "# Pilot report template\n\nSee repository `docs/pilot_report_template.md`.\n",
+            "# Pilot report template\n\n"
+            "Separate software metrics from causal claims. See `docs/PILOT.md`.\n",
             encoding="utf-8",
         )
 

@@ -29,7 +29,7 @@ def main() -> int:
     message = (
         "FAIL: .github/CODEOWNERS still contains REPLACE_WITH placeholders.\n"
         "Merge is blocked until real GitHub handles replace placeholders "
-        "(see MAINTAINERS.md and docs/20_LAUNCH_CHECKLIST.md).\n" + "\n".join(hits)
+        "(see .github/CODEOWNERS).\n" + "\n".join(hits)
     )
     warn_only = os.environ.get("LPE_CODEOWNERS_PLACEHOLDERS_OK", "").strip() in {
         "1",

@@ -72,7 +72,7 @@ NON_CLAIMS_ITEMS: tuple[dict[str, str], ...] = (
 )
 
 NON_CLAIMS_BANNER = "NON_CLAIMS"
-NON_CLAIMS_DOC_PATH = "docs/28_NON_CLAIMS.md"
+NON_CLAIMS_DOC_PATH = "docs/NON_CLAIMS.md"
 
 # CLI / payload keys that must never be True for honesty.
 _FORBIDDEN_TRUE_KEYS = frozenset(
@@ -180,7 +180,7 @@ def refuse_oversell_flags(
 # Partner-scaffold markdown (kept in sync with docs/28).
 NON_CLAIMS_MARKDOWN = """# Explicit non-claims
 
-Canonical list: `docs/28_NON_CLAIMS.md` (repository root).
+Canonical list: `docs/NON_CLAIMS.md`.
 
 1. **ENGINEERING_SPEC §21 is not passed.** Instrumentation and dry-runs only.
 2. **No causal utility / causal TPPR** from warehouse or dry-run software metrics.

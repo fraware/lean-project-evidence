@@ -1,8 +1,38 @@
-# Contract migration protocol
+# Project contract
 
-This document defines how project contracts evolve across `schema_version` releases.
+## Location
 
-## Version policy
+`.lean-project-contract/`
+
+## Files
+
+- `project.yaml`
+- `intent/project.md`
+- `terminology.yaml`
+- `obligations.yaml`
+- `policies.yaml`
+- `review.yaml`
+- `tests/`
+
+## Contract-authoring rule
+
+Record only information that changes an acceptance decision or makes a downstream milestone measurable.
+
+Every minute of contract maintenance belongs in the TPPR denominator.
+
+## Change control
+
+Contract changes are reviewed separately from candidate changes.
+
+A candidate cannot modify its own acceptance contract in the same evidence run.
+
+Contract version and content hash are recorded in every packet.
+
+## Migration protocol
+
+This section defines how project contracts evolve across `schema_version` releases.
+
+### Version policy
 
 - Contract files use semantic versions (`MAJOR.MINOR.PATCH`).
 - Every contract file includes `schema_version`.
@@ -11,7 +41,7 @@ This document defines how project contracts evolve across `schema_version` relea
 - Field removals or meaning changes require a major release.
 - Old schemas remain exported under `schemas/` so historical packets stay interpretable.
 
-## Migration steps
+### Migration steps
 
 1. Export the new schemas with `python scripts/export_schemas.py` and commit the updated `schemas/*.schema.json` files.
 2. Bump `SCHEMA_VERSION` and `SUPPORTED_SCHEMA_VERSIONS` together in `src/lpe/models.py`.
@@ -19,15 +49,15 @@ This document defines how project contracts evolve across `schema_version` relea
 4. Update `examples/minimal-project/.lean-project-contract/` to the new version before release.
 5. Re-run `pytest`, `lpe contract validate`, and schema export checks in CI.
 
-## Non-mutating rule
+### Non-mutating rule
 
 Existing ledger events and evidence packets are never rewritten. Contract migrations affect only future loads and compiles.
 
-## Rollback
+### Rollback
 
 If a migration fails validation, restore the prior contract directory from version control and keep the previous `schema_version` until the migration is corrected.
 
-## Validation gates
+### Validation gates
 
 A migrated contract must pass:
 
@@ -38,7 +68,7 @@ A migrated contract must pass:
 - non-empty intent markdown;
 - deterministic `contract_hash` reproducibility from canonical JSON.
 
-## Dry-run and apply helpers
+### Dry-run and apply helpers
 
 Use `lpe contract migrate-dry-run PATH [--to VERSION]` to plan a rewrite
 **without mutating files**. Behavior:

@@ -145,7 +145,7 @@ def refuse_research_entrypoint(name: str) -> None:
             f"{epic} blocked until machine-readable §21 authorization. "
             f"Entrypoint {name!r} is not available; training does not exist. "
             "Run `lpe research status` or `lpe research evaluate-gates`. "
-            "See docs/28_NON_CLAIMS.md."
+            "See docs/NON_CLAIMS.md."
         )
 
 
@@ -184,7 +184,7 @@ def research_status_payload() -> dict[str, Any]:
         "learned_routing_authorized": False,
         "synthesis_authorized": False,
         "gates": list(RESEARCH_GATE_MATRIX),
-        "non_claims_doc": "docs/28_NON_CLAIMS.md",
+        "non_claims_doc": "docs/NON_CLAIMS.md",
     }
 
 

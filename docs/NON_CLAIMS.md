@@ -47,8 +47,7 @@ ENGINEERING_SPEC §21 and do **not** prove LPE improves outcomes.
 
 ## Related
 
-- `VALIDATION_REPORT.md` — honesty preamble and audit §9 mirror
-- `docs/26_SPEC_ROADMAP_AUDIT.md` §8–9 — “do not claim” scorecard
-- `docs/27_PARTNER_PILOT_HANDOFF.md` — partner pilot still deferred
-- `docs/adr/0003-human-authority.md` — R3/R4 human authority
-- `docs/ENGINEERING_SPEC.md` §21 — scientific clearance criteria (not claimed)
+- [`adr/0003-human-authority.md`](adr/0003-human-authority.md) — R3/R4 human authority
+- [`ENGINEERING_SPEC.md`](ENGINEERING_SPEC.md) §21 — scientific clearance criteria (not claimed)
+- [`PILOT.md`](PILOT.md) — partner instrumentation vs study claims
+- [`closure/PILOT_OPERATOR_RUNBOOK.md`](closure/PILOT_OPERATOR_RUNBOOK.md) — live partner operator steps

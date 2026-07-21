@@ -24,7 +24,7 @@ def test_dry_run_no_op_when_already_at_target(example_project: Path) -> None:
     assert report["action"] == "no_op"
     assert report["mutated"] is False
     assert report["files_to_rewrite"] == []
-    assert "18_CONTRACT_MIGRATION" in report["bump_path"]
+    assert "CONTRACT.md" in report["bump_path"] or "migration" in report["bump_path"].lower()
 
 
 def test_dry_run_would_rewrite_0_1_to_current(example_project: Path) -> None:

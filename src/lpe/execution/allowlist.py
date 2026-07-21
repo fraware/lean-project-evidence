@@ -36,7 +36,7 @@ def validate_build_command(command: list[str]) -> list[str]:
     if not command:
         raise CommandAllowlistError(
             "build_command is empty. Configure an allowlisted command such as "
-            f"{sorted(ALLOWED_BUILD_COMMANDS)} (see docs/09_SECURITY_AND_PRIVACY.md)."
+            f"{sorted(ALLOWED_BUILD_COMMANDS)} (see docs/SECURITY_AND_PRIVACY.md)."
         )
 
     executable = command[0]
@@ -68,7 +68,7 @@ def validate_build_command(command: list[str]) -> list[str]:
         raise CommandAllowlistError(
             f"build_command executable {executable!r} (basename {basename!r}) is not "
             f"on the allowlist. Allowed: {sorted(ALLOWED_BUILD_COMMANDS)}. "
-            "See docs/09_SECURITY_AND_PRIVACY.md."
+            "See docs/SECURITY_AND_PRIVACY.md."
         )
 
     return command
