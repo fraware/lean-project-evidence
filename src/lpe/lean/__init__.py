@@ -1,9 +1,9 @@
 """Lean extraction adapter package."""
 
 from lpe.lean.extractor import (
+    EXTRACTION_SCHEMA_V1_1,
     REGEX_STUB_EXTRACTOR,
     TOOLCHAIN_EXTRACTOR,
-    EXTRACTION_SCHEMA_V1_1,
     AdaptiveLeanExtractor,
     LeanDeclaration,
     LeanExtractionResult,
@@ -18,9 +18,18 @@ from lpe.lean.extractor import (
     lean_toolchain_available,
     list_lean_source_modules,
     load_toolchain_json,
-    signature_for_hash,
     resolve_changed_names_detailed,
     resolve_changed_names_for_cone,
+    signature_for_hash,
+)
+from lpe.lean.models import (
+    EXTRACTION_PROTOCOL_VERSION,
+    EXTRACTION_SCHEMA_V2,
+    GENERIC_EXTRACTOR_ID,
+    UNSUPPORTED_TOOLCHAIN_CODE,
+    DeclarationRecord,
+    ExtractionCompleteness,
+    LeanExtractionResultV2,
 )
 from lpe.lean.toolchain import (
     ensure_toolchain_extraction,
@@ -30,12 +39,19 @@ from lpe.lean.toolchain import (
 )
 
 __all__ = [
+    "EXTRACTION_PROTOCOL_VERSION",
+    "EXTRACTION_SCHEMA_V1_1",
+    "EXTRACTION_SCHEMA_V2",
+    "GENERIC_EXTRACTOR_ID",
     "REGEX_STUB_EXTRACTOR",
     "TOOLCHAIN_EXTRACTOR",
-    "EXTRACTION_SCHEMA_V1_1",
+    "UNSUPPORTED_TOOLCHAIN_CODE",
     "AdaptiveLeanExtractor",
+    "DeclarationRecord",
+    "ExtractionCompleteness",
     "LeanDeclaration",
     "LeanExtractionResult",
+    "LeanExtractionResultV2",
     "LeanExtractor",
     "RegexLeanExtractor",
     "artifact_covers_lean_sources",

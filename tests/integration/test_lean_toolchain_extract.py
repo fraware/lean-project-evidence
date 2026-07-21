@@ -59,7 +59,10 @@ def test_lake_exe_produces_toolchain_json(tmp_path: Path) -> None:
         assert decl.signature_hash == sha256_text(decl.signature)
     # Schema 1.1: Environment decl edges separate from module import edges.
     assert result.declaration_dependency_edges
-    assert ("LpeFixture.Core.coreVal", "LpeFixture.Diamond.apex") in result.declaration_dependency_edges
+    assert (
+        "LpeFixture.Core.coreVal",
+        "LpeFixture.Diamond.apex",
+    ) in result.declaration_dependency_edges
     assert ("LpeFixture.Diamond.leftBranch", "LpeFixture.Diamond.bottom") in (
         result.declaration_dependency_edges
     )
@@ -139,9 +142,7 @@ def test_lake_extract_import_expansion_semantics(tmp_path: Path) -> None:
         baseline_imports=["LpeFixture.Core"],
     )
     assert result.extractor == TOOLCHAIN_EXTRACTOR
-    diff = result.import_diff or import_expansion(
-        ["LpeFixture.Core"], result.imports
-    )
+    diff = result.import_diff or import_expansion(["LpeFixture.Core"], result.imports)
     # New fixture modules beyond the baseline Core import.
     assert "LpeFixture.Diamond" in diff["added"] or "LpeFixture.Chain" in diff["added"]
     assert "LpeFixture.Core" not in diff["added"]
@@ -280,7 +281,10 @@ def test_lake_extract_opaque_kinds_and_limitation_notes(tmp_path: Path) -> None:
     # hiddenHelper may or may not appear depending on Lean's opaque value storage;
     # never invent a cone membership claim beyond emitted edges.
     edges = set(result.declaration_dependency_edges)
-    if ("LpeFixture.OpaqueLimits.hiddenHelper", "LpeFixture.OpaqueLimits.secretOpaque") not in edges:
+    if (
+        "LpeFixture.OpaqueLimits.hiddenHelper",
+        "LpeFixture.OpaqueLimits.secretOpaque",
+    ) not in edges:
         assert "LpeFixture.OpaqueLimits.hiddenHelper" not in cone
 
 

@@ -42,9 +42,7 @@ def _seed_example_with_toolchain(
         payload = json.loads(
             (TOOLCHAIN_PROJECT / ".lpe" / "lean-extraction.json").read_text(encoding="utf-8")
         )
-    (lpe_dir / "lean-extraction.json").write_text(
-        json.dumps(payload, indent=2), encoding="utf-8"
-    )
+    (lpe_dir / "lean-extraction.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return dest
 
 
@@ -89,9 +87,7 @@ def test_removing_toolchain_json_falls_back_to_regex_stub(tmp_path: Path) -> Non
     assert result.complete is False
 
 
-def test_compile_toolchain_json_allows_axiom_pass(
-    example_project: Path, tmp_path: Path
-) -> None:
+def test_compile_toolchain_json_allows_axiom_pass(example_project: Path, tmp_path: Path) -> None:
     project = _seed_example_with_toolchain(tmp_path / "proj", example_project)
     packet = compile_evidence(project, _candidate_for_comparison(), skip_build=True)
     axiom = next(f for f in packet.findings if f.check_id == "lean.prohibited_axioms")
@@ -105,9 +101,7 @@ def test_compile_toolchain_json_allows_axiom_pass(
     assert "Example.Public.Comparison.helper" in impact.details.get("impact_cone", [])
 
 
-def test_compile_regex_stub_never_axiom_pass(
-    example_project: Path, tmp_path: Path
-) -> None:
+def test_compile_regex_stub_never_axiom_pass(example_project: Path, tmp_path: Path) -> None:
     """Honesty: same Lean sources without toolchain JSON → axiom UNKNOWN, never PASS."""
     project = tmp_path / "proj"
     shutil.copytree(example_project, project)
@@ -128,9 +122,7 @@ def test_compile_regex_stub_never_axiom_pass(
     assert impact.details.get("extractor") == REGEX_STUB_EXTRACTOR
 
 
-def test_toolchain_incomplete_flag_never_pass(
-    example_project: Path, tmp_path: Path
-) -> None:
+def test_toolchain_incomplete_flag_never_pass(example_project: Path, tmp_path: Path) -> None:
     incomplete = json.loads(
         (TOOLCHAIN_PROJECT / ".lpe" / "lean-extraction.json").read_text(encoding="utf-8")
     )
@@ -147,9 +139,7 @@ def test_toolchain_incomplete_flag_never_pass(
     assert impact.details.get("complete") is False
 
 
-def test_toolchain_with_prohibited_axiom_fails(
-    example_project: Path, tmp_path: Path
-) -> None:
+def test_toolchain_with_prohibited_axiom_fails(example_project: Path, tmp_path: Path) -> None:
     payload = {
         "declarations": [
             {
@@ -169,9 +159,7 @@ def test_toolchain_with_prohibited_axiom_fails(
         "complete": True,
         "errors": [],
     }
-    project = _seed_example_with_toolchain(
-        tmp_path / "proj", example_project, extraction=payload
-    )
+    project = _seed_example_with_toolchain(tmp_path / "proj", example_project, extraction=payload)
     packet = compile_evidence(project, _candidate_for_comparison(), skip_build=True)
     axiom = next(f for f in packet.findings if f.check_id == "lean.prohibited_axioms")
     assert axiom.status is FindingStatus.FAIL
