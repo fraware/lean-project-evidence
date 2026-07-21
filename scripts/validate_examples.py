@@ -13,7 +13,5 @@ candidate_path = ROOT / "examples" / "candidates" / "R3-definition-change.json"
 candidate = CandidateDescriptor.model_validate(
     json.loads(candidate_path.read_text(encoding="utf-8"))
 )
-validate_candidate_obligations(
-    contract, candidate.project_id, candidate.obligation_ids
-)
+validate_candidate_obligations(contract, candidate.project_id, candidate.obligation_ids)
 print(contract.contract_hash)
