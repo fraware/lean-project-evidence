@@ -1,0 +1,98 @@
+{
+  "schema_version": "1.0",
+  "source": {
+    "closure_package": "docs/closure/v1/",
+    "spec": "docs/closure/v1/lean_project_evidence_engineering_closure_spec_v1.md",
+    "backlog": "docs/closure/v1/lean_project_evidence_closure_backlog_v1.csv",
+    "release_acceptance": "docs/closure/v1/lean_project_evidence_release_acceptance_v1.md",
+    "manifest": "docs/closure/v1/MANIFEST.sha256",
+    "audited_commit": "412b380dacd6b33300ee1c007e0ec8aa2ab5fb1a"
+  },
+  "closure": {
+    "current_release": "0.2.0",
+    "status": "in_progress",
+    "phase": "bootstrap",
+    "phase_a_to_g_code_implemented": false,
+    "non_claims_preserved": true
+  },
+  "release_train": [
+    {
+      "release": "0.2.0",
+      "name": "Evidence Integrity",
+      "status": "in_progress",
+      "closure_ids": "CLOSURE-001..CLOSURE-017"
+    },
+    {
+      "release": "0.3.0",
+      "name": "Pilot Readiness",
+      "status": "not_started",
+      "closure_ids": "CLOSURE-018..CLOSURE-032"
+    },
+    {
+      "release": "0.4.0",
+      "name": "Pilot Completion",
+      "status": "not_started",
+      "closure_ids": "CLOSURE-033..CLOSURE-036"
+    },
+    {
+      "release": "post-gate",
+      "name": "Post-Gate Research Capabilities",
+      "status": "blocked",
+      "closure_ids": "CLOSURE-037..CLOSURE-038"
+    }
+  ],
+  "milestones": [
+    {
+      "id": "M0",
+      "name": "Foundation",
+      "status": "fixture_done",
+      "notes": "Fixture-scoped foundation exists at the audited baseline."
+    },
+    {
+      "id": "M1",
+      "name": "Deterministic Evidence",
+      "status": "fixture_done",
+      "notes": "Fixture-scoped deterministic evidence exists; closure 0.2.0 must harden candidate consistency and provenance."
+    },
+    {
+      "id": "M2",
+      "name": "Review Operation",
+      "status": "fixture_done",
+      "notes": "Fixture-scoped review operation exists; closure 0.3.0 must add typed quorum and R3/R4 human acceptance."
+    },
+    {
+      "id": "M3",
+      "name": "Lean-Aware Evidence",
+      "status": "fixture_done",
+      "notes": "Fixture-scoped Lean extraction exists; closure 0.2.0 must add generic extraction and paired base/head protocol."
+    },
+    {
+      "id": "M4",
+      "name": "Semantic Evidence",
+      "status": "fixture_done",
+      "notes": "Fixture-scoped semantic providers exist; closure 0.2.0 must route executable checks through one workspace and executor."
+    },
+    {
+      "id": "M5",
+      "name": "Shadow Pilot",
+      "status": "instrument_ready",
+      "notes": "Pilot instrumentation is present, but protocol freeze, assignment, data lock, and Section 21 gates remain closure work."
+    },
+    {
+      "id": "M6",
+      "name": "Learned Routing",
+      "status": "blocked",
+      "authorization_flag": "learned_routing_authorized",
+      "authorized": false,
+      "notes": "Blocked until a machine-readable Section 21 gate report authorizes learned routing."
+    },
+    {
+      "id": "M7",
+      "name": "Project-Targeted Synthesis",
+      "status": "blocked",
+      "authorization_flag": "synthesis_authorized",
+      "authorized": false,
+      "notes": "Blocked until a machine-readable Section 21 gate report authorizes project-targeted synthesis."
+    }
+  ]
+}
