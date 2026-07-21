@@ -1,0 +1,23 @@
+{
+  "schema_version": "0.3.0",
+  "freeze_id": "proto-freeze-proto.example-partner.v1",
+  "protocol_id": "proto.example-partner.v1",
+  "protocol_hash": "75120fe6a0e760a4474f5fc3bb0d780639123194b028e0da1422f39af0225274",
+  "component_hashes": {
+    "protocol.yaml": "144e58a67a89e2720025d35bc9883ada3e477ad2a18e4b507bc8c543021cb018",
+    "endpoints.yaml": "05dae54f16838869caea64bcd4408e6d599c282d23ded240665cf3c0c6f7ee23",
+    "assignment.yaml": "83f27630bb7a20b7628eb45bb84f9ed8d7713a6c38067d5d3b7ec317a915226c",
+    "reviewer-roster.yaml": "f3e5c1f0b8fa99bdd4475e044acdd4a99b341252596c558ee4a21d109686dc20",
+    "held-out-set.json": "f175aed8e6a767abce1a5b1769fd825c59b3461b9d79f77bad4a476d6a30c07e",
+    "comprehension.yaml": "8ae9a36a78485d801aa5debcb2551f745f1fb147f6738777831f5797e085ba4e",
+    "analysis.yaml": "9a1fd6532e58e3c499bb14d8bdd18f517bea3980b2ceecb083523535c18eb240",
+    "signatures.json": "d70171e1117c0fa8e843b8d3e313a1e94dbfb3a2b53638c11d01d7b038bc752c"
+  },
+  "frozen_at": "2026-07-21T09:03:57.655171+00:00",
+  "signatures": {
+    "research_lead": "research-lead@example.org",
+    "domain_lead": "domain-lead@example.org",
+    "repository_maintainer": "maintainer@example.org",
+    "signed_at": "2026-07-21T09:03:57.607257Z"
+  }
+}

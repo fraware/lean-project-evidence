@@ -1,0 +1,12 @@
+roster_id: roster.example.v1
+reviewers:
+- reviewer_id: domain-alice
+  roles:
+  - domain-lead
+  eligible: true
+  conflict_declaration_hash: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+- reviewer_id: maint-bob
+  roles:
+  - repository-maintainer
+  eligible: true
+  conflict_declaration_hash: dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd

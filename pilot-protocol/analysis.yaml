@@ -1,0 +1,14 @@
+plan_id: analysis.example.v1
+primary_endpoints:
+- weighted_accepted_obligations_per_review_repair_hour
+- l2_l3_defect_sensitivity
+- tppr_v2_by_condition
+secondary_endpoints:
+- median_review_minutes
+- agreement
+agreement_methods:
+- cohen_kappa
+- fleiss_kappa
+- gwet_ac1
+bootstrap_iterations: 2000
+analysis_image_digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

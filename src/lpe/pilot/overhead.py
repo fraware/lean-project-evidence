@@ -17,7 +17,7 @@ class OverheadReport:
         baseline_minutes: float,
         instrumented_minutes: float,
         budget_fraction: float = 0.10,
-    ) -> "OverheadReport":
+    ) -> OverheadReport:
         if baseline_minutes <= 0:
             overhead = 0.0
         else:

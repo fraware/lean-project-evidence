@@ -1,0 +1,6 @@
+primary_operational: weighted_accepted_with_quorum / (H_review + H_repair)
+primary_safety: proportion_adjudicated_L2_L3_before_integration
+primary_north_star: tppr_v2_by_condition
+secondary:
+- median_review_minutes
+- automation_rate

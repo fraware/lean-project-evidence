@@ -1,0 +1,9 @@
+assignment_id: assign.example.v1
+randomization_seed_ciphertext: enc:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+seed_key_id: pilot-seed-key-1
+strata:
+- risk_class
+- artifact_type
+workload_balance: true
+author_exclusion: true
+repair_blinding: true

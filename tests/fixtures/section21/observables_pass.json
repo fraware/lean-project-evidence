@@ -1,0 +1,14 @@
+{
+  "packet_automation_rate": 0.85,
+  "exact_environment_reproduction": 0.95,
+  "median_instrumentation_overhead": 0.05,
+  "p90_instrumentation_overhead": 0.12,
+  "comprehension_pass_rate": 0.9,
+  "primary_category_agreement": 0.8,
+  "instrumented_efficiency_gain": 0.25,
+  "instrumented_l2_l3_sensitivity_delta_pp": -1.0,
+  "instrumented_additional_integrated_l3": 0,
+  "sealed_reproducible": true,
+  "dataset_sufficiency_for_routing": true,
+  "dataset_sufficiency_for_synthesis": true
+}

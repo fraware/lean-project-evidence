@@ -160,9 +160,7 @@ def test_cli_overhead_separated_from_review_minutes(tmp_path: Path) -> None:
 def test_record_field_overhead_api(tmp_path: Path) -> None:
     store = LedgerStore(tmp_path / "p.sqlite3")
     wh = PilotWarehouse(store, actor_id="ops", project_id="proj")
-    report, entry = compute_field_overhead(
-        baseline_minutes=50.0, wall_minutes=54.0
-    )
+    report, entry = compute_field_overhead(baseline_minutes=50.0, wall_minutes=54.0)
     assert report.within_budget is True
     assert entry.is_review_minutes is False
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -112,7 +112,7 @@ def synthetic_candidates(tmp_path: Path, count: int) -> list[Path]:
 
 def build_frozen_corpus(repository_root: Path, work_dir: Path) -> list[Path]:
     examples = load_example_candidates(repository_root)
-    # 6 examples + 12 synthetic = 18 (within 10–20 target).
+    # 6 examples + 12 synthetic = 18 (within 10-20 target).
     synthetic = synthetic_candidates(work_dir, 12)
     corpus = examples + synthetic
     if not 10 <= len(corpus) <= 20:
@@ -162,9 +162,7 @@ def run_frozen_corpus_dry_run(
         condition = "instrumented" if index % 2 == 0 else "control"
 
         if warehouse is None:
-            warehouse = PilotWarehouse(
-                store, actor_id=actor_id, project_id=project_id
-            )
+            warehouse = PilotWarehouse(store, actor_id=actor_id, project_id=project_id)
 
         warehouse.register_candidate(
             candidate_id=candidate_id,
@@ -190,18 +188,14 @@ def run_frozen_corpus_dry_run(
         )
         compile_overhead_minutes += (time.perf_counter() - t0) / 60.0
         if compile_result.exit_code != 0:
-            raise RuntimeError(
-                f"compile failed for {candidate_id}: {compile_result.stdout}"
-            )
+            raise RuntimeError(f"compile failed for {candidate_id}: {compile_result.stdout}")
 
         packet = json.loads(packet_path.read_text(encoding="utf-8"))
         if packet["recommendation"] not in {"ESCALATE", "REJECT", "ACCEPT"}:
             raise RuntimeError(f"unexpected recommendation for {candidate_id}")
         # skip_build + regex-stub ⇒ hard gate must not silently pass.
         if packet["hard_gate_passed"] is not False:
-            raise RuntimeError(
-                f"hard_gate_passed unexpectedly true for {candidate_id}"
-            )
+            raise RuntimeError(f"hard_gate_passed unexpectedly true for {candidate_id}")
 
         warehouse.mark_packet_automated(
             candidate_id=candidate_id,
@@ -232,9 +226,7 @@ def run_frozen_corpus_dry_run(
                     "reviewer_roles": [],
                     "decision": "REQUEST_REPAIR",
                     "confidence": 75,
-                    "rationale": (
-                        "Pilot dry-run escalate path only; not a §21 study outcome."
-                    ),
+                    "rationale": ("Pilot dry-run escalate path only; not a §21 study outcome."),
                     "review_minutes": review_minutes,
                     "required_repair": "Dry-run: clarify candidate intent",
                 }
@@ -258,9 +250,7 @@ def run_frozen_corpus_dry_run(
         )
         if review_result.exit_code != 0:
             raise RuntimeError(
-                "review failed: "
-                + review_result.stdout
-                + (review_result.stderr or "")
+                "review failed: " + review_result.stdout + (review_result.stderr or "")
             )
 
         warehouse.record_expert_time(
@@ -296,7 +286,7 @@ def run_frozen_corpus_dry_run(
             project_id=project_id,
             artifact_id="pilot-dry-run-corpus",
             obligation_id="O-01",
-            occurred_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            occurred_at=datetime(2026, 1, 1, tzinfo=UTC),
             actor_id=actor_id,
             payload={"weight": 3, "note": "dry-run only; not §21"},
         )
@@ -323,9 +313,7 @@ def run_frozen_corpus_dry_run(
 
     # Refresh summary after overhead append.
     summary = summarize_pilot(LedgerStore(ledger), project_id=project_id)
-    summary_json, summary_md = write_summary_reports(
-        summary, reports_dir, stem="pilot_summary"
-    )
+    summary_json, summary_md = write_summary_reports(summary, reports_dir, stem="pilot_summary")
 
     refuse_oversell_flags(
         section_21_cleared=summary.section_21_cleared,
