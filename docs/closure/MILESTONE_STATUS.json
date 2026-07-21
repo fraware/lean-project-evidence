@@ -6,39 +6,113 @@
     "backlog": "docs/closure/v1/lean_project_evidence_closure_backlog_v1.csv",
     "release_acceptance": "docs/closure/v1/lean_project_evidence_release_acceptance_v1.md",
     "manifest": "docs/closure/v1/MANIFEST.sha256",
-    "audited_commit": "412b380dacd6b33300ee1c007e0ec8aa2ab5fb1a"
+    "audited_commit": "412b380dacd6b33300ee1c007e0ec8aa2ab5fb1a",
+    "remaining_acceptance": "docs/closure/REMAINING_ACCEPTANCE.md"
   },
   "closure": {
     "current_release": "0.2.0",
-    "status": "in_progress",
-    "phase": "bootstrap",
+    "status": "engineering_complete_formal_acceptance_open",
+    "phase": "phase_e",
     "phase_a_to_g_code_implemented": false,
-    "non_claims_preserved": true
+    "phase_a_engineering": true,
+    "phase_b_engineering": true,
+    "phase_c_engineering": true,
+    "phase_d_engineering": true,
+    "phase_e_engineering": true,
+    "phase_f_engineering": "scaffolding_only",
+    "phase_g_engineering": "blocked",
+    "phase_g_blocked": true,
+    "formal_0_2_0_acceptance_checklist_complete": false,
+    "formal_0_3_0_acceptance_checklist_complete": false,
+    "formal_0_4_0_requires_live_partner": true,
+    "package_version_honesty": "Package remains 0.2.0 until formal release-acceptance checklists are closed; Phase D–E engineering is present but not a 0.3.0 tag claim.",
+    "non_claims_preserved": true,
+    "known_partials": [
+      "compatibility_matrix_external_scale_pending_live_validation",
+      "coverage_overall_90_critical_95_branch_85_met",
+      "live_paired_extract_opt_in",
+      "docker_image_publish_by_digest_recipe_ready_push_needs_registry"
+    ],
+    "notes": "Engineering for CLOSURE-001–032 is present on the working tree with documented partials (see REMAINING_ACCEPTANCE.md gap matrix). Package version stays 0.2.0. CLOSURE-031 live GitHub Check E2E remains operator/secrets-gated. CLOSURE-033–036 need a live partner. CLOSURE-037/038 remain BLOCKED until Section21GateReport authorization. Generic extract defaults on when safe; live paired extract remains opt-in (EXTRACT_DEFAULTS.md). Synthetic §21 pass/fail fixtures exist; no live pilot claimed. Coverage: overall lines 94.17% and critical packages ≥95% met; branch 85.22% met (CI hard via check_coverage_gates.py --fail-under=90 --require-critical --require-branch). Full src/lpe ruff+mypy+format merge-ready. CLOSURE-017 coverage/typing gates met (no longer a documented partial). FindingPayload typed variants emitted by semantic/downstream/fixture providers and compiler (legacy dict coercion retained). Snapshot copy skips .lpe/artifacts CAS and tooling caches to avoid re-ingest feedback loops. Docker digest record scripts exist without requiring registry login."
+  },
+  "closure_ids": {
+    "CLOSURE-001": "done_engineering",
+    "CLOSURE-002": "done_engineering",
+    "CLOSURE-003": "done_engineering",
+    "CLOSURE-004": "done_engineering_partial_sbom_digest_publish",
+    "CLOSURE-005": "done_engineering",
+    "CLOSURE-006": "done_engineering_partial_scale",
+    "CLOSURE-007": "done_engineering",
+    "CLOSURE-008": "done_engineering_paired_live_opt_in",
+    "CLOSURE-009": "done_engineering_partial_matrix",
+    "CLOSURE-010": "done_engineering",
+    "CLOSURE-011": "done_engineering",
+    "CLOSURE-012": "done_engineering",
+    "CLOSURE-013": "done_engineering",
+    "CLOSURE-014": "done_engineering",
+    "CLOSURE-015": "done_engineering",
+    "CLOSURE-016": "done_engineering",
+    "CLOSURE-017": "done_engineering",
+    "CLOSURE-018": "done_engineering",
+    "CLOSURE-019": "done_engineering",
+    "CLOSURE-020": "done_engineering",
+    "CLOSURE-021": "done_engineering",
+    "CLOSURE-022": "done_engineering",
+    "CLOSURE-023": "done_engineering",
+    "CLOSURE-024": "done_engineering",
+    "CLOSURE-025": "done_engineering",
+    "CLOSURE-026": "done_engineering",
+    "CLOSURE-027": "done_engineering",
+    "CLOSURE-028": "done_engineering",
+    "CLOSURE-029": "done_engineering",
+    "CLOSURE-030": "done_engineering",
+    "CLOSURE-031": "engineering_ready_needs_secrets",
+    "CLOSURE-032": "done_engineering",
+    "CLOSURE-033": "needs_partner",
+    "CLOSURE-034": "needs_partner",
+    "CLOSURE-035": "needs_partner",
+    "CLOSURE-036": "needs_partner",
+    "CLOSURE-037": "blocked",
+    "CLOSURE-038": "blocked",
+    "done_engineering": "CLOSURE-001..CLOSURE-003, CLOSURE-005, CLOSURE-007, CLOSURE-010..CLOSURE-017, CLOSURE-018..CLOSURE-030, CLOSURE-032",
+    "done_engineering_with_documented_partials": "CLOSURE-004, CLOSURE-006, CLOSURE-008, CLOSURE-009",
+    "engineering_ready_needs_secrets": "CLOSURE-031",
+    "needs_partner": "CLOSURE-033..CLOSURE-036",
+    "blocked": "CLOSURE-037..CLOSURE-038"
   },
   "release_train": [
     {
       "release": "0.2.0",
       "name": "Evidence Integrity",
-      "status": "in_progress",
-      "closure_ids": "CLOSURE-001..CLOSURE-017"
+      "status": "engineering_complete_formal_acceptance_open",
+      "closure_ids": "CLOSURE-001..CLOSURE-017",
+      "engineering_complete_ids": "CLOSURE-001..CLOSURE-017"
     },
     {
       "release": "0.3.0",
       "name": "Pilot Readiness",
-      "status": "not_started",
-      "closure_ids": "CLOSURE-018..CLOSURE-032"
+      "status": "engineering_present_package_not_bumped",
+      "closure_ids": "CLOSURE-018..CLOSURE-032",
+      "engineering_complete_ids": "CLOSURE-018..CLOSURE-030, CLOSURE-032",
+      "notes": "Code for Phase D–E is present. Package/tag remain 0.2.0 until formal checklists + live Check E2E (CLOSURE-031) close. See REMAINING_ACCEPTANCE.md."
     },
     {
       "release": "0.4.0",
       "name": "Pilot Completion",
-      "status": "not_started",
-      "closure_ids": "CLOSURE-033..CLOSURE-036"
+      "status": "needs_partner",
+      "closure_ids": "CLOSURE-033..CLOSURE-036",
+      "notes": "CLI/automation scaffolding present; live partner freeze, episodes, persistence, and sealed report require human partner selection and field execution."
     },
     {
       "release": "post-gate",
       "name": "Post-Gate Research Capabilities",
       "status": "blocked",
-      "closure_ids": "CLOSURE-037..CLOSURE-038"
+      "closure_ids": "CLOSURE-037..CLOSURE-038",
+      "authorization_flags": {
+        "learned_routing_authorized": false,
+        "synthesis_authorized": false
+      },
+      "notes": "Do not implement training until learned_routing_authorized / synthesis_authorized from Section21GateReport."
     }
   ],
   "milestones": [
@@ -52,31 +126,31 @@
       "id": "M1",
       "name": "Deterministic Evidence",
       "status": "fixture_done",
-      "notes": "Fixture-scoped deterministic evidence exists; closure 0.2.0 must harden candidate consistency and provenance."
+      "notes": "Workspace fingerprinting, CAS, and basis/coverage model advanced in Phase A-C engineering."
     },
     {
       "id": "M2",
       "name": "Review Operation",
       "status": "fixture_done",
-      "notes": "Fixture-scoped review operation exists; closure 0.3.0 must add typed quorum and R3/R4 human acceptance."
+      "notes": "Typed quorum, dimension attestations, conflicts, repair/adjudication landed (CLOSURE-021–024)."
     },
     {
       "id": "M3",
       "name": "Lean-Aware Evidence",
       "status": "fixture_done",
-      "notes": "Fixture-scoped Lean extraction exists; closure 0.2.0 must add generic extraction and paired base/head protocol."
+      "notes": "Generic extraction default-on when safe; live paired opt-in; compatibility matrix fixture supported, external scale pending_live_validation."
     },
     {
       "id": "M4",
       "name": "Semantic Evidence",
       "status": "fixture_done",
-      "notes": "Fixture-scoped semantic providers exist; closure 0.2.0 must route executable checks through one workspace and executor."
+      "notes": "Fixture manifests, successor suites, synthesis registry landed in Phase C."
     },
     {
       "id": "M5",
       "name": "Shadow Pilot",
       "status": "instrument_ready",
-      "notes": "Pilot instrumentation is present, but protocol freeze, assignment, data lock, and Section 21 gates remain closure work."
+      "notes": "Protocol bundle, assignment, comprehension, data lock, analysis, §21 evaluator, TPPR v2 engineering present. Live partner study not executed. Live GitHub Check E2E needs dedicated-repo secrets (CLOSURE-031)."
     },
     {
       "id": "M6",
@@ -84,7 +158,7 @@
       "status": "blocked",
       "authorization_flag": "learned_routing_authorized",
       "authorized": false,
-      "notes": "Blocked until a machine-readable Section 21 gate report authorizes learned routing."
+      "notes": "CLOSURE-037 BLOCKED until machine-readable Section21GateReport.learned_routing_authorized=true. No training implementation."
     },
     {
       "id": "M7",
@@ -92,7 +166,7 @@
       "status": "blocked",
       "authorization_flag": "synthesis_authorized",
       "authorized": false,
-      "notes": "Blocked until a machine-readable Section 21 gate report authorizes project-targeted synthesis."
+      "notes": "CLOSURE-038 BLOCKED until machine-readable Section21GateReport.synthesis_authorized=true. No training implementation."
     }
   ]
 }

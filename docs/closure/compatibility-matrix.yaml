@@ -1,0 +1,128 @@
+# LPE Lean compatibility matrix (CLOSURE-006 / spec §9.10–9.11).
+# Fixture is supported. External projects: selected candidates with pinned SHAs
+# for selection workflow; scale gates remain incomplete until live extract
+# validation is recorded (network/`@pytest.mark.slow` / `@pytest.mark.lean`).
+
+schema_version: "1.0"
+protocol_version: "2.0"
+status: partial  # fixture supported; external scale gates pending live validation
+
+toolchains:
+  - id: lean-4.14.x
+    status: supported
+    prefix: "leanprover/lean4:v4.14."
+    accepted_prefixes:
+      - "leanprover/lean4:v4.14."
+      - "leanprover/lean4:v4.14.0"
+    notes: "Primary supported line for 0.2.0; matches tests/fixtures/lean_project"
+
+  - id: lean-4.22.0-rc4
+    status: candidate
+    prefix: "leanprover/lean4:v4.22.0-rc4"
+    accepted_prefixes:
+      - "leanprover/lean4:v4.22.0-rc4"
+    project:
+      name: batteries
+      repository: https://github.com/leanprover-community/batteries
+      commit_sha: "pending_live_validation"
+    notes: >
+      Current-stable candidate used by Batteries; commit_sha remains
+      pending_live_validation until a recorded extract run pins it.
+
+projects:
+  - id: fixture
+    status: supported
+    kind: fixture
+    name: LpeFixture
+    path: tests/fixtures/lean_project
+    commit_sha: local
+    mathlib: false
+    min_declarations: 1
+    notes: "In-repo Lake fixture; default CI + unit extract coverage"
+
+  - id: small-independent-public
+    status: selected_candidate
+    kind: small_independent
+    name: batteries
+    repository: https://github.com/leanprover-community/batteries
+    # Pin is a selection intent, not a validated extract result.
+    commit_sha: pending_live_validation
+    lean_toolchain: leanprover/lean4:v4.22.0-rc4
+    mathlib: false
+    min_declarations: 1
+    notes: >
+      Small independent public Lake project (no Mathlib). Selection workflow
+      records this candidate; scale test skips until commit_sha is a real SHA
+      and network/Lake are available.
+
+  - id: medium-500-decls
+    status: selected_candidate
+    kind: medium
+    name: Aesop
+    repository: https://github.com/leanprover-community/aesop
+    commit_sha: pending_live_validation
+    lean_toolchain: pending_live_validation
+    mathlib: false
+    min_declarations: 500
+    notes: "Medium public project candidate; needs pinned SHA + extract count gate"
+
+  - id: mathlib-backed-downstream
+    status: selected_candidate
+    kind: mathlib_downstream
+    name: mathlib4-sample-usage
+    repository: https://github.com/leanprover-community/mathlib4
+    commit_sha: pending_live_validation
+    mathlib: true
+    cache_required: true
+    min_declarations: 1
+    notes: >
+      Mathlib-backed downstream extract is operator/network gated. Do not claim
+      completeness from this matrix row alone.
+
+  - id: bounded-mathlib-10k
+    status: selected_candidate
+    kind: bounded_mathlib
+    name: mathlib4-bounded-modules
+    repository: https://github.com/leanprover-community/mathlib4
+    commit_sha: pending_live_validation
+    mathlib: true
+    module_set: pending_selection
+    min_declarations: 10000
+    notes: "Bounded Mathlib module set (≥10k decls) requires live cache + selection"
+
+scale_gates:
+  - id: fixture
+    project_ref: fixture
+    required_before: "0.2.0"
+    status: satisfied_by_fixture
+  - id: small-independent-public
+    project_ref: small-independent-public
+    required_before: "0.2.0"
+    status: pending_live_validation
+  - id: medium-500-decls
+    project_ref: medium-500-decls
+    required_before: "0.2.0"
+    status: pending_live_validation
+  - id: mathlib-backed-downstream
+    project_ref: mathlib-backed-downstream
+    required_before: "0.2.0"
+    status: pending_live_validation
+  - id: bounded-mathlib-10k
+    project_ref: bounded-mathlib-10k
+    required_before: "0.2.0"
+    status: pending_live_validation
+
+selection_workflow:
+  script: scripts/validate_compatibility_matrix.py
+  scale_test: tests/unit/test_compatibility_matrix.py
+  notes: >
+    Run `python scripts/validate_compatibility_matrix.py` to summarize gaps.
+    Use `--require-selected` only when every scale gate has a real commit_sha
+    and a recorded extract. Pytest scale cases skip without network/SHA.
+
+unsupported_policy:
+  code: UNSUPPORTED_TOOLCHAIN
+  silent_regex_success: forbidden
+  notes: >
+    Unsupported toolchains must fail with UNSUPPORTED_TOOLCHAIN and must never
+    be reported as elaborator success via silent regex-stub fallback.
