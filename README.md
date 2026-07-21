@@ -102,8 +102,28 @@ Metrics such as generated declarations, compilation rate, proofs completed, revi
 
 ## Status
 
-This repository is an engineering scaffold and specification for the first implementation. The deterministic contract, evidence, ledger, and TPPR core are executable. Lean semantic extraction, dependency impact analysis, downstream replacement testing, and model-assisted checks are defined behind interfaces and belong to the staged backlog.
+Package version is **0.2.0** (evidence-integrity engineering). That is an
+engineering package version, **not** a formal acceptance or production-readiness
+claim.
 
-**Partner shadow-pilot instrumentation:** engineering-ready via `docs/24_PARTNER_PILOT_READY.md` and `lpe pilot init-partner` — ready to *instrument*, not ready to *claim* §21 / causal utility. See also `docs/pilot_analysis_plan_template.md` (UNFROZEN until partner signs).
+| Track | Honest status |
+| --- | --- |
+| **0.2.0** Evidence Integrity | Engineering present; formal checklist open — do not tag until humans close `docs/closure/REMAINING_ACCEPTANCE.md` |
+| **0.3.0** Pilot Readiness | Engineering present on the tree (typed ledger, R1–R4 quorum, TPPR v2, protocol freeze, assignment, comprehension, data lock, §21 evaluator); package **not** bumped; live GitHub Check E2E needs secrets |
+| **0.4.0** Pilot Completion | Needs live partner execution (`docs/closure/PILOT_OPERATOR_RUNBOOK.md`) |
+| **M6 / M7** | Blocked until `Section21GateReport` authorizes training |
 
-**Explicit non-claims:** see [`docs/28_NON_CLAIMS.md`](docs/28_NON_CLAIMS.md) (canonical). M6/M7 training is blocked until §21 (`lpe research status`).
+Machine-readable status: [`docs/closure/MILESTONE_STATUS.json`](docs/closure/MILESTONE_STATUS.json).
+Remaining formal items: [`docs/closure/REMAINING_ACCEPTANCE.md`](docs/closure/REMAINING_ACCEPTANCE.md).
+
+M3/M4 Lean-aware and semantic evidence interfaces work for fixture/partner
+instrumentation; Mathlib-scale / external compatibility pins remain
+`pending_live_validation`.
+
+**Partner shadow-pilot:** ready to *instrument* via `lpe pilot init-partner`,
+`pilot-protocol/`, and the operator runbook — **not** ready to *claim* §21 /
+causal utility. Analysis plans stay UNFROZEN until a partner signs.
+
+**Explicit non-claims:** [`docs/28_NON_CLAIMS.md`](docs/28_NON_CLAIMS.md).
+M6/M7 training stays blocked until `learned_routing_authorized` /
+`synthesis_authorized` (`lpe research status`, `lpe research evaluate-gates`).
