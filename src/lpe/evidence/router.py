@@ -39,12 +39,8 @@ def select_review_question(
     routing = _BASELINE.route(
         unresolved_dimensions=[finding.dimension.value for finding in unresolved]
     )
-    priority_rank = {
-        name: index for index, name in enumerate(routing.question_priority)
-    }
-    unresolved.sort(
-        key=lambda finding: priority_rank.get(finding.dimension.value, 99)
-    )
+    priority_rank = {name: index for index, name in enumerate(routing.question_priority)}
+    unresolved.sort(key=lambda finding: priority_rank.get(finding.dimension.value, 99))
     finding = unresolved[0] if unresolved else None
 
     if finding is not None and finding.dimension is EvidenceDimension.SEMANTIC:
@@ -52,7 +48,9 @@ def select_review_question(
             "Does the candidate preserve the intended mathematical object, assumptions, "
             "and level of generality recorded in the project contract?"
         )
-        relevance = "Semantic acceptance controls whether the artifact can count as trusted progress."
+        relevance = (
+            "Semantic acceptance controls whether the artifact can count as trusted progress."
+        )
     elif finding is not None and finding.dimension is EvidenceDimension.REPOSITORY:
         question = (
             "Does the candidate use the repository's intended abstraction and belong in "
@@ -70,7 +68,9 @@ def select_review_question(
             "Should this high-risk candidate be accepted as expressing the project's intended "
             "mathematics and repository architecture?"
         )
-        relevance = "Project policy reserves high-risk semantic decisions for an authorized reviewer."
+        relevance = (
+            "Project policy reserves high-risk semantic decisions for an authorized reviewer."
+        )
 
     return ReviewQuestion(
         question_id=new_id("question"),

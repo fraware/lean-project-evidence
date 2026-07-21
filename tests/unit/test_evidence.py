@@ -102,32 +102,30 @@ def test_private_and_docs_candidates_mark_api_fit_not_applicable(
     """No public decls → api_fit / declared_use are N/A (not soft UNKNOWN theater)."""
     r0 = CandidateDescriptor.model_validate(
         json.loads(
-            (
-                repository_root / "examples" / "candidates" / "R0-comment-only.json"
-            ).read_text(encoding="utf-8")
+            (repository_root / "examples" / "candidates" / "R0-comment-only.json").read_text(
+                encoding="utf-8"
+            )
         )
     )
     r1 = CandidateDescriptor.model_validate(
         json.loads(
-            (
-                repository_root / "examples" / "candidates" / "R1-private-lemma.json"
-            ).read_text(encoding="utf-8")
+            (repository_root / "examples" / "candidates" / "R1-private-lemma.json").read_text(
+                encoding="utf-8"
+            )
         )
     )
     for candidate in (r0, r1):
         packet = compile_evidence(example_project, candidate, skip_build=True)
         api_fit = next(f for f in packet.findings if f.check_id == "repository.api_fit")
-        declared = next(
-            f for f in packet.findings if f.check_id == "downstream.declared_use"
-        )
+        declared = next(f for f in packet.findings if f.check_id == "downstream.declared_use")
         assert api_fit.status is FindingStatus.NOT_APPLICABLE
         assert declared.status is FindingStatus.NOT_APPLICABLE
     # Public R3 still leaves these unresolved.
     r3 = CandidateDescriptor.model_validate(
         json.loads(
-            (
-                repository_root / "examples" / "candidates" / "R3-definition-change.json"
-            ).read_text(encoding="utf-8")
+            (repository_root / "examples" / "candidates" / "R3-definition-change.json").read_text(
+                encoding="utf-8"
+            )
         )
     )
     packet_r3 = compile_evidence(example_project, r3, skip_build=True)

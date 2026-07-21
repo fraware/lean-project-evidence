@@ -53,8 +53,7 @@ def decide(
             hard_gate_passed=False,
             recommendation=Recommendation.REJECT,
             reasons=[
-                "hard gate failures: "
-                + "; ".join(finding.summary for finding in hard_failures)
+                "hard gate failures: " + "; ".join(finding.summary for finding in hard_failures)
             ],
             uncertainty=[],
             hard_failures=[finding.check_id for finding in hard_failures],
@@ -64,14 +63,9 @@ def decide(
     unresolved_hard = [
         finding
         for finding in findings
-        if finding.check_id in HARD_FAIL_CHECKS
-        and finding.status is FindingStatus.UNKNOWN
+        if finding.check_id in HARD_FAIL_CHECKS and finding.status is FindingStatus.UNKNOWN
     ]
-    unknown = [
-        finding.summary
-        for finding in findings
-        if finding.status is FindingStatus.UNKNOWN
-    ]
+    unknown = [finding.summary for finding in findings if finding.status is FindingStatus.UNKNOWN]
 
     # AUDIT-020: unresolved hard-relevant checks must not imply hard_gate_passed.
     if unresolved_hard:
@@ -80,8 +74,7 @@ def decide(
             hard_gate_passed=False,
             recommendation=Recommendation.ESCALATE,
             reasons=[
-                "hard-relevant checks unresolved (not axiom-safe): "
-                + ", ".join(unresolved_ids)
+                "hard-relevant checks unresolved (not axiom-safe): " + ", ".join(unresolved_ids)
             ],
             uncertainty=unknown,
             hard_failures=[],

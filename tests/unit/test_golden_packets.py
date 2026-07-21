@@ -58,7 +58,8 @@ FORCED_ESCALATE_DIMENSIONS = frozenset(
 @pytest.mark.parametrize(
     ("fixture", "expected_risk", "expected_recommendation"),
     [
-        ("R0-comment-only.json", RiskClass.R0, Recommendation.ESCALATE),
+        # Lexical fallback floors at R1 (CLOSURE-009: never R0 auto-accept).
+        ("R0-comment-only.json", RiskClass.R1, Recommendation.ESCALATE),
         ("R1-private-lemma.json", RiskClass.R1, Recommendation.ESCALATE),
         ("R2-public-theorem.json", RiskClass.R2, Recommendation.ESCALATE),
         ("R3-definition-change.json", RiskClass.R3, Recommendation.ESCALATE),
@@ -208,9 +209,7 @@ def test_sandbox_isolation_not_applicable_when_skip_build(
 
     monkeypatch.setattr(DockerSandboxExecutor, "is_available", staticmethod(lambda: True))
     candidate = load_candidate("R0-comment-only.json")
-    packet = compile_evidence(
-        example_project, candidate, skip_build=True, use_sandbox=True
-    )
+    packet = compile_evidence(example_project, candidate, skip_build=True, use_sandbox=True)
     isolation = next(f for f in packet.findings if f.check_id == "execution.isolation")
     # AUDIT-006: skip_build must not claim isolation PASS.
     assert isolation.status is FindingStatus.NOT_APPLICABLE

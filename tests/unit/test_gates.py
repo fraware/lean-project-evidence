@@ -123,4 +123,3 @@ def test_r0_auto_accept_when_no_unknown() -> None:
     decision = decide(findings=findings, risk_class=RiskClass.R0, auto_accept_eligible=True)
     assert decision.recommendation is Recommendation.ACCEPT
     assert decision.hard_gate_passed is True
-

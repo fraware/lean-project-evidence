@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from lpe import __version__
 from lpe.contract.loader import load_contract, validate_candidate_obligations
 from lpe.evidence.gates import decide
+from lpe.evidence.payloads import (
+    FindingPayload,
+    executed_check_payload,
+    opaque_finding_payload,
+    structural_diff_payload,
+)
 from lpe.evidence.risk import classify_risk
 from lpe.evidence.router import select_review_question
+from lpe.evidence.synthesis import apply_synthesis, recommendation_policy_id
 from lpe.execution.allowlist import validate_build_command
 from lpe.execution.protocol import LeanExecutor
 from lpe.execution.runner import SubprocessLeanExecutor
@@ -19,12 +26,10 @@ from lpe.execution.sandbox import (
     isolation_status_for_executor,
     parse_combined_phase,
 )
-from lpe.execution.worktree import create_isolated_worktree, store_execution_logs
 from lpe.git.candidate import enrich_candidate_from_git
 from lpe.git.diff import GitError
 from lpe.hashing import sha256_text, sha256_value
 from lpe.ids import new_id
-from lpe.paths import PathTraversalError, assert_safe_repo_relative
 from lpe.lean.extractor import (
     REGEX_STUB_EXTRACTOR,
     TOOLCHAIN_EXTRACTOR,
@@ -33,7 +38,6 @@ from lpe.lean.extractor import (
     impact_cone,
     import_expansion,
     resolve_changed_names_detailed,
-    resolve_changed_names_for_cone,
 )
 from lpe.lean.toolchain import (
     NOTE_DOCKER_EXTRACT,
@@ -47,14 +51,20 @@ from lpe.lean.toolchain import (
 )
 from lpe.models import (
     CandidateDescriptor,
+    EvidenceCoverage,
     EvidenceDimension,
     EvidenceFinding,
     EvidencePacket,
     FindingStatus,
+    HardGateResult,
     ProjectContract,
     Provenance,
     Severity,
+    UncertaintyRecord,
 )
+from lpe.paths import PathTraversalError, assert_safe_repo_relative
+from lpe.providers.base import CancellationToken, ProviderContext
+from lpe.providers.downstream import DownstreamSuccessorProvider
 from lpe.providers.semantic import (
     CounterexampleProvider,
     DownstreamReplacementProvider,
@@ -62,6 +72,30 @@ from lpe.providers.semantic import (
     ExampleRunnerProvider,
     StatementDiffProvider,
 )
+from lpe.workspace.artifacts import (
+    validate_packet_size_budget,
+)
+from lpe.workspace.manager import (
+    EvaluationWorkspaceManager,
+    HostExecutionRefusedError,
+    NetworkPolicyError,
+    canonical_finding_payload,
+    compute_evidence_fingerprint,
+    select_executor,
+    stable_finding_id,
+)
+
+# Re-export workspace policy errors for CLI / callers that historically imported
+# them from the compiler module.
+__all__ = [
+    "HostExecutionRefusedError",
+    "NetworkPolicyError",
+    "compile_evidence",
+]
+
+# Compatibility re-exports for tests that still patch the legacy worktree helper.
+from lpe.execution.worktree import create_isolated_worktree  # noqa: F401
+from lpe.workspace.snapshots import create_snapshot_pair  # noqa: F401
 
 # Extractors that cannot prove axiom closure — never PASS lean.prohibited_axioms.
 _INCOMPLETE_AXIOM_EXTRACTORS = frozenset(
@@ -73,20 +107,25 @@ _INCOMPLETE_AXIOM_EXTRACTORS = frozenset(
 )
 
 
-class HostExecutionRefusedError(RuntimeError):
-    """Raised when a host subprocess build would run without an explicit insecure opt-in."""
-
-
-class NetworkPolicyError(RuntimeError):
-    """Raised when network_policy cannot be enforced with the selected executor."""
-
-
 def _normalize_network_policy(policy: str) -> str:
     normalized = (policy or "deny").strip().lower()
     if normalized not in {"deny", "allow"}:
         # Fail closed: unknown policies are treated as deny.
         return "deny"
     return normalized
+
+
+def _select_executor(
+    *,
+    insecure_host_exec: bool,
+    network_policy: str,
+) -> tuple[LeanExecutor, bool]:
+    """Compatibility wrapper; prefer ``select_executor`` for descriptors."""
+    executor, _descriptor, network_isolated = select_executor(
+        insecure_host_exec=insecure_host_exec,
+        network_policy=network_policy,
+    )
+    return executor, network_isolated
 
 
 def _provenance(
@@ -111,6 +150,20 @@ def _provenance(
     )
 
 
+_DEFAULT_CHECK_VERSION = "0.1.0"
+
+
+def _subject_hash(*, check_id: str, dimension: EvidenceDimension, details: dict[str, Any]) -> str:
+    """Stable subject digest for finding IDs (CLOSURE-011)."""
+    return sha256_value(
+        {
+            "check_id": check_id,
+            "dimension": dimension.value if hasattr(dimension, "value") else str(dimension),
+            "details": details,
+        }
+    )[:16]
+
+
 def _finding(
     *,
     check_id: str,
@@ -123,11 +176,21 @@ def _finding(
     finished: datetime,
     command: list[str] | None = None,
     provider_metadata: dict[str, Any] | None = None,
+    check_version: str = _DEFAULT_CHECK_VERSION,
+    payload: FindingPayload | None = None,
 ) -> EvidenceFinding:
-    return EvidenceFinding(
-        finding_id=new_id("finding"),
+    finding_id = stable_finding_id(
         check_id=check_id,
-        check_version="0.1.0",
+        subject_hash=_subject_hash(check_id=check_id, dimension=dimension, details=details),
+        check_version=check_version,
+    )
+    typed_payload: FindingPayload = (
+        payload if payload is not None else _default_compiler_payload(check_id, details)
+    )
+    return EvidenceFinding(
+        finding_id=finding_id,
+        check_id=check_id,
+        check_version=check_version,
         dimension=dimension,
         status=status,
         severity=severity,
@@ -141,49 +204,19 @@ def _finding(
             output={"status": status, "summary": summary},
             provider_metadata=provider_metadata,
         ),
+        payload=typed_payload,
     )
 
 
-def _select_executor(
-    *,
-    insecure_host_exec: bool,
-    network_policy: str,
-) -> tuple[LeanExecutor, bool]:
-    """Prefer Docker sandbox; refuse host subprocess unless explicitly opted in.
-
-    Returns (executor, network_isolated). network_isolated is True only when Docker
-    will run with --network=none.
-    """
-    policy = _normalize_network_policy(network_policy)
-
-    if policy == "deny":
-        # Host subprocess cannot enforce network isolation (AUDIT-019).
-        if insecure_host_exec:
-            raise NetworkPolicyError(
-                "network_policy is 'deny', which requires Docker --network=none. "
-                "Host subprocess execution (--insecure-host-exec) cannot enforce "
-                "network isolation and is refused. Install Docker, or set "
-                "network_policy to 'allow' only for trusted repositories."
-            )
-        if not DockerSandboxExecutor.is_available():
-            raise HostExecutionRefusedError(
-                "network_policy is 'deny' and Docker sandbox is unavailable. "
-                "Install Docker and ensure it is on PATH. Host builds cannot "
-                "satisfy a deny network policy (--insecure-host-exec is not "
-                "sufficient when network_policy is deny)."
-            )
-        return DockerSandboxExecutor(network_none=True), True
-
-    # policy == "allow": sandbox preferred; host opt-in permitted.
-    if insecure_host_exec:
-        return SubprocessLeanExecutor(), False
-    if DockerSandboxExecutor.is_available():
-        return DockerSandboxExecutor(network_none=False), False
-    raise HostExecutionRefusedError(
-        "Docker sandbox is unavailable and host subprocess builds are refused by default "
-        "for untrusted repositories. Install Docker and ensure it is on PATH, or pass "
-        "--insecure-host-exec to allow unisolated host builds (not recommended)."
-    )
+def _default_compiler_payload(check_id: str, details: dict[str, Any]) -> FindingPayload:
+    if check_id in {"lean.build", "lean.typecheck"}:
+        return executed_check_payload(check_id, details)
+    if check_id.startswith("lean.") or check_id.startswith("repository."):
+        if any(
+            key in details for key in ("changed", "compared", "missing", "impact_cone", "axioms")
+        ):
+            return structural_diff_payload(details)
+    return opaque_finding_payload(details)
 
 
 def _is_incomplete_axiom_extractor(extractor_id: str) -> bool:
@@ -196,7 +229,7 @@ def _is_incomplete_axiom_extractor(extractor_id: str) -> bool:
     )
 
 
-def _is_toolchain_complete(extraction) -> bool:
+def _is_toolchain_complete(extraction: Any) -> bool:
     return (
         extraction.extractor == TOOLCHAIN_EXTRACTOR
         and bool(getattr(extraction, "complete", False))
@@ -204,7 +237,7 @@ def _is_toolchain_complete(extraction) -> bool:
     )
 
 
-def _extract_executor_from_notes(extraction) -> str | None:
+def _extract_executor_from_notes(extraction: Any) -> str | None:
     """Derive extract provenance from toolchain notes (docker-sandbox vs host)."""
     notes = list(getattr(extraction, "notes", []) or [])
     for note in notes:
@@ -218,8 +251,8 @@ def _extract_executor_from_notes(extraction) -> str | None:
 
 
 def _check_axioms(
-    contract,
-    extraction,
+    contract: Any,
+    extraction: Any,
     *,
     started: datetime,
 ) -> EvidenceFinding:
@@ -229,7 +262,7 @@ def _check_axioms(
     incomplete = _is_incomplete_axiom_extractor(extraction.extractor)
 
     if extraction.errors:
-        finished = datetime.now(timezone.utc)
+        finished = datetime.now(UTC)
         return _finding(
             check_id="lean.prohibited_axioms",
             dimension=EvidenceDimension.KERNEL,
@@ -243,7 +276,7 @@ def _check_axioms(
         )
 
     if prohibited:
-        finished = datetime.now(timezone.utc)
+        finished = datetime.now(UTC)
         return _finding(
             check_id="lean.prohibited_axioms",
             dimension=EvidenceDimension.KERNEL,
@@ -263,7 +296,7 @@ def _check_axioms(
 
     # Fail closed: incomplete extractors must never PASS (empty axioms_used is not proof).
     if incomplete:
-        finished = datetime.now(timezone.utc)
+        finished = datetime.now(UTC)
         return _finding(
             check_id="lean.prohibited_axioms",
             dimension=EvidenceDimension.KERNEL,
@@ -291,15 +324,14 @@ def _check_axioms(
 
     # Fail closed: lean.toolchain without complete=true is not axiom closure.
     if not _is_toolchain_complete(extraction):
-        finished = datetime.now(timezone.utc)
+        finished = datetime.now(UTC)
         return _finding(
             check_id="lean.prohibited_axioms",
             dimension=EvidenceDimension.KERNEL,
             status=FindingStatus.UNKNOWN,
             severity=Severity.L3,
             summary=(
-                "Toolchain extraction is present but incomplete; "
-                "axiom closure remains unresolved"
+                "Toolchain extraction is present but incomplete; axiom closure remains unresolved"
             ),
             details={
                 "allowed_axioms": sorted(allowed),
@@ -317,7 +349,7 @@ def _check_axioms(
             provider_metadata={"extractor": extraction.extractor},
         )
 
-    finished = datetime.now(timezone.utc)
+    finished = datetime.now(UTC)
     return _finding(
         check_id="lean.prohibited_axioms",
         dimension=EvidenceDimension.KERNEL,
@@ -366,9 +398,7 @@ def _collect_placeholder_materials(
         sources.append("patch_text")
 
     if candidate.patch_path:
-        patch_file = assert_safe_repo_relative(
-            repository, candidate.patch_path, label="patch_path"
-        )
+        patch_file = assert_safe_repo_relative(repository, candidate.patch_path, label="patch_path")
         if patch_file.is_file():
             chunks.append(patch_file.read_text(encoding="utf-8", errors="replace"))
             sources.append(candidate.patch_path)
@@ -418,12 +448,10 @@ def compile_evidence(
     run_id = new_id("run")
     findings: list[EvidenceFinding] = []
 
-    started = datetime.now(timezone.utc)
+    started = datetime.now(UTC)
     if contract is None:
         contract = load_contract(project_path)
-    validate_candidate_obligations(
-        contract, candidate.project_id, candidate.obligation_ids
-    )
+    validate_candidate_obligations(contract, candidate.project_id, candidate.obligation_ids)
 
     # Fail closed early when sandbox=False would violate network_policy=deny.
     if (
@@ -444,7 +472,7 @@ def compile_evidence(
 
     _validate_candidate_paths(repository_path, candidate)
 
-    finished = datetime.now(timezone.utc)
+    finished = datetime.now(UTC)
     findings.append(
         _finding(
             check_id="contract.valid",
@@ -475,7 +503,7 @@ def compile_evidence(
         for path in candidate.changed_paths
         if any(path.startswith(prefix) for prefix in contract.policies.changed_path_denylist)
     ]
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     findings.append(
         _finding(
             check_id="repository.changed_paths",
@@ -498,11 +526,9 @@ def compile_evidence(
         candidate=candidate,
     )
     prohibited_tokens = [
-        token
-        for token in contract.project.prohibited_tokens
-        if token in scan_material
+        token for token in contract.project.prohibited_tokens if token in scan_material
     ]
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     findings.append(
         _finding(
             check_id="lean.placeholders",
@@ -523,29 +549,87 @@ def compile_evidence(
         )
     )
 
-    build_repo = repository_path
-    worktree_session = None
     network_policy = _normalize_network_policy(contract.project.execution.network_policy)
     build_ran = False
     network_isolated = False
     executor: LeanExecutor
-    # Capture extraction before worktree cleanup so post-build JSON is not lost.
+    executor_descriptor = None
     pending_extraction = None
     extract_executor_name: str | None = None
     sandbox_invocations: int | None = None
     combined_build_extract = False
     extract_already_done = False
+    ws_manager = EvaluationWorkspaceManager(artifact_root=repository_path)
+    workspace = None
+    build_repo = repository_path
+
+    semantic_providers = (
+        StatementDiffProvider(),
+        ExampleRunnerProvider(),
+        CounterexampleProvider(),
+        DuplicateRetrievalProvider(),
+        DownstreamReplacementProvider(),
+        DownstreamSuccessorProvider(),
+    )
+    provider_versions = {p.provider_id: p.provider_version for p in semantic_providers}
 
     try:
-        if use_worktree and candidate.head_commit:
-            worktree_session = create_isolated_worktree(
-                repository_path,
-                head_commit=candidate.head_commit,
+        # Select executor before workspace so descriptor is frozen into RunManifest.
+        if skip_build and network_policy == "deny" and not DockerSandboxExecutor.is_available():
+            from lpe.workspace.models import ExecutorDescriptor as _ED
+
+            executor = SubprocessLeanExecutor()
+            executor_descriptor = _ED(
+                backend="host",
+                network_policy="deny",
+                readonly_root=False,
+                source_mount_readonly=False,
             )
-            build_repo = worktree_session.worktree_path
+            network_isolated = False
+        elif skip_build and insecure_host_exec and network_policy == "allow":
+            executor, executor_descriptor, network_isolated = select_executor(
+                insecure_host_exec=True,
+                network_policy="allow",
+            )
+        elif skip_build and DockerSandboxExecutor.is_available():
+            executor, executor_descriptor, network_isolated = select_executor(
+                insecure_host_exec=False,
+                network_policy=network_policy,
+            )
+        elif skip_build:
+            from lpe.workspace.models import ExecutorDescriptor as _ED
+
+            executor = SubprocessLeanExecutor()
+            executor_descriptor = _ED(
+                backend="host",
+                network_policy="allow" if network_policy == "allow" else "deny",
+                readonly_root=False,
+                source_mount_readonly=False,
+            )
+            network_isolated = False
+        else:
+            executor, executor_descriptor, network_isolated = select_executor(
+                insecure_host_exec=insecure_host_exec,
+                network_policy=network_policy,
+            )
+
+        # Always create an EvaluationWorkspace so providers never see the operator path.
+        # ``use_worktree`` is retained for CLI compatibility; workspace isolation is mandatory.
+        _ = use_worktree
+        workspace = ws_manager.create(
+            repository_path,
+            contract,
+            candidate,
+            executor=executor,
+            executor_descriptor=executor_descriptor,
+            run_id=run_id,
+            provider_versions=provider_versions,
+            artifact_root=repository_path,
+        )
+        build_repo = workspace.candidate_path
 
         if skip_build:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             findings.append(
                 _finding(
                     check_id="lean.build",
@@ -558,24 +642,9 @@ def compile_evidence(
                     finished=now,
                 )
             )
-            # Do not claim isolation for a build that did not run (AUDIT-006).
-            if insecure_host_exec:
-                executor = SubprocessLeanExecutor()
-                network_isolated = False
-            elif DockerSandboxExecutor.is_available() and network_policy == "deny":
-                executor = DockerSandboxExecutor(network_none=True)
-                network_isolated = True
-            elif DockerSandboxExecutor.is_available():
-                executor = DockerSandboxExecutor(network_none=False)
-                network_isolated = False
-            else:
-                executor = SubprocessLeanExecutor()
-                network_isolated = False
+            # Executor already selected above; isolation not claimed for skipped builds.
+            pass
         else:
-            executor, network_isolated = _select_executor(
-                insecure_host_exec=insecure_host_exec,
-                network_policy=network_policy,
-            )
             command = validate_build_command(list(contract.project.execution.build_command))
             allowlist = list(contract.project.execution.environment_allowlist)
             timeout_s = contract.project.execution.timeout_seconds
@@ -588,11 +657,12 @@ def compile_evidence(
                 and not os.environ.get("LPE_LEAN_EXTRACT_CMD", "").strip()
                 and project_declares_lpe_extract(build_repo)
             )
-            build_started = datetime.now(timezone.utc)
+            build_started = datetime.now(UTC)
             if use_combined:
-                out_rel = str(
-                    extraction_artifact_path(build_repo).relative_to(build_repo)
-                ).replace("\\", "/")
+                assert isinstance(executor, DockerSandboxExecutor)
+                out_rel = str(extraction_artifact_path(build_repo).relative_to(build_repo)).replace(
+                    "\\", "/"
+                )
                 result = executor.verify_build_and_extract(
                     repository=build_repo,
                     build_command=command,
@@ -640,11 +710,20 @@ def compile_evidence(
                     sandbox_invocations = 1
                 build_ok = result.exit_code == 0
 
-            build_finished = datetime.now(timezone.utc)
+            build_finished = datetime.now(UTC)
             build_ran = True
-            if worktree_session is not None:
-                store_execution_logs(
-                    worktree_session, stdout=result.stdout, stderr=result.stderr
+            if workspace is not None:
+                workspace.artifact_store.put_text(
+                    result.stdout or "",
+                    "text/plain",
+                    logical_name="build.stdout.log",
+                    producer_id="lpe.compiler",
+                )
+                workspace.artifact_store.put_text(
+                    result.stderr or "",
+                    "text/plain",
+                    logical_name="build.stderr.log",
+                    producer_id="lpe.compiler",
                 )
             status = FindingStatus.PASS if build_ok else FindingStatus.FAIL
             findings.append(
@@ -665,7 +744,10 @@ def compile_evidence(
                         "stderr_hash": sha256_text(result.stderr),
                         "stdout": result.stdout,
                         "stderr": result.stderr,
-                        "worktree": str(build_repo) if use_worktree else None,
+                        "worktree": str(build_repo),
+                        "snapshot_fingerprint": (
+                            workspace.snapshot_fingerprint if workspace else None
+                        ),
                         "insecure_host_exec": insecure_host_exec,
                         "network_policy": network_policy,
                         "network_isolated": network_isolated,
@@ -689,9 +771,7 @@ def compile_evidence(
                     timeout_seconds=contract.project.execution.timeout_seconds,
                     executor=executor,
                     max_output_bytes=contract.project.execution.max_output_bytes,
-                    environment_allowlist=list(
-                        contract.project.execution.environment_allowlist
-                    ),
+                    environment_allowlist=list(contract.project.execution.environment_allowlist),
                 )
                 extract_executor_name = extract_executor_label(executor)
                 if (
@@ -722,9 +802,7 @@ def compile_evidence(
                         and lake_extract.notes
                     ):
                         pending_extraction.notes = list(
-                            dict.fromkeys(
-                                [*pending_extraction.notes, *lake_extract.notes]
-                            )
+                            dict.fromkeys([*pending_extraction.notes, *lake_extract.notes])
                         )
             elif build_ran and extract_already_done:
                 # Combined path already produced pending_extraction (success or fail-closed).
@@ -737,371 +815,440 @@ def compile_evidence(
                     loaded = extract_lean_repository(build_repo, run_toolchain=False)
                     if loaded is not None and pending_extraction.notes:
                         loaded.notes = list(
-                            dict.fromkeys(
-                                [*loaded.notes, *pending_extraction.notes]
-                            )
+                            dict.fromkeys([*loaded.notes, *pending_extraction.notes])
                         )
                         pending_extraction = loaded
             elif not build_ran:
                 pending_extraction = extract_lean_repository(build_repo)
-            # Persist out of the worktree before cleanup so providers re-reading
-            # the primary project path still see toolchain-complete JSON.
+            # Persist toolchain JSON into the durable CAS root (operator .lpe),
+            # while providers continue to read from the live candidate worktree.
             if (
                 pending_extraction is not None
                 and _is_toolchain_complete(pending_extraction)
-                and build_repo.resolve() != repository_path.resolve()
+                and workspace is not None
             ):
                 persist_toolchain_artifact(build_repo, repository_path)
-    finally:
-        # Always tear down worktrees, including when build/validation raises.
-        if worktree_session is not None:
-            worktree_session.cleanup()
-
-    iso_status_name, iso_executor = isolation_status_for_executor(
-        executor,
-        build_ran=build_ran,
-        skip_build=skip_build,
-        network_isolated=network_isolated,
-    )
-    isolation_now = datetime.now(timezone.utc)
-    if iso_status_name == "PASS":
-        iso_status = FindingStatus.PASS
-        iso_severity = Severity.INFO
-        iso_summary = "Build executed in network-isolated Docker sandbox"
-    elif iso_status_name == "NOT_APPLICABLE":
-        iso_status = FindingStatus.NOT_APPLICABLE
-        iso_severity = Severity.INFO
-        iso_summary = (
-            "Build was skipped; isolation was not exercised "
-            "(not claimed as PASS)"
-        )
-    else:
-        iso_status = FindingStatus.UNKNOWN
-        iso_severity = Severity.L2
-        iso_summary = (
-            "Subprocess execution does not independently enforce the configured "
-            "network-isolation policy"
-            if not network_isolated
-            else "Isolation status could not be confirmed for this executor"
-        )
-    findings.append(
-        _finding(
-            check_id="execution.isolation",
-            dimension=EvidenceDimension.KERNEL,
-            status=iso_status,
-            severity=iso_severity,
-            summary=iso_summary,
-            details={
-                "configured_network_policy": network_policy,
-                "executor": iso_executor,
-                "build_ran": build_ran,
-                "skip_build": skip_build,
-                "network_isolated": network_isolated,
-                "insecure_host_exec": insecure_host_exec,
-                "sandbox_preferred": not insecure_host_exec,
-                "extract_executor": extract_executor_name,
-                "combined_build_extract": combined_build_extract,
-                "sandbox_invocations": sandbox_invocations,
-                "required_remedy": (
-                    None
-                    if iso_status is FindingStatus.PASS
-                    else (
-                        None
-                        if iso_status is FindingStatus.NOT_APPLICABLE
-                        else (
-                            "install Docker for sandboxed builds with network_policy=deny; "
-                            "host subprocess cannot claim network isolation"
-                        )
+                workspace.artifact_store.put_text(
+                    (build_repo / ".lpe" / "lean-extraction.json").read_text(
+                        encoding="utf-8", errors="replace"
                     )
-                ),
-            },
-            started=isolation_now,
-            finished=isolation_now,
-        )
-    )
+                    if (build_repo / ".lpe" / "lean-extraction.json").is_file()
+                    else "",
+                    "application/json",
+                    logical_name="lean-extraction.json",
+                    producer_id="lpe.compiler",
+                )
 
-    axiom_started = datetime.now(timezone.utc)
-    if enable_lean_extraction and candidate.changed_paths:
-        # Full-repo extract so impact edges can reach downstream dependents
-        # outside the changed-path set (AUDIT-012). Prefer post-build capture.
-        extraction = pending_extraction or extract_lean_repository(repository_path)
-        findings.append(_check_axioms(contract, extraction, started=axiom_started))
-
-        graph = build_dependency_graph(extraction)
-        changed_names, resolution_warnings = resolve_changed_names_detailed(
-            candidate.changed_declarations, extraction
+        digest_resolved = bool(
+            executor_descriptor and getattr(executor_descriptor, "digest_resolved", False)
         )
-        cone = impact_cone(graph, changed=changed_names)
-        impact_now = datetime.now(timezone.utc)
-        toolchain_ok = _is_toolchain_complete(extraction)
-        if not changed_names and not cone:
-            impact_status = FindingStatus.NOT_APPLICABLE
-            impact_summary = "No changed declarations supplied for impact analysis"
-        elif toolchain_ok:
-            impact_status = FindingStatus.PASS
-            impact_summary = "Impact cone computed from toolchain dependency graph"
+        iso_status_name, iso_executor = isolation_status_for_executor(
+            executor,
+            build_ran=build_ran,
+            skip_build=skip_build,
+            network_isolated=network_isolated,
+            image_digest_resolved=digest_resolved,
+        )
+        isolation_now = datetime.now(UTC)
+        if iso_status_name == "PASS":
+            iso_status = FindingStatus.PASS
+            iso_severity = Severity.INFO
+            iso_summary = "Build executed in network-isolated Docker sandbox"
+        elif iso_status_name == "NOT_APPLICABLE":
+            iso_status = FindingStatus.NOT_APPLICABLE
+            iso_severity = Severity.INFO
+            iso_summary = "Build was skipped; isolation was not exercised (not claimed as PASS)"
         else:
-            # Regex-stub cones are heuristic — never claim toolchain truth (AUDIT-011).
-            impact_status = FindingStatus.UNKNOWN
-            impact_summary = (
-                "Impact cone estimated via regex-stub dependency graph; "
-                "not elaborator-complete"
+            iso_status = FindingStatus.UNKNOWN
+            iso_severity = Severity.L2
+            iso_summary = (
+                "Subprocess execution does not independently enforce the configured "
+                "network-isolation policy"
+                if not network_isolated
+                else "Isolation status could not be confirmed for this executor"
             )
         findings.append(
             _finding(
-                check_id="lean.impact_cone",
+                check_id="execution.isolation",
                 dimension=EvidenceDimension.KERNEL,
-                status=impact_status,
-                severity=Severity.INFO if impact_status is FindingStatus.PASS else Severity.L2,
-                summary=impact_summary,
+                status=iso_status,
+                severity=iso_severity,
+                summary=iso_summary,
                 details={
-                    "changed": sorted(changed_names),
-                    "impact_cone": sorted(cone),
-                    "import_count": len(extraction.imports),
-                    "edge_count": len(extraction.dependency_edges),
-                    "declaration_edge_count": len(
-                        extraction.effective_declaration_edges()
+                    "configured_network_policy": network_policy,
+                    "executor": iso_executor,
+                    "build_ran": build_ran,
+                    "skip_build": skip_build,
+                    "network_isolated": network_isolated,
+                    "insecure_host_exec": insecure_host_exec,
+                    "sandbox_preferred": not insecure_host_exec,
+                    "extract_executor": extract_executor_name,
+                    "combined_build_extract": combined_build_extract,
+                    "sandbox_invocations": sandbox_invocations,
+                    "required_remedy": (
+                        None
+                        if iso_status is FindingStatus.PASS
+                        else (
+                            None
+                            if iso_status is FindingStatus.NOT_APPLICABLE
+                            else (
+                                "install Docker for sandboxed builds with network_policy=deny; "
+                                "host subprocess cannot claim network isolation"
+                            )
+                        )
                     ),
-                    "import_edge_count": len(extraction.import_edges),
-                    "extraction_schema_version": getattr(
-                        extraction, "extraction_schema_version", "1.0"
-                    ),
-                    "extractor": extraction.extractor,
-                    "complete": getattr(extraction, "complete", False),
-                    "notes": list(getattr(extraction, "notes", []) or []),
-                    "extract_executor": _extract_executor_from_notes(extraction),
-                    "graph_semantics": "dependee->depender (downstream impact)",
-                    "resolution_warnings": resolution_warnings,
                 },
-                started=impact_now,
-                finished=impact_now,
-                provider_metadata={"extractor": extraction.extractor},
+                started=isolation_now,
+                finished=isolation_now,
             )
         )
 
-        import_now = datetime.now(timezone.utc)
-        baseline_imports: list[str] = []
-        # Compare candidate-touched file imports against empty baseline when no prior
-        # extraction artifact is supplied; surface added imports honestly.
-        import_diff = extraction.import_diff or import_expansion(
-            baseline_imports, extraction.imports
-        )
-        if not extraction.imports and not import_diff.get("added") and not import_diff.get(
-            "removed"
-        ):
-            import_status = FindingStatus.NOT_APPLICABLE
-            import_summary = "No imports observed in extracted Lean paths"
-        elif toolchain_ok:
-            import_status = FindingStatus.PASS
-            import_summary = "Import expansion computed from toolchain extraction"
+        axiom_started = datetime.now(UTC)
+        if enable_lean_extraction and candidate.changed_paths:
+            # Full-repo extract so impact edges can reach downstream dependents
+            # outside the changed-path set (AUDIT-012). Prefer post-build capture.
+            extraction = pending_extraction or extract_lean_repository(repository_path)
+            findings.append(_check_axioms(contract, extraction, started=axiom_started))
+
+            graph = build_dependency_graph(extraction)
+            changed_names, resolution_warnings = resolve_changed_names_detailed(
+                candidate.changed_declarations, extraction
+            )
+            cone = impact_cone(graph, changed=changed_names)
+            impact_now = datetime.now(UTC)
+            toolchain_ok = _is_toolchain_complete(extraction)
+            if not changed_names and not cone:
+                impact_status = FindingStatus.NOT_APPLICABLE
+                impact_summary = "No changed declarations supplied for impact analysis"
+            elif toolchain_ok:
+                impact_status = FindingStatus.PASS
+                impact_summary = "Impact cone computed from toolchain dependency graph"
+            else:
+                # Regex-stub cones are heuristic — never claim toolchain truth (AUDIT-011).
+                impact_status = FindingStatus.UNKNOWN
+                impact_summary = (
+                    "Impact cone estimated via regex-stub dependency graph; not elaborator-complete"
+                )
+            findings.append(
+                _finding(
+                    check_id="lean.impact_cone",
+                    dimension=EvidenceDimension.KERNEL,
+                    status=impact_status,
+                    severity=Severity.INFO if impact_status is FindingStatus.PASS else Severity.L2,
+                    summary=impact_summary,
+                    details={
+                        "changed": sorted(changed_names),
+                        "impact_cone": sorted(cone),
+                        "import_count": len(extraction.imports),
+                        "edge_count": len(extraction.dependency_edges),
+                        "declaration_edge_count": len(extraction.effective_declaration_edges()),
+                        "import_edge_count": len(extraction.import_edges),
+                        "extraction_schema_version": getattr(
+                            extraction, "extraction_schema_version", "1.0"
+                        ),
+                        "extractor": extraction.extractor,
+                        "complete": getattr(extraction, "complete", False),
+                        "notes": list(getattr(extraction, "notes", []) or []),
+                        "extract_executor": _extract_executor_from_notes(extraction),
+                        "graph_semantics": "dependee->depender (downstream impact)",
+                        "resolution_warnings": resolution_warnings,
+                    },
+                    started=impact_now,
+                    finished=impact_now,
+                    provider_metadata={"extractor": extraction.extractor},
+                )
+            )
+
+            import_now = datetime.now(UTC)
+            baseline_imports: list[str] = []
+            # Compare candidate-touched file imports against empty baseline when no prior
+            # extraction artifact is supplied; surface added imports honestly.
+            import_diff = extraction.import_diff or import_expansion(
+                baseline_imports, extraction.imports
+            )
+            if (
+                not extraction.imports
+                and not import_diff.get("added")
+                and not import_diff.get("removed")
+            ):
+                import_status = FindingStatus.NOT_APPLICABLE
+                import_summary = "No imports observed in extracted Lean paths"
+            elif toolchain_ok:
+                import_status = FindingStatus.PASS
+                import_summary = "Import expansion computed from toolchain extraction"
+            else:
+                import_status = FindingStatus.UNKNOWN
+                import_summary = "Import expansion from regex-stub only; not elaborator-complete"
+            findings.append(
+                _finding(
+                    check_id="lean.import_expansion",
+                    dimension=EvidenceDimension.REPOSITORY,
+                    status=import_status,
+                    severity=Severity.INFO if import_status is FindingStatus.PASS else Severity.L2,
+                    summary=import_summary,
+                    details={
+                        "imports": extraction.imports,
+                        "added": import_diff.get("added", []),
+                        "removed": import_diff.get("removed", []),
+                        "import_edges": [list(e) for e in extraction.import_edges],
+                        "extraction_schema_version": getattr(
+                            extraction, "extraction_schema_version", "1.0"
+                        ),
+                        "semantics": (
+                            "added=modules in after\\before; "
+                            "removed=modules in before\\after; "
+                            "import_edges are module→module when schema≥1.1"
+                        ),
+                        "extractor": extraction.extractor,
+                    },
+                    started=import_now,
+                    finished=import_now,
+                    provider_metadata={"extractor": extraction.extractor},
+                )
+            )
         else:
-            import_status = FindingStatus.UNKNOWN
-            import_summary = (
-                "Import expansion from regex-stub only; not elaborator-complete"
+            findings.append(
+                _finding(
+                    check_id="lean.prohibited_axioms",
+                    dimension=EvidenceDimension.KERNEL,
+                    status=FindingStatus.UNKNOWN,
+                    severity=Severity.L3,
+                    summary="Axiom dependency closure has not yet been extracted",
+                    details={
+                        "allowed_axioms": contract.project.allowed_axioms,
+                        "required_remedy": "enable lean extraction or supply changed .lean paths",
+                    },
+                    started=axiom_started,
+                    finished=datetime.now(UTC),
+                )
             )
-        findings.append(
-            _finding(
-                check_id="lean.import_expansion",
-                dimension=EvidenceDimension.REPOSITORY,
-                status=import_status,
-                severity=Severity.INFO if import_status is FindingStatus.PASS else Severity.L2,
-                summary=import_summary,
-                details={
-                    "imports": extraction.imports,
-                    "added": import_diff.get("added", []),
-                    "removed": import_diff.get("removed", []),
-                    "import_edges": [list(e) for e in extraction.import_edges],
-                    "extraction_schema_version": getattr(
-                        extraction, "extraction_schema_version", "1.0"
-                    ),
-                    "semantics": (
-                        "added=modules in after\\before; "
-                        "removed=modules in before\\after; "
-                        "import_edges are module→module when schema≥1.1"
-                    ),
-                    "extractor": extraction.extractor,
-                },
-                started=import_now,
-                finished=import_now,
-                provider_metadata={"extractor": extraction.extractor},
-            )
-        )
-    else:
-        findings.append(
-            _finding(
-                check_id="lean.prohibited_axioms",
-                dimension=EvidenceDimension.KERNEL,
-                status=FindingStatus.UNKNOWN,
-                severity=Severity.L3,
-                summary="Axiom dependency closure has not yet been extracted",
-                details={
-                    "allowed_axioms": contract.project.allowed_axioms,
-                    "required_remedy": "enable lean extraction or supply changed .lean paths",
-                },
-                started=axiom_started,
-                finished=datetime.now(timezone.utc),
-            )
-        )
 
-    risk_class = classify_risk(candidate)
+        declaration_diff = None
+        if workspace is not None and enable_lean_extraction:
+            import os as _os
 
-    if enable_semantic_providers:
-        for provider in (
-            StatementDiffProvider(),
-            ExampleRunnerProvider(),
-            CounterexampleProvider(),
-            DuplicateRetrievalProvider(),
-            DownstreamReplacementProvider(),
-        ):
-            findings.extend(provider.collect(project_path, contract, candidate))
-    else:
-        semantic_started = datetime.now(timezone.utc)
-        signature_changes = [
-            declaration.name
-            for declaration in candidate.changed_declarations
-            if declaration.signature_changed
+            from lpe.lean.declaration_diff import diff_extractions
+
+            # Live paired extract (2x Lake) remains opt-in: set LPE_PAIRED_EXTRACT=1
+            # when a Lean toolchain is available and elaborator-backed base/head
+            # diff is required. Default dry-run still records fingerprints and
+            # never invents elaborator completeness.
+            paired_live = _os.environ.get("LPE_PAIRED_EXTRACT", "0").lower() in {
+                "1",
+                "true",
+                "yes",
+            }
+            try:
+                paired = ws_manager.extract_pair(dry_run=not paired_live)
+                if (
+                    paired.base.completeness.environment_loaded
+                    and paired.candidate.completeness.environment_loaded
+                    and not paired.base.has_blocking_errors
+                    and not paired.candidate.has_blocking_errors
+                ):
+                    declaration_diff = diff_extractions(paired.base, paired.candidate)
+            except Exception as exc:
+                findings.append(
+                    _finding(
+                        check_id="lean.paired_extract",
+                        dimension=EvidenceDimension.UNCERTAINTY,
+                        status=FindingStatus.UNKNOWN,
+                        severity=Severity.L2,
+                        summary=f"Paired Lean extraction unavailable: {exc}",
+                        details={"error": str(exc)},
+                        started=datetime.now(UTC),
+                        finished=datetime.now(UTC),
+                    )
+                )
+
+        risk_class = classify_risk(candidate, declaration_diff=declaration_diff)
+
+        if enable_semantic_providers:
+            assert workspace is not None
+            provider_context = ProviderContext(
+                workspace=workspace,
+                contract=contract,
+                candidate=candidate,
+                candidate_extraction=pending_extraction,
+                cancellation=CancellationToken(),
+                provider_deadline=datetime.now(UTC),
+            )
+            for provider in semantic_providers:
+                provider_result = provider.collect(provider_context)
+                findings.extend(provider_result.findings)
+                for ref in provider_result.artifact_refs:
+                    try:
+                        workspace.artifact_store.verify(ref)
+                    except (OSError, ValueError, FileNotFoundError):
+                        pass
+        else:
+            semantic_started = datetime.now(UTC)
+            signature_changes = [
+                declaration.name
+                for declaration in candidate.changed_declarations
+                if declaration.signature_changed
+            ]
+            semantic_status = (
+                FindingStatus.UNKNOWN if signature_changes else FindingStatus.NOT_APPLICABLE
+            )
+            findings.append(
+                _finding(
+                    check_id="semantic.intent_fidelity",
+                    dimension=EvidenceDimension.SEMANTIC,
+                    status=semantic_status,
+                    severity=Severity.L3 if signature_changes else Severity.INFO,
+                    summary=(
+                        "Semantic fidelity requires authorized review for changed signatures"
+                        if signature_changes
+                        else "No supplied declaration signature change requires semantic comparison"
+                    ),
+                    details={
+                        "changed_signatures": signature_changes,
+                        "claimed_intent": candidate.claimed_intent,
+                    },
+                    started=semantic_started,
+                    finished=datetime.now(UTC),
+                )
+            )
+
+        public_declarations = [
+            declaration.name for declaration in candidate.changed_declarations if declaration.public
         ]
-        semantic_status = (
-            FindingStatus.UNKNOWN if signature_changes else FindingStatus.NOT_APPLICABLE
+        # CLOSURE-015: synthesize canonical api_fit / declared_use / intent_support
+        # from provider outputs; do not emit contradictory generic UNKNOWN placeholders.
+        _ = public_declarations  # retained for clarity / future coverage summaries
+        findings = apply_synthesis(
+            findings,
+            candidate=candidate,
+            risk_class=risk_class,
         )
+
+        persistence_now = datetime.now(UTC)
         findings.append(
             _finding(
-                check_id="semantic.intent_fidelity",
-                dimension=EvidenceDimension.SEMANTIC,
-                status=semantic_status,
-                severity=Severity.L3 if signature_changes else Severity.INFO,
-                summary=(
-                    "Semantic fidelity requires authorized review for changed signatures"
-                    if signature_changes
-                    else "No supplied declaration signature change requires semantic comparison"
-                ),
-                details={
-                    "changed_signatures": signature_changes,
-                    "claimed_intent": candidate.claimed_intent,
-                },
-                started=semantic_started,
-                finished=datetime.now(timezone.utc),
+                check_id="persistence.follow_up",
+                dimension=EvidenceDimension.PERSISTENCE,
+                status=FindingStatus.NOT_APPLICABLE,
+                severity=Severity.INFO,
+                summary="Persistence is measured after integration and cannot be credited yet",
+                details={"required_event": "PERSISTENCE_CONFIRMED"},
+                started=persistence_now,
+                finished=persistence_now,
             )
         )
 
-    public_declarations = [
-        declaration.name
-        for declaration in candidate.changed_declarations
-        if declaration.public
-    ]
-    now = datetime.now(timezone.utc)
-    if public_declarations:
-        api_fit_status = FindingStatus.UNKNOWN
-        api_fit_severity = Severity.L2
-        api_fit_summary = "Repository API fit has not yet been established"
-    else:
-        # No public surface change → API-fit evidence is not required.
-        api_fit_status = FindingStatus.NOT_APPLICABLE
-        api_fit_severity = Severity.INFO
-        api_fit_summary = (
-            "No public declaration changes; repository API fit not applicable"
-        )
-    findings.append(
-        _finding(
-            check_id="repository.api_fit",
-            dimension=EvidenceDimension.REPOSITORY,
-            status=api_fit_status,
-            severity=api_fit_severity,
-            summary=api_fit_summary,
-            details={"public_declarations": public_declarations},
-            started=now,
-            finished=now,
-        )
-    )
-
-    now = datetime.now(timezone.utc)
-    if public_declarations:
-        declared_use_status = FindingStatus.UNKNOWN
-        declared_use_severity = Severity.L2
-        declared_use_summary = "Declared downstream use has not yet been executed"
-    else:
-        # Private / docs-only candidates do not yet require executed downstream use.
-        declared_use_status = FindingStatus.NOT_APPLICABLE
-        declared_use_severity = Severity.INFO
-        declared_use_summary = (
-            "No public declaration changes; declared downstream use not applicable"
-        )
-    findings.append(
-        _finding(
-            check_id="downstream.declared_use",
-            dimension=EvidenceDimension.DOWNSTREAM,
-            status=declared_use_status,
-            severity=declared_use_severity,
-            summary=declared_use_summary,
-            details={"obligation_ids": candidate.obligation_ids},
-            started=now,
-            finished=now,
-        )
-    )
-
-    persistence_now = datetime.now(timezone.utc)
-    findings.append(
-        _finding(
-            check_id="persistence.follow_up",
-            dimension=EvidenceDimension.PERSISTENCE,
-            status=FindingStatus.NOT_APPLICABLE,
-            severity=Severity.INFO,
-            summary="Persistence is measured after integration and cannot be credited yet",
-            details={"required_event": "PERSISTENCE_CONFIRMED"},
-            started=persistence_now,
-            finished=persistence_now,
-        )
-    )
-
-    rule = contract.policies.risk_rules[risk_class]
-    decision = decide(
-        findings=findings,
-        risk_class=risk_class,
-        auto_accept_eligible=rule.auto_accept_eligible,
-    )
-    estimated_minutes = contract.review.default_review_minutes.get(risk_class, 30)
-    question = (
-        select_review_question(
+        rule = contract.policies.risk_rules[risk_class]
+        auto_accept_eligible = rule.auto_accept_eligible
+        if executor_descriptor is not None and executor_descriptor.blocks_auto_accept:
+            auto_accept_eligible = False
+        decision = decide(
             findings=findings,
             risk_class=risk_class,
-            required_roles=rule.required_roles,
-            estimated_minutes=estimated_minutes,
+            auto_accept_eligible=auto_accept_eligible,
         )
-        if decision.recommendation.value == "ESCALATE"
-        else None
-    )
-
-    reasons = list(decision.reasons)
-    if decision.hard_failures:
-        reasons.append(
-            "hard failures: " + ", ".join(decision.hard_failures)
-        )
-    if decision.unresolved_hard_checks:
-        reasons.append(
-            "unresolved hard-relevant checks (do not treat as axiom-safe): "
-            + ", ".join(decision.unresolved_hard_checks)
+        estimated_minutes = contract.review.default_review_minutes.get(risk_class, 30)
+        question = (
+            select_review_question(
+                findings=findings,
+                risk_class=risk_class,
+                required_roles=rule.required_roles,
+                estimated_minutes=estimated_minutes,
+            )
+            if decision.recommendation.value == "ESCALATE"
+            else None
         )
 
-    candidate_hash = sha256_value(candidate.model_dump(mode="json"))
-    evidence_fingerprint = sha256_value(
-        {
-            "contract_hash": contract.contract_hash,
-            "candidate_hash": candidate_hash,
-            "compiler_version": __version__,
-        }
-    )
-    return EvidencePacket(
-        packet_id=f"packet_{evidence_fingerprint}",
-        run_id=run_id,
-        project_id=contract.project.project_id,
-        contract_hash=contract.contract_hash,
-        candidate=candidate,
-        risk_class=risk_class,
-        findings=findings,
-        hard_gate_passed=decision.hard_gate_passed,
-        recommendation=decision.recommendation,
-        recommendation_reasons=reasons,
-        unresolved_uncertainty=decision.uncertainty,
-        review_question=question,
-        evidence_fingerprint=evidence_fingerprint,
-    )
+        reasons = list(decision.reasons)
+        if decision.hard_failures:
+            reasons.append("hard failures: " + ", ".join(decision.hard_failures))
+        if decision.unresolved_hard_checks:
+            reasons.append(
+                "unresolved hard-relevant checks (do not treat as axiom-safe): "
+                + ", ".join(decision.unresolved_hard_checks)
+            )
+
+        assert workspace is not None and workspace.run_manifest is not None
+        evidence_fingerprint = compute_evidence_fingerprint(
+            workspace.run_manifest,
+            [canonical_finding_payload(f) for f in findings],
+        )
+        coverage_summary: dict[str, EvidenceCoverage] = {}
+        for finding in findings:
+            if finding.coverage is None:
+                continue
+            key = finding.dimension.value
+            prior = coverage_summary.get(key)
+            if prior is None:
+                coverage_summary[key] = finding.coverage
+            else:
+                coverage_summary[key] = EvidenceCoverage(
+                    requested_subject_count=(
+                        prior.requested_subject_count + finding.coverage.requested_subject_count
+                    ),
+                    evaluated_subject_count=(
+                        prior.evaluated_subject_count + finding.coverage.evaluated_subject_count
+                    ),
+                    excluded_subject_count=(
+                        prior.excluded_subject_count + finding.coverage.excluded_subject_count
+                    ),
+                    exclusion_reasons=list(
+                        dict.fromkeys(
+                            [*prior.exclusion_reasons, *finding.coverage.exclusion_reasons]
+                        )
+                    ),
+                    complete_for_declared_scope=(
+                        prior.complete_for_declared_scope
+                        and finding.coverage.complete_for_declared_scope
+                    ),
+                    allows_partial_pass=(
+                        prior.allows_partial_pass or finding.coverage.allows_partial_pass
+                    ),
+                )
+        hard_gate = HardGateResult(
+            passed=decision.hard_gate_passed,
+            hard_failures=list(decision.hard_failures),
+            unresolved_hard_checks=list(decision.unresolved_hard_checks),
+            reasons=list(decision.reasons),
+        )
+        uncertainty_records = [
+            UncertaintyRecord(code="unresolved", message=msg) for msg in decision.uncertainty
+        ]
+        # Stamp snapshot fingerprint on findings that lack one (V2 identity).
+        snap = workspace.snapshot_fingerprint
+        stamped: list[EvidenceFinding] = []
+        for finding in findings:
+            if finding.snapshot_fingerprint:
+                stamped.append(finding)
+            else:
+                stamped.append(finding.model_copy(update={"snapshot_fingerprint": snap}))
+        packet = EvidencePacket(
+            packet_id=f"packet_{evidence_fingerprint}",
+            run_id=run_id,
+            project_id=contract.project.project_id,
+            contract_hash=contract.contract_hash,
+            candidate=candidate,
+            risk_class=risk_class,
+            findings=stamped,
+            hard_gate_passed=decision.hard_gate_passed,
+            recommendation=decision.recommendation,
+            recommendation_reasons=reasons,
+            unresolved_uncertainty=decision.uncertainty,
+            review_question=question,
+            evidence_fingerprint=evidence_fingerprint,
+            recommendation_policy_id=recommendation_policy_id(),
+            run_manifest=workspace.run_manifest.model_dump(mode="json"),
+            coverage_summary=coverage_summary,
+            hard_gate=hard_gate,
+            uncertainty_records=uncertainty_records,
+        )
+        validate_packet_size_budget(packet)
+        # Durable persist gate: cleanup only after packet + CAS refs are ready.
+        ws_manager.mark_persisted()
+        ws_manager.cleanup(force=False)
+        if not ws_manager.verify_cleanup():
+            # Best-effort second pass
+            ws_manager.cleanup(force=True)
+        return packet
+    finally:
+        if workspace is not None and not workspace.cleanup_token.cleaned:
+            ws_manager.cleanup(force=True)
