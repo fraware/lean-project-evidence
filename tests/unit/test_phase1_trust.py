@@ -123,6 +123,19 @@ def test_host_exec_allowed_with_insecure_flag(
                 timed_out=False,
             )
 
+        def run(self, **kwargs):  # type: ignore[no-untyped-def]
+            return self.verify_build(
+                repository=kwargs["workspace"].candidate_path,
+                command=list(kwargs["command"].argv),
+                timeout_seconds=kwargs["resource_profile"].timeout_seconds,
+                max_output_bytes=kwargs["resource_profile"].max_output_bytes,
+                environment_allowlist=kwargs.get("environment_allowlist") or [],
+            )
+
+    monkeypatch.setattr(
+        "lpe.workspace.manager.SubprocessLeanExecutor",
+        FakeExecutor,
+    )
     monkeypatch.setattr(
         "lpe.evidence.compiler.SubprocessLeanExecutor",
         FakeExecutor,
@@ -178,9 +191,7 @@ def test_enrich_rejects_null_oid(tmp_path: Path, example_project: Path) -> None:
         enrich_candidate_from_git(tmp_path, candidate, contract)
 
 
-def test_enrich_overrides_self_declared_risk_fields(
-    tmp_path: Path, example_project: Path
-) -> None:
+def test_enrich_overrides_self_declared_risk_fields(tmp_path: Path, example_project: Path) -> None:
     _init_git(tmp_path)
     lean = tmp_path / "Internal.lean"
     lean.write_text("def foo : Nat := 1\n", encoding="utf-8")
@@ -217,9 +228,7 @@ def test_enrich_overrides_self_declared_risk_fields(
     assert enriched.changed_declarations[0].kind is ArtifactType.DEFINITION
 
 
-def test_compile_forces_git_enrichment_for_risk(
-    tmp_path: Path, example_project: Path
-) -> None:
+def test_compile_forces_git_enrichment_for_risk(tmp_path: Path, example_project: Path) -> None:
     _init_git(tmp_path)
     public = tmp_path / "Example" / "Public"
     public.mkdir(parents=True)
@@ -250,9 +259,7 @@ def test_compile_forces_git_enrichment_for_risk(
 # --- AUDIT-016 ---
 
 
-def test_placeholder_scan_finds_sorry_in_lean_file(
-    example_project: Path, tmp_path: Path
-) -> None:
+def test_placeholder_scan_finds_sorry_in_lean_file(example_project: Path, tmp_path: Path) -> None:
     lean_dir = example_project / "Example" / "Public"
     lean_dir.mkdir(parents=True, exist_ok=True)
     lean_file = lean_dir / "PlaceholderProbe.lean"
@@ -310,9 +317,7 @@ def test_axiom_check_unknown_for_empty_regex_stub(example_project: Path) -> None
         axioms_used=[],
         extractor="lean.regex-extractor",
     )
-    finding = _check_axioms(
-        contract, extraction, started=datetime.now(timezone.utc)
-    )
+    finding = _check_axioms(contract, extraction, started=datetime.now(timezone.utc))
     assert finding.status is FindingStatus.UNKNOWN
     assert finding.check_id == "lean.prohibited_axioms"
 
@@ -331,9 +336,7 @@ def test_axiom_check_fail_when_prohibited_found(example_project: Path) -> None:
         axioms_used=["Definitely.Prohibited.Axiom"],
         extractor="lean.regex-extractor",
     )
-    finding = _check_axioms(
-        contract, extraction, started=datetime.now(timezone.utc)
-    )
+    finding = _check_axioms(contract, extraction, started=datetime.now(timezone.utc))
     assert finding.status is FindingStatus.FAIL
 
 

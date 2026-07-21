@@ -49,20 +49,14 @@ BUDGETS: dict[str, SoftBudget] = {
     ),
     "ledger_append_p95_s": SoftBudget("ledger_append_p95_s", LEDGER_APPEND_P95_S, "s"),
     "review_packet_s": SoftBudget("review_packet_s", REVIEW_PACKET_S, "s"),
-    "evidence_skip_build_s": SoftBudget(
-        "evidence_skip_build_s", EVIDENCE_SKIP_BUILD_S, "s"
-    ),
-    "ledger_verify_1000_s": SoftBudget(
-        "ledger_verify_1000_s", LEDGER_VERIFY_1000_S, "s"
-    ),
+    "evidence_skip_build_s": SoftBudget("evidence_skip_build_s", EVIDENCE_SKIP_BUILD_S, "s"),
+    "ledger_verify_1000_s": SoftBudget("ledger_verify_1000_s", LEDGER_VERIFY_1000_S, "s"),
     "tppr_moderate_s": SoftBudget("tppr_moderate_s", TPPR_MODERATE_S, "s"),
     "markdown_render_s": SoftBudget("markdown_render_s", MARKDOWN_RENDER_S, "s"),
     "orchestration_skip_build_s": SoftBudget(
         "orchestration_skip_build_s", ORCHESTRATION_SKIP_BUILD_S, "s"
     ),
-    "impact_cone_synthetic_s": SoftBudget(
-        "impact_cone_synthetic_s", IMPACT_CONE_SYNTHETIC_S, "s"
-    ),
+    "impact_cone_synthetic_s": SoftBudget("impact_cone_synthetic_s", IMPACT_CONE_SYNTHETIC_S, "s"),
     "impact_cone_synthetic_peak_mib": SoftBudget(
         "impact_cone_synthetic_peak_mib", IMPACT_CONE_SYNTHETIC_PEAK_MIB, "MiB"
     ),
@@ -78,7 +72,4 @@ def assert_within_soft_budget(metric: str, observed: float) -> None:
 
 
 def budget_snapshot() -> list[dict[str, Any]]:
-    return [
-        {**asdict(b), "soft_ceiling": b.soft_ceiling}
-        for b in BUDGETS.values()
-    ]
+    return [{**asdict(b), "soft_ceiling": b.soft_ceiling} for b in BUDGETS.values()]

@@ -27,9 +27,7 @@ from lpe.paths import PathTraversalError, assert_safe_repo_relative
         "a/b/../../c/../../../x",
     ],
 )
-def test_assert_safe_repo_relative_rejects_traversal(
-    tmp_path: Path, relative: str
-) -> None:
+def test_assert_safe_repo_relative_rejects_traversal(tmp_path: Path, relative: str) -> None:
     """Invariant: any escape / absolute / home path is refused before resolve."""
     with pytest.raises(PathTraversalError):
         assert_safe_repo_relative(tmp_path, relative)
@@ -66,9 +64,7 @@ def test_compile_rejects_changed_paths_traversal(example_project: Path) -> None:
         compile_evidence(example_project, candidate, skip_build=True)
 
 
-def test_compile_rejects_patch_path_traversal(
-    example_project: Path, tmp_path: Path
-) -> None:
+def test_compile_rejects_patch_path_traversal(example_project: Path, tmp_path: Path) -> None:
     """Invariant: patch_path outside the repo is refused."""
     outside = tmp_path / "outside.patch"
     outside.write_text("diff --git a/x b/x\n", encoding="utf-8")
