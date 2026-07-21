@@ -21,9 +21,7 @@ def test_doctor_warns_default_docker_not_lean() -> None:
     result = runner.invoke(app, ["doctor"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
-    assert payload["docker_image"] == DEFAULT_DOCKER_IMAGE or "LPE_DOCKER_IMAGE" in str(
-        payload
-    )
+    assert payload["docker_image"] == DEFAULT_DOCKER_IMAGE or "LPE_DOCKER_IMAGE" in str(payload)
     assert payload.get("docker_image_lean_capable_hint")
 
 

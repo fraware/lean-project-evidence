@@ -143,9 +143,7 @@ def test_export_seal_content_hash_consistency(
     )
 
 
-def test_cli_seal_and_verify_seal(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_cli_seal_and_verify_seal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv(SEAL_ENV_KEY, raising=False)
     ledger = tmp_path / "ledger.sqlite3"
     store = LedgerStore(ledger)
@@ -168,9 +166,7 @@ def test_cli_seal_and_verify_seal(
     assert "seal does not match" in failed.output or "event_count" in failed.output
 
 
-def test_empty_seal_key_fails_closed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_empty_seal_key_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(SEAL_ENV_KEY, "   ")
     store = LedgerStore(tmp_path / "ledger.sqlite3")
     store.initialize()
@@ -178,9 +174,7 @@ def test_empty_seal_key_fails_closed(
         write_seal(store)
 
 
-def test_seal_alternate_path_round_trip(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_seal_alternate_path_round_trip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from lpe.ledger.seal import is_seal_colocated
 
     monkeypatch.delenv(SEAL_ENV_KEY, raising=False)
@@ -213,25 +207,19 @@ def test_cli_seal_alternate_path_and_verify(
     store = LedgerStore(ledger)
     store.append(_event("e1", {"x": 1}))
 
-    sealed = runner.invoke(
-        app, ["ledger", "seal", str(ledger), "--seal", str(alternate)]
-    )
+    sealed = runner.invoke(app, ["ledger", "seal", str(ledger), "--seal", str(alternate)])
     assert sealed.exit_code == 0, sealed.output
     payload = json.loads(sealed.stdout)
     assert payload["colocated"] is False
     assert payload["storage_recommendation"]
     assert alternate.is_file()
 
-    checked = runner.invoke(
-        app, ["ledger", "verify-seal", str(ledger), "--seal", str(alternate)]
-    )
+    checked = runner.invoke(app, ["ledger", "verify-seal", str(ledger), "--seal", str(alternate)])
     assert checked.exit_code == 0, checked.output
     assert json.loads(checked.stdout)["colocated"] is False
 
     store.append(_event("e2", {"x": 2}))
-    failed = runner.invoke(
-        app, ["ledger", "verify-seal", str(ledger), "--seal", str(alternate)]
-    )
+    failed = runner.invoke(app, ["ledger", "verify-seal", str(ledger), "--seal", str(alternate)])
     assert failed.exit_code == 1
 
 

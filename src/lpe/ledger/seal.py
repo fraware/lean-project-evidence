@@ -21,9 +21,11 @@ from lpe import __version__
 from lpe.hashing import canonical_json, sha256_text
 from lpe.ledger.store import LedgerIntegrityError, LedgerStore
 
-SEAL_SCHEMA_VERSION = "1.0"
+SEAL_SCHEMA_VERSION = "2.0"
+SEAL_SCHEMA_VERSIONS_SUPPORTED = frozenset({"1.0", "2.0"})
 SEAL_KIND = "lpe.ledger.seal"
 SEAL_ENV_KEY = "LPE_LEDGER_SEAL_KEY"
+SEAL_ENV_KEY_ID = "LPE_LEDGER_SEAL_KEY_ID"
 
 CUSTODY_CONTENT_HASH = "content_hash_only"
 CUSTODY_HMAC = "hmac"
@@ -78,20 +80,19 @@ def _seal_key_from_env() -> bytes | None:
     if raw is None:
         return None
     if not raw.strip():
-        raise LedgerSealError(
-            f"{SEAL_ENV_KEY} is set but empty; refuse seal (fail closed)"
-        )
+        raise LedgerSealError(f"{SEAL_ENV_KEY} is set but empty; refuse seal (fail closed)")
     return raw.encode("utf-8")
 
 
 def snapshot_state(store: LedgerStore) -> dict[str, Any]:
     """Recompute seal-relevant ledger state after an implicit verify caller.
 
-    Returns ``event_count``, ``artifact_tips``, ``global_tip``, and
+    Returns ``event_count``, ``artifact_tips``, ``project_tips``, ``global_tip``, and
     ``export_content_hash`` matching ``export_jsonl`` byte layout.
     """
     store.initialize()
     artifact_tips: dict[str, str] = {}
+    project_tips: dict[str, str] = {}
     digest = hashlib.sha256()
     event_count = 0
     global_tip: str | None = None
@@ -103,8 +104,10 @@ def snapshot_state(store: LedgerStore) -> dict[str, Any]:
             line = json.dumps(record, sort_keys=True) + "\n"
             digest.update(line.encode("utf-8"))
             artifact_id = str(row["artifact_id"])
+            project_id = str(row["project_id"])
             event_hash = str(row["event_hash"])
             artifact_tips[artifact_id] = event_hash
+            project_tips[project_id] = event_hash
             global_tip = event_hash
             event_count += 1
 
@@ -117,6 +120,7 @@ def snapshot_state(store: LedgerStore) -> dict[str, Any]:
     return {
         "event_count": event_count,
         "artifact_tips": dict(sorted(artifact_tips.items())),
+        "project_tips": dict(sorted(project_tips.items())),
         "global_tip": global_tip_value,
         "export_content_hash": digest.hexdigest(),
     }
@@ -131,12 +135,30 @@ def _compute_hmac(manifest: dict[str, Any], key: bytes) -> str:
     return hmac.new(key, _mac_payload(manifest), hashlib.sha256).hexdigest()
 
 
+def _prior_seal_metadata(seal_path: Path | None) -> tuple[int, str | None]:
+    """Return (next_sequence, prior_seal_hash) when an existing seal is present."""
+    if seal_path is None or not seal_path.is_file():
+        return 1, None
+    try:
+        prior = load_seal(seal_path)
+    except LedgerSealError:
+        return 1, None
+    prior_seq = prior.get("seal_sequence")
+    sequence = int(prior_seq) + 1 if isinstance(prior_seq, int) else 1
+    prior_hash = sha256_text(canonical_json(prior))
+    return sequence, prior_hash
+
+
 def build_seal_manifest(
     store: LedgerStore,
     *,
     sealed_at: datetime | None = None,
     tool_version: str | None = None,
     key: bytes | None = None,
+    protocol_freeze_hash: str | None = None,
+    custody_location: str | None = None,
+    seal_path: Path | None = None,
+    hmac_key_id: str | None = None,
 ) -> dict[str, Any]:
     """Build a seal dict for the current verified ledger state."""
     state = snapshot_state(store)
@@ -145,6 +167,11 @@ def build_seal_manifest(
         when = when.replace(tzinfo=UTC)
     use_key = key if key is not None else _seal_key_from_env()
     custody = CUSTODY_HMAC if use_key is not None else CUSTODY_CONTENT_HASH
+    path = seal_path or default_seal_path(store.path)
+    seal_sequence, prior_seal_hash = _prior_seal_metadata(path if path.is_file() else None)
+    key_id = hmac_key_id or os.environ.get(SEAL_ENV_KEY_ID) or None
+    colocated = is_seal_colocated(store.path, path)
+    location = custody_location or ("colocated_writable" if colocated else "separate_or_external")
     manifest: dict[str, Any] = {
         "schema_version": SEAL_SCHEMA_VERSION,
         "kind": SEAL_KIND,
@@ -153,12 +180,25 @@ def build_seal_manifest(
         "ledger_path": str(store.path.resolve()),
         "event_count": state["event_count"],
         "artifact_tips": state["artifact_tips"],
+        "project_tips": state["project_tips"],
         "global_tip": state["global_tip"],
         "export_content_hash": state["export_content_hash"],
+        "ledger_export_hash": state["export_content_hash"],
+        "seal_sequence": seal_sequence,
+        "prior_seal_hash": prior_seal_hash,
+        "protocol_freeze_hash": protocol_freeze_hash,
         "custody": custody,
+        "custody_location": location,
         "custody_note": _HMAC_NOTE if custody == CUSTODY_HMAC else _CONTENT_HASH_NOTE,
         "not_worm": True,
+        "colocated_writable_warning": (
+            "Seal is co-located and writable with the ledger; prefer off-host or read-only storage."
+            if colocated
+            else None
+        ),
     }
+    if key_id:
+        manifest["hmac_key_id"] = key_id
     if use_key is not None:
         manifest["hmac"] = _compute_hmac(manifest, use_key)
     return manifest
@@ -169,6 +209,8 @@ def write_seal(
     seal_path: Path | None = None,
     *,
     tool_version: str | None = None,
+    protocol_freeze_hash: str | None = None,
+    custody_location: str | None = None,
 ) -> dict[str, Any]:
     """Verify the ledger, then write a seal manifest (fail closed)."""
     try:
@@ -178,18 +220,30 @@ def write_seal(
 
     path = seal_path or default_seal_path(store.path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    manifest = build_seal_manifest(store, tool_version=tool_version)
+    manifest = build_seal_manifest(
+        store,
+        tool_version=tool_version,
+        protocol_freeze_hash=protocol_freeze_hash,
+        custody_location=custody_location,
+        seal_path=path,
+    )
     path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     colocated = is_seal_colocated(store.path, path)
-    return {
+    result = {
         "seal_path": str(path.resolve()),
         "manifest": manifest,
         "colocated": colocated,
         "storage_recommendation": STORAGE_RECOMMENDATION,
     }
+    if colocated:
+        result["warning"] = (
+            "Seal is co-located and writable with the ledger directory; "
+            "store separately or read-only to reduce forge risk."
+        )
+    return result
 
 
 def load_seal(seal_path: Path) -> dict[str, Any]:
@@ -218,10 +272,11 @@ def verify_seal(
         raise LedgerSealError(
             f"seal kind mismatch: expected {SEAL_KIND!r}, got {sealed.get('kind')!r}"
         )
-    if sealed.get("schema_version") != SEAL_SCHEMA_VERSION:
+    schema = sealed.get("schema_version")
+    if schema not in SEAL_SCHEMA_VERSIONS_SUPPORTED:
         raise LedgerSealError(
-            f"unsupported seal schema_version {sealed.get('schema_version')!r}; "
-            f"supported: {SEAL_SCHEMA_VERSION!r}"
+            f"unsupported seal schema_version {schema!r}; "
+            f"supported: {sorted(SEAL_SCHEMA_VERSIONS_SUPPORTED)!r}"
         )
 
     try:
@@ -237,20 +292,20 @@ def verify_seal(
         )
     if sealed.get("artifact_tips") != state["artifact_tips"]:
         mismatches.append("artifact_tips mismatch")
+    if "project_tips" in sealed and sealed.get("project_tips") != state["project_tips"]:
+        mismatches.append("project_tips mismatch")
     if sealed.get("global_tip") != state["global_tip"]:
         mismatches.append(
             f"global_tip: seal={sealed.get('global_tip')!r} live={state['global_tip']!r}"
         )
-    if sealed.get("export_content_hash") != state["export_content_hash"]:
+    export_hash = sealed.get("export_content_hash") or sealed.get("ledger_export_hash")
+    if export_hash != state["export_content_hash"]:
         mismatches.append(
             "export_content_hash mismatch "
-            f"(seal={sealed.get('export_content_hash')!r} "
-            f"live={state['export_content_hash']!r})"
+            f"(seal={export_hash!r} live={state['export_content_hash']!r})"
         )
     if mismatches:
-        raise LedgerSealError(
-            "seal does not match live ledger: " + "; ".join(mismatches)
-        )
+        raise LedgerSealError("seal does not match live ledger: " + "; ".join(mismatches))
 
     custody = sealed.get("custody")
     use_key = key if key is not None else _seal_key_from_env()
@@ -260,22 +315,18 @@ def verify_seal(
         if not isinstance(expected_mac, str) or not expected_mac:
             raise LedgerSealError("seal custody is hmac but hmac field is missing")
         if use_key is None:
-            raise LedgerSealError(
-                f"seal requires {SEAL_ENV_KEY} to verify HMAC (fail closed)"
-            )
+            raise LedgerSealError(f"seal requires {SEAL_ENV_KEY} to verify HMAC (fail closed)")
         actual_mac = _compute_hmac(sealed, use_key)
         if not hmac.compare_digest(actual_mac, expected_mac):
             raise LedgerSealError("seal HMAC mismatch (key wrong or seal tampered)")
     elif custody == CUSTODY_CONTENT_HASH:
         if sealed.get("hmac"):
-            raise LedgerSealError(
-                "seal custody is content_hash_only but hmac field is present"
-            )
+            raise LedgerSealError("seal custody is content_hash_only but hmac field is present")
     else:
         raise LedgerSealError(f"unknown seal custody mode: {custody!r}")
 
     colocated = is_seal_colocated(store.path, path)
-    return {
+    result = {
         "ok": True,
         "seal_path": str(path.resolve()),
         "event_count": state["event_count"],
@@ -285,4 +336,12 @@ def verify_seal(
         "storage_recommendation": STORAGE_RECOMMENDATION,
         "custody_note": sealed.get("custody_note")
         or (_HMAC_NOTE if custody == CUSTODY_HMAC else _CONTENT_HASH_NOTE),
+        "seal_sequence": sealed.get("seal_sequence"),
+        "custody_location": sealed.get("custody_location"),
     }
+    if colocated:
+        result["warning"] = (
+            "Seal is co-located and writable with the ledger directory; "
+            "prefer `lpe ledger seal --seal <separate-path>`."
+        )
+    return result

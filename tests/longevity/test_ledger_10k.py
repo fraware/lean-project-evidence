@@ -52,8 +52,7 @@ def test_ledger_10k_export_jsonl_and_verify(tmp_path: Path) -> None:
     assert written == N_10K
     assert verified == N_10K
     assert elapsed_s <= LEDGER_10K_EXPORT_VERIFY_S, (
-        f"10k export+verify took {elapsed_s:.3f}s; "
-        f"soft ceiling {LEDGER_10K_EXPORT_VERIFY_S}s"
+        f"10k export+verify took {elapsed_s:.3f}s; soft ceiling {LEDGER_10K_EXPORT_VERIFY_S}s"
     )
 
 
