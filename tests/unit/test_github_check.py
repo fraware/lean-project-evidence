@@ -73,14 +73,9 @@ def test_conclusion_mapping_defaults_fail_closed() -> None:
     assert recommendation_to_conclusion(Recommendation.ACCEPT) == "success"
     assert recommendation_to_conclusion(Recommendation.REJECT) == "failure"
     assert recommendation_to_conclusion(Recommendation.ESCALATE) == "failure"
+    assert recommendation_to_conclusion(Recommendation.ESCALATE, escalate_as="neutral") == "neutral"
     assert (
-        recommendation_to_conclusion(Recommendation.ESCALATE, escalate_as="neutral")
-        == "neutral"
-    )
-    assert (
-        recommendation_to_conclusion(
-            Recommendation.ESCALATE, escalate_as="action_required"
-        )
+        recommendation_to_conclusion(Recommendation.ESCALATE, escalate_as="action_required")
         == "action_required"
     )
 
@@ -113,9 +108,7 @@ def test_escalate_as_neutral_configurable() -> None:
     assert payload["conclusion"] == "neutral"
 
 
-def test_github_check_adapter_from_compile(
-    example_project: Path, example_candidate
-) -> None:
+def test_github_check_adapter_from_compile(example_project: Path, example_candidate) -> None:
     packet = compile_evidence(example_project, example_candidate, skip_build=True)
     check = packet_to_github_check(packet)
     payload = render_check_payload(check)

@@ -122,9 +122,7 @@ def test_plan_dry_run_default_fail_closed_escalate() -> None:
 
 
 def test_refuse_mock_or_missing_sha() -> None:
-    payload = render_check_payload(
-        packet_to_github_check(_packet(head=None))
-    )
+    payload = render_check_payload(packet_to_github_check(_packet(head=None)))
     payload["head_sha"] = "mock-sha"
     with pytest.raises(GitHubSubmitError, match="mock-sha"):
         plan_check_run_submit(payload, owner="acme", repo="widgets")
@@ -156,9 +154,7 @@ def test_classify_auth_failure() -> None:
 def test_submit_dry_run_does_not_invoke_runner() -> None:
     payload = render_check_payload(packet_to_github_check(_packet()))
     mock_run = MagicMock()
-    result = submit_check_run(
-        payload, owner="acme", repo="widgets", post=False, runner=mock_run
-    )
+    result = submit_check_run(payload, owner="acme", repo="widgets", post=False, runner=mock_run)
     assert result.posted is False
     assert result.plan.dry_run is True
     mock_run.assert_not_called()
@@ -167,13 +163,9 @@ def test_submit_dry_run_does_not_invoke_runner() -> None:
 def test_submit_post_uses_gh_api_stdin() -> None:
     payload = render_check_payload(packet_to_github_check(_packet()))
     mock_run = MagicMock(
-        return_value=CompletedProcess(
-            args=[], returncode=0, stdout='{"id": 1}', stderr=""
-        )
+        return_value=CompletedProcess(args=[], returncode=0, stdout='{"id": 1}', stderr="")
     )
-    result = submit_check_run(
-        payload, owner="acme", repo="widgets", post=True, runner=mock_run
-    )
+    result = submit_check_run(payload, owner="acme", repo="widgets", post=True, runner=mock_run)
     assert result.posted is True
     assert result.exit_code == 0
     mock_run.assert_called_once()
@@ -203,9 +195,7 @@ def test_submit_post_auth_failure_raises_clear() -> None:
         )
     )
     with pytest.raises(GitHubSubmitError, match="auth"):
-        submit_check_run(
-            payload, owner="acme", repo="widgets", post=True, runner=mock_run
-        )
+        submit_check_run(payload, owner="acme", repo="widgets", post=True, runner=mock_run)
 
 
 def test_submit_post_failure_raises() -> None:
@@ -216,9 +206,7 @@ def test_submit_post_failure_raises() -> None:
         )
     )
     with pytest.raises(GitHubSubmitError, match="422"):
-        submit_check_run(
-            payload, owner="acme", repo="widgets", post=True, runner=mock_run
-        )
+        submit_check_run(payload, owner="acme", repo="widgets", post=True, runner=mock_run)
 
 
 def test_cli_submit_check_dry_run(tmp_path: Path) -> None:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from lpe.models import EvidencePacket, Recommendation
 
@@ -30,9 +30,7 @@ def recommendation_to_conclusion(
     Projects that want non-blocking escalate can pass ``escalate_as=\"neutral\"``.
     """
     value = (
-        recommendation.value
-        if isinstance(recommendation, Recommendation)
-        else str(recommendation)
+        recommendation.value if isinstance(recommendation, Recommendation) else str(recommendation)
     )
     if value == "ACCEPT":
         return "success"
@@ -48,13 +46,9 @@ def packet_to_github_check(
     *,
     escalate_as: EscalateConclusion = "failure",
 ) -> GitHubCheckOutput:
-    conclusion = recommendation_to_conclusion(
-        packet.recommendation, escalate_as=escalate_as
-    )
+    conclusion = recommendation_to_conclusion(packet.recommendation, escalate_as=escalate_as)
 
-    finding_lines = [
-        f"- [{f.status.value}] {f.check_id}: {f.summary}" for f in packet.findings
-    ]
+    finding_lines = [f"- [{f.status.value}] {f.check_id}: {f.summary}" for f in packet.findings]
     summary = (
         f"Risk {packet.risk_class.value}; recommendation {packet.recommendation.value}. "
         f"{len(packet.unresolved_uncertainty)} unresolved uncertainties."
@@ -109,7 +103,7 @@ def render_check_payload(
     check: GitHubCheckOutput,
     *,
     head_sha: str | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Render a GitHub Checks API-shaped payload.
 
     Prefer an explicit ``head_sha``, then the check's candidate SHA, else a

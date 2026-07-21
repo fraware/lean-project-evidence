@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lean-project-evidence"
-version = "0.1.0"
+version = "0.2.0"
 description = "Project-grounded evidence and review infrastructure for AI-assisted Lean development"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -30,9 +30,13 @@ lpe = "lpe.cli:app"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"lpe.lean" = ["bundled/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -60,3 +64,11 @@ select = ["E", "F", "I", "B", "UP", "RUF"]
 python_version = "3.12"
 strict = true
 packages = ["lpe"]
+
+[tool.coverage.run]
+source = ["lpe"]
+branch = true
+
+[tool.coverage.report]
+skip_covered = true
+show_missing = true

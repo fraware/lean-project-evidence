@@ -82,9 +82,7 @@ def _minimal_packet(*, head_sha: str) -> EvidencePacket:
             claimed_intent="github check e2e",
             changed_paths=["README.md"],
             changed_declarations=[],
-            generator=GeneratorProvenance(
-                generator_type="test", name="gh-e2e", version="0"
-            ),
+            generator=GeneratorProvenance(generator_type="test", name="gh-e2e", version="0"),
         ),
         risk_class=RiskClass.R0,
         findings=[finding],

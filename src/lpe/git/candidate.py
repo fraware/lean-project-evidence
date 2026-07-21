@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from typing import Any
 
 from lpe.git.diff import GitError, changed_paths, classify_added_declarations, resolve_commit
 from lpe.models import CandidateDescriptor, ProjectContract
@@ -126,7 +127,7 @@ def build_candidate_from_commits(
     base_commit: str,
     head_commit: str,
     claimed_intent: str,
-    generator: dict,
+    generator: dict[str, Any],
 ) -> CandidateDescriptor:
     _reject_null_oid("base_commit", base_commit)
     _reject_null_oid("head_commit", head_commit)

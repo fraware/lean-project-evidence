@@ -178,9 +178,7 @@ def test_compile_rejects_invalid_rev_on_git_project(
         compile_evidence(git_seeded_project, candidate, skip_build=True)
 
 
-def test_evidence_cli_rejects_invalid_rev(
-    git_seeded_project: Path, tmp_path: Path
-) -> None:
+def test_evidence_cli_rejects_invalid_rev(git_seeded_project: Path, tmp_path: Path) -> None:
     head = _rev(git_seeded_project)
     candidate_path = tmp_path / "candidate.json"
     candidate_path.write_text(

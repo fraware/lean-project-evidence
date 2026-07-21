@@ -63,7 +63,10 @@ def issue_body(row: dict[str, str]) -> str:
             criteria,
             "",
             "---",
-            "Imported from `backlog/issues.csv`. Link pull requests to this issue and state the path to TPPR.",
+            (
+                "Imported from `backlog/issues.csv`. "
+                "Link pull requests to this issue and state the path to TPPR."
+            ),
         ]
     )
     return "\n".join(lines)

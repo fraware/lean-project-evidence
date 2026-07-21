@@ -5,7 +5,7 @@ import os
 import shutil
 import sqlite3
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
@@ -16,11 +16,7 @@ from lpe.contract.migration import (
     check_contract_schema_versions,
     dry_run_contract_migration,
 )
-from lpe.evidence.compiler import (
-    HostExecutionRefusedError,
-    NetworkPolicyError,
-    compile_evidence,
-)
+from lpe.evidence.compiler import compile_evidence
 from lpe.execution.allowlist import CommandAllowlistError
 from lpe.execution.sandbox import DEFAULT_DOCKER_IMAGE, DockerSandboxExecutor
 from lpe.gate.month_one import evaluate_month_one_gate, format_gate_report
@@ -31,6 +27,7 @@ from lpe.github.submit import (
     parse_owner_repo,
     submit_check_run,
 )
+from lpe.ids import new_id
 from lpe.ledger.seal import (
     STORAGE_RECOMMENDATION,
     LedgerSealError,
@@ -39,7 +36,12 @@ from lpe.ledger.seal import (
     verify_seal,
     write_seal,
 )
-from lpe.ledger.store import LedgerAuthError, LedgerIntegrityError, LedgerStore
+from lpe.ledger.store import (
+    LedgerAuthError,
+    LedgerIntegrityError,
+    LedgerStore,
+    LedgerTransitionError,
+)
 from lpe.metrics.tppr import compute_tppr
 from lpe.models import (
     SCHEMA_VERSION,
@@ -50,13 +52,37 @@ from lpe.models import (
 )
 from lpe.paths import PathTraversalError
 from lpe.reporting.markdown import render_packet
+from lpe.review.acceptance import AcceptanceError, aggregate_and_record_acceptance
+from lpe.review.adjudication import (
+    ADJUDICATOR_ROLE,
+    AdjudicationError,
+    AdjudicationRecord,
+    ProvisionalJudgment,
+    auditable_lineage,
+    build_adjudication_attestation,
+    reveal_peer_attestations,
+    validate_adjudicator,
+)
 from lpe.review.authority import (
     AuthorityError,
     can_record_acceptance,
     validate_decision_for_risk,
     validate_reviewer_authority,
 )
-from lpe.review.decisions import record_review_decision
+from lpe.review.conflicts import (
+    ConflictError,
+    ReviewerConflictDeclaration,
+    require_eligible_for_primary_attestation,
+)
+from lpe.review.decisions import record_attestation_event, record_review_decision
+from lpe.review.models import ReviewAttestationV2
+from lpe.review.repair import (
+    RepairError,
+    build_repair_lineage,
+    repair_completed_event,
+    repair_requested_event,
+)
+from lpe.workspace.manager import HostExecutionRefusedError, NetworkPolicyError
 
 app = typer.Typer(help="Project-grounded evidence for AI-assisted Lean development")
 contract_app = typer.Typer(help="Project contract operations")
@@ -69,20 +95,12 @@ gate_app = typer.Typer(help="Month-one gate evaluation")
 lean_app = typer.Typer(help="Lean toolchain helpers")
 github_app = typer.Typer(help="GitHub Check adapters (dry-run by default)")
 pilot_app = typer.Typer(
-    help=(
-        "Durable pilot warehouse (ledger-backed instrumentation; "
-        "not §21 / no causal claims)"
-    )
+    help=("Durable pilot warehouse (ledger-backed instrumentation; not §21 / no causal claims)")
 )
 research_app = typer.Typer(
-    help=(
-        "Research gate status (M6/M7 / EPIC-039/040 blocked until §21; "
-        "no training entrypoints)"
-    )
+    help=("Research gate status (M6/M7 / EPIC-039/040 blocked until §21; no training entrypoints)")
 )
-routing_app = typer.Typer(
-    help="M6 routing (BLOCKED until §21 — exits non-zero)"
-)
+routing_app = typer.Typer(help="M6 routing (BLOCKED until §21 — exits non-zero)")
 
 app.add_typer(contract_app, name="contract")
 app.add_typer(candidate_app, name="candidate")
@@ -121,11 +139,10 @@ def _refuse_pilot_oversell_options(
         raise typer.Exit(code=1) from exc
 
 
-_PILOT_OVERSELL_FLAG_HELP = (
-    "FORBIDDEN: implies §21 / causal clearance. Always refused (exit 1)."
-)
+_PILOT_OVERSELL_FLAG_HELP = "FORBIDDEN: implies §21 / causal clearance. Always refused (exit 1)."
 
-def _read_json(path: Path) -> dict:
+
+def _read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -166,7 +183,7 @@ def doctor(
         )
     lean_status = lean_extractor_status(repo)
     adr = adr_0003_status()
-    status: dict = {
+    status: dict[str, Any] = {
         "lpe_version": __version__,
         "git": shutil.which("git"),
         "lake": shutil.which("lake"),
@@ -189,11 +206,12 @@ def doctor(
         typer.echo("ADR 0003 enforcement inactive — unexpected", err=True)
         raise typer.Exit(code=1)
 
-def _ledger_permission_report(path: Path) -> dict:
+
+def _ledger_permission_report(path: Path) -> dict[str, Any]:
     """Warn when ledger path looks world-writable (POSIX); honest on Windows."""
     import stat
 
-    report: dict = {
+    report: dict[str, Any] = {
         "path": str(path.resolve()),
         "exists": path.is_file(),
         "warnings": [],
@@ -207,9 +225,7 @@ def _ledger_permission_report(path: Path) -> dict:
     seal_path = default_seal_path(path)
     report["seal_path"] = str(seal_path)
     report["seal_exists"] = seal_path.is_file()
-    report["seal_colocated"] = (
-        is_seal_colocated(path, seal_path) if seal_path.is_file() else None
-    )
+    report["seal_colocated"] = is_seal_colocated(path, seal_path) if seal_path.is_file() else None
     report["seal_storage_recommendation"] = STORAGE_RECOMMENDATION
     if not seal_path.is_file():
         report["warnings"].append(
@@ -249,14 +265,10 @@ def _ledger_permission_report(path: Path) -> dict:
     report["parent_mode"] = oct(stat.S_IMODE(parent_mode))
     if mode & stat.S_IWOTH:
         report["ok"] = False
-        report["warnings"].append(
-            "ledger file is world-writable (other write bit set)"
-        )
+        report["warnings"].append("ledger file is world-writable (other write bit set)")
     if parent_mode & stat.S_IWOTH:
         report["ok"] = False
-        report["warnings"].append(
-            "ledger parent directory is world-writable"
-        )
+        report["warnings"].append("ledger parent directory is world-writable")
     report["supported_retention"] = (
         "lpe ledger archive --output ARCHIVE.jsonl then verify; "
         "optional fresh lpe ledger init for a new working set"
@@ -267,9 +279,10 @@ def _ledger_permission_report(path: Path) -> dict:
     )
     return report
 
+
 @contract_app.command("validate")
 def contract_validate(
-    project: Annotated[Path, typer.Argument(exists=True, file_okay=False)]
+    project: Annotated[Path, typer.Argument(exists=True, file_okay=False)],
 ) -> None:
     contract = load_contract(project)
     typer.echo(
@@ -296,18 +309,14 @@ def candidate_validate(
     candidate = CandidateDescriptor.model_validate(_read_json(candidate_path))
     if project is not None:
         contract = load_contract(project)
-        validate_candidate_obligations(
-            contract, candidate.project_id, candidate.obligation_ids
-        )
+        validate_candidate_obligations(contract, candidate.project_id, candidate.obligation_ids)
     typer.echo(candidate.model_dump_json(indent=2))
 
 
 @evidence_app.command("compile")
 def evidence_compile(
     project: Annotated[Path, typer.Option("--project", exists=True, file_okay=False)],
-    candidate_path: Annotated[
-        Path, typer.Option("--candidate", exists=True, dir_okay=False)
-    ],
+    candidate_path: Annotated[Path, typer.Option("--candidate", exists=True, dir_okay=False)],
     output: Annotated[Path, typer.Option("--output")],
     skip_build: Annotated[bool, typer.Option("--skip-build")] = False,
     insecure_host_exec: Annotated[
@@ -338,9 +347,37 @@ def evidence_compile(
             ),
         ),
     ] = True,
+    paired_extract: Annotated[
+        bool,
+        typer.Option(
+            "--paired-extract/--no-paired-extract",
+            help=(
+                "Run live elaborator-backed base+candidate extract (2x Lake). "
+                "Default off — dry-run fingerprints still run. "
+                "Equivalent to LPE_PAIRED_EXTRACT=1 when enabled."
+            ),
+        ),
+    ] = False,
+    prefer_generic_extract: Annotated[
+        bool | None,
+        typer.Option(
+            "--prefer-generic-extract/--no-prefer-generic-extract",
+            help=(
+                "Prefer injected generic extract when Lake is available and the "
+                "project has no lpe_extract target (default auto). "
+                "Sets LPE_PREFER_GENERIC_EXTRACT for this invocation."
+            ),
+        ),
+    ] = None,
     markdown: Annotated[Path | None, typer.Option("--markdown")] = None,
     github_check: Annotated[Path | None, typer.Option("--github-check")] = None,
 ) -> None:
+    if paired_extract:
+        os.environ["LPE_PAIRED_EXTRACT"] = "1"
+    if prefer_generic_extract is True:
+        os.environ["LPE_PREFER_GENERIC_EXTRACT"] = "1"
+    elif prefer_generic_extract is False:
+        os.environ["LPE_PREFER_GENERIC_EXTRACT"] = "0"
     candidate = CandidateDescriptor.model_validate(_read_json(candidate_path))
     try:
         packet = compile_evidence(
@@ -368,7 +405,10 @@ def evidence_compile(
     if github_check is not None:
         check = packet_to_github_check(packet)
         github_check.parent.mkdir(parents=True, exist_ok=True)
-        github_check.write_text(json.dumps(render_check_payload(check), indent=2) + "\n", encoding="utf-8")
+        github_check.write_text(
+            json.dumps(render_check_payload(check), indent=2) + "\n",
+            encoding="utf-8",
+        )
     typer.echo(str(output))
 
 
@@ -481,10 +521,7 @@ def ledger_archive(
                 "next_steps": [
                     "Retain the verified JSONL as the offline audit artifact.",
                     "Do not DELETE/UPDATE events in the live SQLite file.",
-                    (
-                        "Optional fresh working set: "
-                        f"{result['fresh_ledger_hint']}"
-                    ),
+                    (f"Optional fresh working set: {result['fresh_ledger_hint']}"),
                 ],
             },
             indent=2,
@@ -562,6 +599,60 @@ def ledger_verify_seal(
     typer.echo(json.dumps(result, indent=2))
 
 
+@ledger_app.command("migrate")
+def ledger_migrate(
+    source: Annotated[
+        Path,
+        typer.Option("--source", exists=True, dir_okay=False, help="Source 0.1 ledger"),
+    ],
+    target: Annotated[
+        Path,
+        typer.Option("--target", help="Target 0.2 ledger path (must not exist)"),
+    ],
+    mapping_report: Annotated[
+        Path,
+        typer.Option("--mapping-report", help="JSON report accounting for every source event"),
+    ],
+    source_seal: Annotated[
+        Path | None,
+        typer.Option("--source-seal", help="Optional seal path for source ledger"),
+    ] = None,
+    target_seal: Annotated[
+        Path | None,
+        typer.Option("--target-seal", help="Optional seal path for target ledger"),
+    ] = None,
+) -> None:
+    """Migrate ledger 0.1→0.2 with typed legacy wrappers; verify and reseal both."""
+    from lpe.ledger.migration import LedgerMigrationError, migrate_ledger
+
+    try:
+        report = migrate_ledger(
+            source,
+            target,
+            mapping_report,
+            source_seal=source_seal,
+            target_seal=target_seal,
+        )
+    except (LedgerMigrationError, LedgerIntegrityError, LedgerSealError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(
+        json.dumps(
+            {
+                "ok": True,
+                "source_event_count": report["source_event_count"],
+                "target_event_count": report["target_event_count"],
+                "mapping_report": str(mapping_report),
+                "source_seal_path": report["source_seal_path"],
+                "target_seal_path": report["target_seal_path"],
+                "invented_acceptance": False,
+                "invented_persistence": False,
+            },
+            indent=2,
+        )
+    )
+
+
 @contract_app.command("schema-check")
 def contract_schema_check(
     project: Annotated[Path, typer.Argument(exists=True, file_okay=False)],
@@ -632,9 +723,7 @@ def contract_migrate(
 ) -> None:
     """Versioned contract schema rewrite (refuse-unknown; opt-in --write)."""
     try:
-        report = apply_contract_migration(
-            project, target_version=target, write=write
-        )
+        report = apply_contract_migration(project, target_version=target, write=write)
     except ValueError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
@@ -697,14 +786,72 @@ def github_submit_check(
     # Dry-run and POST both emit the full plan (argv, payload, command_preview).
     typer.echo(json.dumps(result.to_dict(), indent=2))
 
+
 @tppr_app.command("compute")
 def tppr_compute(
     path: Annotated[Path, typer.Argument(exists=True, dir_okay=False)],
     project_id: Annotated[str, typer.Option("--project-id")],
 ) -> None:
+    """Legacy TPPR v1 over dict payloads (kept until ledger migration complete)."""
     store = LedgerStore(path)
     store.verify()
     report = compute_tppr(store.events(project_id), project_id)
+    typer.echo(report.model_dump_json(indent=2))
+
+
+@tppr_app.command("compute-v2")
+def tppr_compute_v2(
+    path: Annotated[Path, typer.Argument(exists=True, dir_okay=False)],
+    project_id: Annotated[str, typer.Option("--project-id")],
+    include_retrospective: Annotated[
+        bool,
+        typer.Option(
+            "--include-retrospective",
+            help="Include retrospective estimates in primary TPPR (protocol opt-in).",
+        ),
+    ] = False,
+) -> None:
+    """TPPR v2 audit report over typed UtilityEventV2 records (CLOSURE-025)."""
+    from lpe.ledger.events import UtilityEventV2
+    from lpe.metrics.tppr_v2 import TPPRAntiGamingError, compute_tppr_v2
+
+    store = LedgerStore(path)
+    store.verify()
+    typed: list[UtilityEventV2] = []
+    for event in store.events(project_id):
+        try:
+            typed.append(UtilityEventV2.model_validate(event.model_dump(mode="json")))
+        except Exception:
+            # Legacy v1 events: wrap as unresolved for audit counting.
+            from lpe.ledger.events import (
+                EventTypeV2,
+                LegacyUnresolvedPayload,
+            )
+
+            typed.append(
+                UtilityEventV2(
+                    event_id=event.event_id,
+                    event_type=EventTypeV2.LEGACY_UNRESOLVED,
+                    project_id=event.project_id,
+                    artifact_id=event.artifact_id,
+                    actor_id=event.actor_id,
+                    obligation_ids=([event.obligation_id] if event.obligation_id else []),
+                    occurred_at=event.occurred_at,
+                    payload=LegacyUnresolvedPayload(
+                        legacy_event_type=event.event_type.value,
+                        legacy_payload=dict(event.payload),
+                    ),
+                )
+            )
+    try:
+        report = compute_tppr_v2(
+            typed,
+            project_id,
+            include_retrospective_in_primary=include_retrospective,
+        )
+    except TPPRAntiGamingError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
     typer.echo(report.model_dump_json(indent=2))
 
 
@@ -758,15 +905,12 @@ def review_record(
             risk_class=risk,
         )
         validate_decision_for_risk(decision, risk)
-        if (
-            decision.decision is ReviewDecisionValue.ACCEPT
-            and not can_record_acceptance(risk)
-        ):
+        if decision.decision is ReviewDecisionValue.ACCEPT and not can_record_acceptance(risk):
             raise AuthorityError(
                 f"{risk.value} ACCEPT cannot be recorded via lpe review record "
-                "(ADR 0003: no R3/R4 auto-accept; multi-authority acceptance is not "
-                "implemented yet). Record REJECT/REQUEST_REPAIR, or use an authorized "
-                "offline process."
+                "(ADR 0003: no R3/R4 auto-accept; single-reviewer ACCEPT refused). "
+                "Record dimension attestations with `lpe review attest`, then "
+                "`lpe review accept-quorum`."
             )
     except AuthorityError as exc:
         typer.echo(str(exc), err=True)
@@ -776,14 +920,418 @@ def review_record(
         if obligation_ids
         else None
     )
-    digest = record_review_decision(
-        ledger,
-        decision,
-        project_id=contract.project.project_id,
-        obligation_ids=obl_list,
-        evidence_fingerprint=fingerprint,
-    )
+    try:
+        digest = record_review_decision(
+            ledger,
+            decision,
+            project_id=contract.project.project_id,
+            obligation_ids=obl_list,
+            evidence_fingerprint=fingerprint,
+            risk_class=risk,
+        )
+    except AcceptanceError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
     typer.echo(digest)
+
+
+@review_app.command("attest")
+def review_attest(
+    project: Annotated[Path, typer.Option("--project", exists=True, file_okay=False)],
+    attestation_path: Annotated[Path, typer.Option("--attestation", exists=True, dir_okay=False)],
+    conflict_path: Annotated[Path, typer.Option("--conflict", exists=True, dir_okay=False)],
+    ledger: Annotated[Path, typer.Option("--ledger")],
+    risk_class: Annotated[str, typer.Option("--risk-class")],
+    obligation_ids: Annotated[
+        str | None,
+        typer.Option("--obligation-ids", help="Comma-separated obligation ids."),
+    ] = None,
+) -> None:
+    """Record a single-dimension review attestation (eligibility fail-closed)."""
+    from lpe.models import RiskClass
+
+    contract = load_contract(project)
+    attestation = ReviewAttestationV2.model_validate(_read_json(attestation_path))
+    conflict = ReviewerConflictDeclaration.model_validate(_read_json(conflict_path))
+    risk = RiskClass(risk_class)
+    try:
+        if conflict.reviewer_id != attestation.reviewer_id:
+            raise ConflictError("conflict reviewer_id must match attestation reviewer_id")
+        conflict_hash = require_eligible_for_primary_attestation(conflict)
+        if attestation.conflict_declaration_hash != conflict_hash:
+            raise ConflictError("attestation conflict_declaration_hash does not match declaration")
+        validate_reviewer_authority(
+            contract,
+            reviewer_id=attestation.reviewer_id,
+            risk_class=risk,
+        )
+    except (AuthorityError, ConflictError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+    store = LedgerStore(ledger)
+    if not ledger.exists():
+        store.initialize()
+    obl_list = (
+        [part.strip() for part in obligation_ids.split(",") if part.strip()]
+        if obligation_ids
+        else None
+    )
+    try:
+        digest = record_attestation_event(
+            store,
+            attestation,
+            project_id=contract.project.project_id,
+            obligation_ids=obl_list,
+        )
+    except Exception as exc:  # lifecycle / integrity
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(digest)
+
+
+@review_app.command("accept-quorum")
+def review_accept_quorum(
+    project: Annotated[Path, typer.Option("--project", exists=True, file_okay=False)],
+    attestations_path: Annotated[
+        Path,
+        typer.Option(
+            "--attestations",
+            exists=True,
+            dir_okay=False,
+            help="JSON array of ReviewAttestationV2 objects",
+        ),
+    ],
+    ledger: Annotated[Path, typer.Option("--ledger")],
+    risk_class: Annotated[str, typer.Option("--risk-class")],
+    evidence_fingerprint: Annotated[str, typer.Option("--evidence-fingerprint")],
+    actor_id: Annotated[str, typer.Option("--actor-id")],
+    artifact_id: Annotated[str, typer.Option("--artifact-id")],
+    obligation_ids: Annotated[
+        str | None,
+        typer.Option("--obligation-ids", help="Comma-separated obligation ids."),
+    ] = None,
+) -> None:
+    """Aggregate ARTIFACT_ACCEPTED only when R1-R4 quorum is satisfied.
+
+    R3/R4 require distinct reviewers; auto-accept remains impossible (ADR 0003).
+    """
+    from lpe.models import RiskClass
+
+    contract = load_contract(project)
+    raw = _read_json(attestations_path)
+    if not isinstance(raw, list):
+        typer.echo("--attestations must be a JSON array", err=True)
+        raise typer.Exit(code=1)
+    attestations = [ReviewAttestationV2.model_validate(item) for item in raw]
+    risk = RiskClass(risk_class)
+    obl_list = (
+        [part.strip() for part in obligation_ids.split(",") if part.strip()]
+        if obligation_ids
+        else None
+    )
+    try:
+        digest = aggregate_and_record_acceptance(
+            ledger,
+            project_id=contract.project.project_id,
+            artifact_id=artifact_id,
+            actor_id=actor_id,
+            risk_class=risk,
+            attestations=attestations,
+            evidence_fingerprint=evidence_fingerprint,
+            obligation_ids=obl_list,
+        )
+    except AcceptanceError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(digest)
+
+
+@review_app.command("repair-lineage")
+def review_repair_lineage(
+    prior_candidate_id: Annotated[str, typer.Option("--prior-candidate-id")],
+    repair_request_ids: Annotated[
+        str,
+        typer.Option(
+            "--repair-request-ids",
+            help="Comma-separated repair request ids (at least one).",
+        ),
+    ],
+    applied_change: Annotated[
+        Path,
+        typer.Option(
+            "--applied-change",
+            exists=True,
+            dir_okay=False,
+            help="File whose contents are hashed as the applied repair change.",
+        ),
+    ],
+    new_evidence_fingerprint: Annotated[
+        str | None,
+        typer.Option("--new-evidence-fingerprint"),
+    ] = None,
+) -> None:
+    """Compute the next repair candidate id and lineage JSON (CLOSURE-024)."""
+    req_ids = [part.strip() for part in repair_request_ids.split(",") if part.strip()]
+    try:
+        lineage = build_repair_lineage(
+            prior_candidate_id=prior_candidate_id,
+            repair_request_ids=req_ids,
+            applied_change=applied_change.read_bytes(),
+            new_evidence_fingerprint=new_evidence_fingerprint,
+        )
+    except RepairError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(
+        json.dumps(
+            {
+                "root_candidate_id": lineage.root_candidate_id,
+                "prior_candidate_id": lineage.prior_candidate_id,
+                "new_candidate_id": lineage.new_candidate_id,
+                "repair_sequence": lineage.repair_sequence,
+                "repair_request_ids": list(lineage.repair_request_ids),
+                "applied_change_hash": lineage.applied_change_hash,
+                "new_evidence_fingerprint": lineage.new_evidence_fingerprint,
+                "note": "Prior attestations do not transfer to the repaired candidate.",
+            },
+            indent=2,
+        )
+    )
+
+
+@review_app.command("repair-request")
+def review_repair_request(
+    project: Annotated[Path, typer.Option("--project", exists=True, file_okay=False)],
+    ledger: Annotated[Path, typer.Option("--ledger")],
+    artifact_id: Annotated[str, typer.Option("--artifact-id")],
+    actor_id: Annotated[str, typer.Option("--actor-id")],
+    candidate_id: Annotated[str, typer.Option("--candidate-id")],
+    rationale: Annotated[str, typer.Option("--rationale")],
+    attestations_path: Annotated[
+        Path,
+        typer.Option(
+            "--attestations",
+            exists=True,
+            dir_okay=False,
+            help="JSON array of ReviewAttestationV2 that requested repair.",
+        ),
+    ],
+    repair_request_id: Annotated[
+        str | None,
+        typer.Option("--repair-request-id", help="Defaults to a generated id."),
+    ] = None,
+    required_change: Annotated[str | None, typer.Option("--required-change")] = None,
+    obligation_ids: Annotated[
+        str | None,
+        typer.Option("--obligation-ids", help="Comma-separated obligation ids."),
+    ] = None,
+) -> None:
+    """Append a typed REPAIR_REQUESTED ledger event (CLOSURE-024)."""
+    contract = load_contract(project)
+    raw = _read_json(attestations_path)
+    if not isinstance(raw, list):
+        typer.echo("--attestations must be a JSON array", err=True)
+        raise typer.Exit(code=1)
+    attestations = [ReviewAttestationV2.model_validate(item) for item in raw]
+    store = LedgerStore(ledger)
+    if not ledger.exists():
+        store.initialize()
+    obl_list = (
+        [part.strip() for part in obligation_ids.split(",") if part.strip()]
+        if obligation_ids
+        else None
+    )
+    rid = repair_request_id or new_id("repair")
+    event = repair_requested_event(
+        event_id=new_id("evt"),
+        project_id=contract.project.project_id,
+        artifact_id=artifact_id,
+        actor_id=actor_id,
+        repair_request_id=rid,
+        candidate_id=candidate_id,
+        attestations=attestations,
+        rationale=rationale,
+        required_change=required_change,
+        obligation_ids=obl_list,
+    )
+    try:
+        digest = store.append_v2(event)
+    except (LedgerTransitionError, LedgerIntegrityError, LedgerAuthError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(
+        json.dumps(
+            {
+                "event_hash": digest,
+                "repair_request_id": rid,
+                "event_id": event.event_id,
+            },
+            indent=2,
+        )
+    )
+
+
+@review_app.command("repair-complete")
+def review_repair_complete(
+    project: Annotated[Path, typer.Option("--project", exists=True, file_okay=False)],
+    ledger: Annotated[Path, typer.Option("--ledger")],
+    artifact_id: Annotated[str, typer.Option("--artifact-id")],
+    actor_id: Annotated[str, typer.Option("--actor-id")],
+    prior_candidate_id: Annotated[str, typer.Option("--prior-candidate-id")],
+    repair_request_ids: Annotated[
+        str,
+        typer.Option("--repair-request-ids", help="Comma-separated repair request ids."),
+    ],
+    applied_change: Annotated[
+        Path,
+        typer.Option("--applied-change", exists=True, dir_okay=False),
+    ],
+    new_evidence_fingerprint: Annotated[
+        str | None,
+        typer.Option("--new-evidence-fingerprint"),
+    ] = None,
+    obligation_ids: Annotated[
+        str | None,
+        typer.Option("--obligation-ids"),
+    ] = None,
+) -> None:
+    """Append REPAIR_COMPLETED and emit the new candidate lineage (CLOSURE-024)."""
+    contract = load_contract(project)
+    req_ids = [part.strip() for part in repair_request_ids.split(",") if part.strip()]
+    try:
+        lineage = build_repair_lineage(
+            prior_candidate_id=prior_candidate_id,
+            repair_request_ids=req_ids,
+            applied_change=applied_change.read_bytes(),
+            new_evidence_fingerprint=new_evidence_fingerprint,
+        )
+    except RepairError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    store = LedgerStore(ledger)
+    if not ledger.exists():
+        store.initialize()
+    obl_list = (
+        [part.strip() for part in obligation_ids.split(",") if part.strip()]
+        if obligation_ids
+        else None
+    )
+    event = repair_completed_event(
+        event_id=new_id("evt"),
+        project_id=contract.project.project_id,
+        artifact_id=artifact_id,
+        actor_id=actor_id,
+        lineage=lineage,
+        obligation_ids=obl_list,
+    )
+    try:
+        digest = store.append_v2(event)
+    except (LedgerTransitionError, LedgerIntegrityError, LedgerAuthError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(
+        json.dumps(
+            {
+                "event_hash": digest,
+                "new_candidate_id": lineage.new_candidate_id,
+                "prior_candidate_id": lineage.prior_candidate_id,
+                "applied_change_hash": lineage.applied_change_hash,
+                "attestations_transfer": False,
+            },
+            indent=2,
+        )
+    )
+
+
+@review_app.command("adjudicate")
+def review_adjudicate(
+    project: Annotated[Path, typer.Option("--project", exists=True, file_okay=False)],
+    provisional_path: Annotated[
+        Path,
+        typer.Option("--provisional", exists=True, dir_okay=False),
+    ],
+    record_path: Annotated[
+        Path,
+        typer.Option("--record", exists=True, dir_okay=False),
+    ],
+    peer_attestations_path: Annotated[
+        Path,
+        typer.Option("--peer-attestations", exists=True, dir_okay=False),
+    ],
+    conflict_path: Annotated[
+        Path,
+        typer.Option("--conflict", exists=True, dir_okay=False),
+    ],
+    original_reviewer_ids: Annotated[
+        str,
+        typer.Option(
+            "--original-reviewer-ids",
+            help="Comma-separated original reviewer ids (adjudicator must not be among them).",
+        ),
+    ],
+    review_minutes: Annotated[float, typer.Option("--review-minutes")],
+    adjudicator_roles: Annotated[
+        str,
+        typer.Option(
+            "--adjudicator-roles",
+            help=f"Comma-separated roles; must include {ADJUDICATOR_ROLE}.",
+        ),
+    ] = ADJUDICATOR_ROLE,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Write adjudication attestation JSON here."),
+    ] = None,
+) -> None:
+    """Validate adjudication lineage and emit an ADJUDICATION attestation (CLOSURE-024)."""
+    load_contract(project)  # ensure project loads; authority checked via roles
+    provisional = ProvisionalJudgment.model_validate(_read_json(provisional_path))
+    record = AdjudicationRecord.model_validate(_read_json(record_path))
+    peers_raw = _read_json(peer_attestations_path)
+    if not isinstance(peers_raw, list):
+        typer.echo("--peer-attestations must be a JSON array", err=True)
+        raise typer.Exit(code=1)
+    peers = [ReviewAttestationV2.model_validate(item) for item in peers_raw]
+    conflict = ReviewerConflictDeclaration.model_validate(_read_json(conflict_path))
+    roles = [part.strip() for part in adjudicator_roles.split(",") if part.strip()]
+    originals = [part.strip() for part in original_reviewer_ids.split(",") if part.strip()]
+    try:
+        if conflict.reviewer_id != record.adjudicator_id:
+            raise AdjudicationError(
+                "conflict reviewer_id must match adjudication record adjudicator_id"
+            )
+        conflict_hash = validate_adjudicator(
+            adjudicator_id=record.adjudicator_id,
+            adjudicator_roles=roles,
+            original_reviewer_ids=originals,
+            conflict=conflict,
+        )
+        if record.conflict_declaration_hash != conflict_hash:
+            raise AdjudicationError("record conflict_declaration_hash does not match declaration")
+        if provisional.judgment_id != record.provisional_judgment_id:
+            raise AdjudicationError("provisional judgment id mismatch with record")
+        revealed = reveal_peer_attestations(provisional, peers)
+        lineage = auditable_lineage(
+            provisional=revealed,
+            record=record,
+            peer_attestations=peers,
+        )
+        attestation = build_adjudication_attestation(
+            record,
+            review_minutes=review_minutes,
+        )
+    except AdjudicationError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+    payload = {
+        "lineage": lineage,
+        "attestation": attestation.model_dump(mode="json"),
+    }
+    text = json.dumps(payload, indent=2)
+    if output is not None:
+        output.write_text(text + "\n", encoding="utf-8")
+    typer.echo(text)
 
 
 @gate_app.command("month-one")
@@ -834,9 +1382,7 @@ def lean_extract(
     summary = {
         "extractor": result.extractor,
         "complete": result.complete,
-        "extraction_schema_version": getattr(
-            result, "extraction_schema_version", "1.0"
-        ),
+        "extraction_schema_version": getattr(result, "extraction_schema_version", "1.0"),
         "declaration_count": len(result.declarations),
         "declaration_edge_count": len(result.effective_declaration_edges()),
         "import_edge_count": len(result.import_edges),
@@ -844,9 +1390,7 @@ def lean_extract(
         "notes": result.notes,
         "artifact": str((repo / ".lpe" / "lean-extraction.json").resolve()),
         "mathlib_scale": False,
-        "note": (
-            "not Mathlib-scale; toolchain completeness is project/fixture scope only"
-        ),
+        "note": ("not Mathlib-scale; toolchain completeness is project/fixture scope only"),
     }
     typer.echo(json.dumps(summary, indent=2))
     if output is not None:
@@ -885,7 +1429,7 @@ def research_status(
         typer.Option("--format", help="json | markdown | text"),
     ] = "json",
 ) -> None:
-    """Print the M6–M7 / EPIC-039/040 / §21 research gate matrix."""
+    """Print the M6-M7 / EPIC-039/040 / section 21 research gate matrix."""
     from lpe.honesty.research_gates import (
         format_research_status,
         research_status_payload,
@@ -944,6 +1488,323 @@ def research_train() -> None:
         raise typer.Exit(code=1) from exc
 
 
+@research_app.command("evaluate-gates")
+def research_evaluate_gates(
+    protocol: Annotated[
+        Path,
+        typer.Option("--protocol", exists=True, help="Protocol bundle dir or protocol.yaml"),
+    ],
+    ledger: Annotated[Path, typer.Option("--ledger", exists=True, dir_okay=False)],
+    seal: Annotated[Path, typer.Option("--seal", exists=True, dir_okay=False)],
+    analysis: Annotated[Path, typer.Option("--analysis", exists=True, dir_okay=False)],
+    output: Annotated[Path, typer.Option("--output", help="section21-gates.json path")],
+    observables: Annotated[
+        Path | None,
+        typer.Option(
+            "--observables",
+            exists=True,
+            dir_okay=False,
+            help="Optional JSON with overhead/comprehension/sufficiency fields",
+        ),
+    ] = None,
+) -> None:
+    """Fail-closed §21 shadow-pilot gate evaluator (CLOSURE-030)."""
+    from lpe.honesty.research_gates import evaluate_gates_from_paths
+
+    try:
+        report = evaluate_gates_from_paths(
+            protocol_path=protocol,
+            ledger_path=ledger,
+            seal_path=seal,
+            analysis_path=analysis,
+            output_path=output,
+            observables_path=observables,
+        )
+    except Exception as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(
+        json.dumps(
+            {
+                "ok": True,
+                "output": str(output),
+                "shadow_pilot_passed": report.shadow_pilot_passed,
+                "learned_routing_authorized": report.learned_routing_authorized,
+                "synthesis_authorized": report.synthesis_authorized,
+                "blocking_reasons": report.blocking_reasons,
+                "report_hash": report.report_hash,
+            },
+            indent=2,
+        )
+    )
+    if not report.shadow_pilot_passed:
+        raise typer.Exit(code=2)
+
+
+@pilot_app.command("protocol-init")
+def pilot_protocol_init(
+    root: Annotated[Path, typer.Argument(help="Directory for pilot-protocol/")],
+    project_id: Annotated[str, typer.Option("--project-id")] = "example-partner",
+) -> None:
+    """Write a complete non-blank example protocol bundle (synthetic; not a live study)."""
+    from lpe.pilot.protocol import write_example_bundle
+
+    path = write_example_bundle(root, project_id=project_id)
+    typer.echo(json.dumps({"ok": True, "root": str(path), "live_partner": False}, indent=2))
+
+
+@pilot_app.command("protocol-validate")
+def pilot_protocol_validate(
+    root: Annotated[Path, typer.Argument(exists=True, file_okay=False)],
+) -> None:
+    """Validate every protocol file; refuse blanks."""
+    from lpe.pilot.protocol import ProtocolError, validate_bundle_dir
+
+    try:
+        bundle = validate_bundle_dir(root)
+    except ProtocolError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(
+        json.dumps(
+            {
+                "ok": True,
+                "protocol_id": bundle.protocol.protocol_id,
+                "protocol_hash": bundle.protocol_hash,
+                "component_hashes": bundle.component_hashes,
+            },
+            indent=2,
+        )
+    )
+
+
+@pilot_app.command("comprehension-score")
+def pilot_comprehension_score(
+    protocol_root: Annotated[Path, typer.Option("--protocol", exists=True, file_okay=False)],
+    cases_path: Annotated[Path, typer.Option("--cases", exists=True, dir_okay=False)],
+    attempt_path: Annotated[Path, typer.Option("--attempt", exists=True, dir_okay=False)],
+    reviewer_id: Annotated[str, typer.Option("--reviewer-id")],
+    output: Annotated[Path, typer.Option("--output")],
+    prior_failures: Annotated[int, typer.Option("--prior-failures")] = 0,
+) -> None:
+    """Score one reviewer comprehension attempt (CLOSURE-028)."""
+    from lpe.pilot.comprehension import (
+        CalibrationCase,
+        ComprehensionAttempt,
+        ComprehensionError,
+        score_comprehension,
+    )
+    from lpe.pilot.protocol import ProtocolError, validate_bundle_dir
+
+    try:
+        bundle = validate_bundle_dir(protocol_root)
+        cases_raw = _read_json(cases_path)
+        attempt_raw = _read_json(attempt_path)
+        cases = [CalibrationCase.model_validate(c) for c in cases_raw]
+        attempt = ComprehensionAttempt.model_validate(attempt_raw)
+        result = score_comprehension(
+            reviewer_id=reviewer_id,
+            config=bundle.comprehension,
+            cases=cases,
+            attempt=attempt,
+            prior_failures=prior_failures,
+        )
+    except (ComprehensionError, ProtocolError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(result.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    typer.echo(
+        json.dumps(
+            {
+                "ok": True,
+                "passed": result.passed,
+                "excluded_from_primary": result.excluded_from_primary,
+                "result_hash": result.result_hash,
+                "output": str(output),
+            },
+            indent=2,
+        )
+    )
+
+
+@pilot_app.command("freeze-protocol")
+def pilot_freeze_protocol(
+    protocol_dir: Annotated[
+        Path,
+        typer.Option("--protocol-dir", exists=True, file_okay=False),
+    ],
+) -> None:
+    """Validate and freeze a machine-readable pilot protocol bundle."""
+    from lpe.pilot.protocol import ProtocolError, freeze_protocol
+
+    try:
+        bundle = freeze_protocol(protocol_dir)
+    except ProtocolError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(
+        json.dumps(
+            {
+                "ok": True,
+                "freeze_id": bundle.freeze_id,
+                "protocol_id": bundle.protocol.protocol_id,
+                "protocol_hash": bundle.protocol_hash,
+                "section_21_cleared": False,
+                "causal_claims": False,
+            },
+            indent=2,
+        )
+    )
+
+
+@pilot_app.command("assign")
+def pilot_assign(
+    protocol_dir: Annotated[
+        Path,
+        typer.Option("--protocol-dir", exists=True, file_okay=False),
+    ],
+    episodes: Annotated[
+        Path,
+        typer.Option("--episodes", exists=True, dir_okay=False, help="JSON list of EpisodeSpec"),
+    ],
+    seed: Annotated[str, typer.Option("--seed", help="Randomization seed plaintext")],
+    output: Annotated[Path, typer.Option("--output", help="Assignment manifest JSON")],
+) -> None:
+    """Deterministic blocked 2:2:1 condition assignment (HMAC-SHA256)."""
+    from lpe.pilot.assignment import AssignmentError, EpisodeSpec, assign_conditions
+    from lpe.pilot.protocol import ProtocolError, verify_freeze
+
+    try:
+        bundle = verify_freeze(protocol_dir)
+        raw = _read_json(episodes)
+        if not isinstance(raw, list):
+            raise AssignmentError("--episodes must be a JSON array")
+        specs = [EpisodeSpec.model_validate(item) for item in raw]
+        manifest = assign_conditions(
+            protocol_id=bundle.protocol.protocol_id,
+            config=bundle.assignment,
+            episodes=specs,
+            roster=bundle.roster,
+            seed_plaintext=seed,
+        )
+    except (ProtocolError, AssignmentError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(manifest.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    typer.echo(
+        json.dumps(
+            {
+                "ok": True,
+                "assignment_id": manifest.assignment_id,
+                "manifest_hash": manifest.manifest_hash,
+                "quotas": manifest.quotas,
+                "output": str(output),
+            },
+            indent=2,
+        )
+    )
+
+
+@pilot_app.command("lock")
+def pilot_lock(
+    protocol_dir: Annotated[
+        Path,
+        typer.Option("--protocol-dir", exists=True, file_okay=False),
+    ],
+    ledger: Annotated[Path, typer.Option("--ledger", exists=True, dir_okay=False)],
+    seal: Annotated[Path, typer.Option("--seal", exists=True, dir_okay=False)],
+    assignment: Annotated[
+        Path,
+        typer.Option("--assignment", exists=True, dir_okay=False),
+    ],
+    analysis_image_digest: Annotated[str, typer.Option("--analysis-image-digest")],
+    expected_episodes: Annotated[
+        str,
+        typer.Option("--expected-episodes", help="Comma-separated episode IDs"),
+    ],
+    completed_episodes: Annotated[
+        str,
+        typer.Option("--completed-episodes", help="Comma-separated episode IDs"),
+    ],
+    output: Annotated[Path, typer.Option("--output")],
+    attestation_complete: Annotated[
+        bool,
+        typer.Option("--attestation-complete/--attestation-incomplete"),
+    ] = False,
+    exclusions_resolved: Annotated[
+        bool,
+        typer.Option("--exclusions-resolved/--exclusions-open"),
+    ] = False,
+) -> None:
+    """Data lock: verify protocol, ledger, seal, held-out, assignment, image."""
+    from lpe.pilot.lock import DataLockError, perform_data_lock
+
+    expected = [x.strip() for x in expected_episodes.split(",") if x.strip()]
+    completed = [x.strip() for x in completed_episodes.split(",") if x.strip()]
+    try:
+        record = perform_data_lock(
+            protocol_bundle=protocol_dir,
+            ledger_path=ledger,
+            seal_path=seal,
+            assignment_plan_path=assignment,
+            analysis_image_digest=analysis_image_digest,
+            expected_episode_ids=expected,
+            completed_episode_ids=completed,
+            attestation_complete=attestation_complete,
+            exclusions_resolved=exclusions_resolved,
+            output_path=output,
+        )
+    except DataLockError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(record.model_dump_json(indent=2))
+
+
+@pilot_app.command("analyze")
+def pilot_analyze(
+    protocol_id: Annotated[str, typer.Option("--protocol-id")],
+    data_lock_hash: Annotated[str, typer.Option("--data-lock-hash")],
+    episodes: Annotated[
+        Path,
+        typer.Option("--episodes", exists=True, dir_okay=False),
+    ],
+    output: Annotated[Path, typer.Option("--output")],
+) -> None:
+    """Descriptive pilot analysis (does not claim causal utility)."""
+    from lpe.pilot.analysis import AnalysisError, PilotEpisodeRecord, analyze_pilot
+
+    try:
+        raw = _read_json(episodes)
+        if not isinstance(raw, list):
+            raise AnalysisError("--episodes must be a JSON array")
+        records = [PilotEpisodeRecord.model_validate(item) for item in raw]
+        report = analyze_pilot(
+            protocol_id=protocol_id,
+            data_lock_hash=data_lock_hash,
+            episodes=records,
+        )
+    except (AnalysisError, ValueError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(report.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    typer.echo(
+        json.dumps(
+            {
+                "ok": True,
+                "analysis_hash": report.analysis_hash,
+                "episode_count": sum(s.count for s in report.by_condition),
+                "output": str(output),
+                "section_21_cleared": False,
+                "causal_claims": False,
+            },
+            indent=2,
+        )
+    )
+
+
 @pilot_app.command("record")
 def pilot_record(
     ledger: Annotated[Path, typer.Option("--ledger", help="Utility ledger SQLite path")],
@@ -959,10 +1820,7 @@ def pilot_record(
         str,
         typer.Option(
             "--kind",
-            help=(
-                "Record kind: candidate | expert-time | packet-automated | "
-                "overhead | outcome"
-            ),
+            help=("Record kind: candidate | expert-time | packet-automated | overhead | outcome"),
         ),
     ],
     candidate_id: Annotated[
@@ -1061,8 +1919,7 @@ def pilot_record(
             mins = minutes if minutes is not None else extras.get("minutes")
             if not cid or not tag or not cat or mins is None:
                 raise ValueError(
-                    "--candidate-id, --condition-tag, --category, and --minutes "
-                    "are required"
+                    "--candidate-id, --condition-tag, --category, and --minutes are required"
                 )
             result = warehouse.record_expert_time(
                 candidate_id=str(cid),
@@ -1086,9 +1943,7 @@ def pilot_record(
             )
         elif kind_norm == "overhead":
             base = (
-                baseline_minutes
-                if baseline_minutes is not None
-                else extras.get("baseline_minutes")
+                baseline_minutes if baseline_minutes is not None else extras.get("baseline_minutes")
             )
             inst = (
                 instrumented_minutes
@@ -1096,17 +1951,13 @@ def pilot_record(
                 else extras.get("instrumented_minutes")
             )
             if base is None or inst is None:
-                raise ValueError(
-                    "--baseline-minutes and --instrumented-minutes are required"
-                )
+                raise ValueError("--baseline-minutes and --instrumented-minutes are required")
             report = OverheadReport.compute(
                 baseline_minutes=float(base),
                 instrumented_minutes=float(inst),
             )
             result = warehouse.record_overhead_snapshot(
-                artifact_id=str(
-                    candidate_id or extras.get("candidate_id") or "pilot-overhead"
-                ),
+                artifact_id=str(candidate_id or extras.get("candidate_id") or "pilot-overhead"),
                 report=report,
                 condition_tag=condition_tag or extras.get("condition_tag"),
                 note=extras.get("note"),
@@ -1116,9 +1967,7 @@ def pilot_record(
             tag = condition_tag or extras.get("condition_tag")
             dec = decision or extras.get("decision")
             if not cid or not tag or not dec:
-                raise ValueError(
-                    "--candidate-id, --condition-tag, and --decision are required"
-                )
+                raise ValueError("--candidate-id, --condition-tag, and --decision are required")
             result = warehouse.record_outcome(
                 candidate_id=str(cid),
                 condition_tag=str(tag),
@@ -1252,9 +2101,7 @@ def pilot_summary(
                 )
             )
         else:
-            typer.echo(
-                f"unknown --format {format!r}; expected json|markdown|both", err=True
-            )
+            typer.echo(f"unknown --format {format!r}; expected json|markdown|both", err=True)
             raise typer.Exit(code=1)
     except OversellClaimError as exc:
         typer.echo(str(exc), err=True)
@@ -1461,8 +2308,7 @@ def pilot_overhead(
         typer.Option(
             "--wall-minutes",
             help=(
-                "Instrumented wall-clock minutes (compile/packet/UI). "
-                "Not expert review minutes."
+                "Instrumented wall-clock minutes (compile/packet/UI). Not expert review minutes."
             ),
         ),
     ],

@@ -36,8 +36,7 @@ def test_git_diff_classifier(tmp_path: Path) -> None:
     ).stdout.strip()
 
     file.write_text(
-        "theorem old : True := by trivial\n"
-        "def newDefinition : Nat := 1\n",
+        "theorem old : True := by trivial\ndef newDefinition : Nat := 1\n",
         encoding="utf-8",
     )
     run("git", "add", ".", cwd=tmp_path)
