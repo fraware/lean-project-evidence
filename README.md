@@ -1,43 +1,102 @@
-# Lean Project Evidence
+```text
+                              _     ____  _____
+                             | |   |  _ \| ____|
+                             | |   | |_) |  _|
+                             | |___|  __/| |___
+                             |_____|_|   |_____|
 
-**Lean Project Evidence** (`lpe`) is a project-grounded evidence and review layer for AI-assisted Lean development.
+                            LEAN PROJECT EVIDENCE
+                Project-grounded evidence for Lean development
+```
 
-The system evaluates a candidate statement, definition, proof, or repository patch against:
+<p align="center">
+  <a href="https://github.com/fraware/lean-project-evidence/actions/workflows/ci.yml"><img src="https://github.com/fraware/lean-project-evidence/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License: Apache 2.0" /></a>
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-%3E%3D3.12-blue.svg" alt="Python >= 3.12" /></a>
+</p>
 
-- the mathematical intention of the project;
-- the exact Lean repository and dependency state;
-- a predeclared critical-path obligation;
-- repository architecture and downstream uses;
-- later persistence and repair outcomes.
+**Lean Project Evidence** (`lean-project-evidence`, CLI: `lpe`) turns project intent and repository state into structured evidence for accept, reject, or escalate decisions on Lean candidates.
 
-The product is designed around one North Star:
+Kernel checks prove a term matches a proposition. They do not prove the proposition matches the mathematics you meant, fits the abstractions you chose, or advances the milestone you care about. LPE closes that gap with contracts, evidence packets, and an append-only utility ledger.
+
+---
+
+## Contents
+
+- [Why it matters](#why-it-matters)
+- [Who it is for](#who-it-is-for)
+- [Quickstart](#quickstart)
+- [Core concepts](#core-concepts)
+- [CLI highlights](#cli-highlights)
+- [Honesty bounds](#honesty-bounds)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## Why it matters
+
+The North Star is **TPPR**: sustained critical-path progress per expert hour.
+
+In plain language: of the obligations that actually move the project forward, how many are accepted and stay accepted — relative to the expert time spent specifying, reviewing, repairing, and integrating?
 
 \[
 \text{TPPR}
 =
 \frac{\text{weighted critical-path obligations accepted and sustained}}
-{\text{expert specification, review, repair, and integration hours}}.
+{\text{expert specification, review, repair, and integration hours}}
 \]
 
-## Problem
+Compilation rates, generated declarations, and synthetic-data volume are diagnostics. They are not the goal.
 
-Kernel verification establishes that a proof term proves a proposition in an environment. It does not establish that the proposition expresses the intended mathematics, fits the repository's abstractions, advances the project milestone, or deserves to become training data.
+---
 
-`lpe` compiles project intent and repository requirements into structured evidence for an accept, reject, or escalate decision.
+## Who it is for
 
-## First wedge
+| Audience | Job |
+| --- | --- |
+| Formalization leads | Decide whether an AI-assisted statement, definition, or patch belongs in the project |
+| Repository maintainers | Bind review to exact Lean/Lake state, architecture, and downstream risk |
+| Pilot partners | Instrument review workflows without claiming causal utility prematurely |
+| Contributors | Extend contracts, evidence gates, CLI surfaces, and tests |
 
-Version 0 targets AI-generated or AI-modified:
+Version 0 focuses on AI-generated or AI-modified theorem statements, definitions, public APIs, imports, and repository patches. Proof generation stays external.
 
-- theorem statements;
-- definitions;
-- public API additions;
-- imports and dependency changes;
-- repository patches with downstream consequences.
+---
 
-Proof generation remains external.
+## Quickstart
 
-## Architecture
+Requires **Python 3.12+**.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+make check
+```
+
+Validate the example contract and compile evidence:
+
+```bash
+lpe contract validate examples/minimal-project
+
+lpe evidence compile \
+  --project examples/minimal-project \
+  --candidate examples/candidates/R3-definition-change.json \
+  --output .lpe/evidence/example.json
+```
+
+Environment health and research-gate honesty:
+
+```bash
+lpe doctor
+lpe research status
+```
+
+---
+
+## Core concepts
 
 ```text
 Project Contract
@@ -52,14 +111,50 @@ Review Router ──────► Expert Decision
 Utility Ledger ─────► TPPR and learning data
 ```
 
-The initial implementation is a modular Python application with:
+| Concept | Role |
+| --- | --- |
+| **Project contract** | Versioned intent, obligations, policies, and review rules for a Lean repo |
+| **Evidence packet** | Deterministic findings from exact-environment Lean/Lake runs and gates |
+| **Review router** | Selects the smallest acceptance-controlling questions; records decisions |
+| **Utility ledger** | Append-only SQLite history of lifecycle outcomes for TPPR |
 
-- versioned JSON/YAML contracts;
-- exact-environment subprocess adapters for Lean and Lake;
-- deterministic evidence gates;
-- a CLI-first workflow;
-- an append-only SQLite utility ledger;
-- provider interfaces for later semantic and retrieval systems.
+Design constraints: local-first, repository-native, exact-toolchain, model-independent, human-controlled for high-risk semantics, inspectable evidence. No opaque quality scalar in version 0.
+
+Every feature should answer: *does this increase critical-path, semantically faithful, repository-accepted, sustained Lean progress per expert hour?*
+
+---
+
+## CLI highlights
+
+| Command | Purpose |
+| --- | --- |
+| `lpe contract validate` | Load and validate a project contract |
+| `lpe evidence compile` | Build an evidence packet for a candidate |
+| `lpe review …` | Record decisions; high-risk paths require human attestation |
+| `lpe ledger verify` / `archive` / `seal` | Integrity checks and export for the utility ledger |
+| `lpe doctor` | Local toolchain and honesty-surface checks |
+| `lpe pilot …` | Partner instrumentation (not scientific clearance) |
+
+Human-readable output by default; `--json` for machines. Nonzero exit on invalid input or hard execution failure.
+
+Full reference: [`docs/CLI.md`](docs/CLI.md).
+
+---
+
+## Honesty bounds
+
+LPE is careful about what it claims. In short:
+
+- Instrumentation and dry-runs do **not** prove causal improvement in TPPR.
+- High-risk (R3/R4) acceptance stays under human authority; there is no production auto-ACCEPT.
+- Fixture and project extractors are **not** Mathlib-scale elaborator-complete kernel truth.
+- Learned routing and synthesis training remain blocked until scientific clearance criteria are met.
+
+Canonical list: [`docs/NON_CLAIMS.md`](docs/NON_CLAIMS.md).
+
+Package version **0.2.0** is an engineering release tag, not a production-readiness or scientific-clearance claim.
+
+---
 
 ## Documentation
 
@@ -67,77 +162,45 @@ The initial implementation is a modular Python application with:
 | --- | --- |
 | [`docs/ENGINEERING_SPEC.md`](docs/ENGINEERING_SPEC.md) | Full product engineering specification |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Modules and deployment model |
-| [`docs/CONTRACT.md`](docs/CONTRACT.md) | Project contract + schema migration |
+| [`docs/CONTRACT.md`](docs/CONTRACT.md) | Project contract and schema migration |
 | [`docs/EVIDENCE_AND_REVIEW.md`](docs/EVIDENCE_AND_REVIEW.md) | Evidence compiler and review router |
-| [`docs/CLI.md`](docs/CLI.md) | CLI conventions and common workflows |
+| [`docs/CLI.md`](docs/CLI.md) | CLI conventions and workflows |
 | [`docs/LEDGER_AND_TPPR.md`](docs/LEDGER_AND_TPPR.md) | Utility ledger, seals, TPPR |
-| [`docs/SECURITY_AND_PRIVACY.md`](docs/SECURITY_AND_PRIVACY.md) | Threat model and mandatory controls |
-| [`docs/NON_CLAIMS.md`](docs/NON_CLAIMS.md) | Canonical anti-oversell list |
-| [`docs/PILOT.md`](docs/PILOT.md) | Partner instrumentation and pilot protocol |
-| [`docs/closure/PILOT_OPERATOR_RUNBOOK.md`](docs/closure/PILOT_OPERATOR_RUNBOOK.md) | Live partner operator steps |
+| [`docs/SECURITY_AND_PRIVACY.md`](docs/SECURITY_AND_PRIVACY.md) | Threat model and controls |
+| [`docs/NON_CLAIMS.md`](docs/NON_CLAIMS.md) | Anti-oversell list |
+| [`docs/PILOT.md`](docs/PILOT.md) | Partner instrumentation protocol |
 | [`docs/adr/`](docs/adr/) | Architecture decision records |
 
-## Repository layout
+Repository layout: `docs/`, `schemas/`, `src/lpe/`, `examples/`, `openapi/`, `scripts/`, `.github/workflows/`.
 
-- `docs/` — product and operator documentation.
-- `schemas/` — canonical JSON Schemas.
-- `src/lpe/` — Python orchestration package.
-- `examples/` — example project contract and candidate.
-- `openapi/openapi.yaml` — future service interface.
-- `.github/workflows/` — CI.
-- `scripts/` — bootstrap, checks, demo, and GitHub helpers.
+---
 
-## Local setup
+## Contributing
+
+Contributions are welcome. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+**Good first paths**
+
+- Improve examples under `examples/`
+- Add unit tests around contracts, evidence gates, or CLI surfaces
+- Clarify docs that already match shipped behavior
+- Fix small schema or validation edge cases with tests
+
+**Local loop**
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
 python -m pip install -e ".[dev]"
 make check
+lpe doctor
+pytest -q
 ```
 
-Run the example:
+Pull requests should state a path to TPPR, include tests for behavior changes, preserve evidence provenance, and document uncertainty where providers return `UNKNOWN`. Schema, execution, ledger, and ADR changes need CODEOWNERS review.
 
-```bash
-lpe contract validate examples/minimal-project
-lpe evidence compile \
-  --project examples/minimal-project \
-  --candidate examples/candidates/R3-definition-change.json \
-  --output .lpe/evidence/example.json
-```
+Security reports: [`SECURITY.md`](SECURITY.md).
 
-## Engineering rule
+---
 
-Every feature must answer the same question:
+## License
 
-> Does it increase critical-path, semantically faithful, repository-accepted, sustained Lean project progress per expert hour?
-
-Metrics such as generated declarations, compilation rate, proofs completed, review-model accuracy, and synthetic-data volume remain diagnostic only.
-
-## Status
-
-Package version is **0.2.0** (evidence-integrity engineering). That is an
-engineering package version, **not** a formal acceptance or production-readiness
-claim.
-
-| Track | Honest status |
-| --- | --- |
-| **0.2.0** Evidence Integrity | Engineering present; formal checklist open — do not tag until humans close `docs/closure/REMAINING_ACCEPTANCE.md` |
-| **0.3.0** Pilot Readiness | Engineering present on the tree (typed ledger, R1–R4 quorum, TPPR v2, protocol freeze, assignment, comprehension, data lock, §21 evaluator); package **not** bumped; live GitHub Check E2E needs secrets |
-| **0.4.0** Pilot Completion | Needs live partner execution (`docs/closure/PILOT_OPERATOR_RUNBOOK.md`) |
-| **M6 / M7** | Blocked until `Section21GateReport` authorizes training |
-
-Machine-readable status: [`docs/closure/MILESTONE_STATUS.json`](docs/closure/MILESTONE_STATUS.json).
-Remaining formal items: [`docs/closure/REMAINING_ACCEPTANCE.md`](docs/closure/REMAINING_ACCEPTANCE.md).
-
-M3/M4 Lean-aware and semantic evidence interfaces work for fixture/partner
-instrumentation; Mathlib-scale / external compatibility pins remain
-`pending_live_validation`.
-
-**Partner shadow-pilot:** ready to *instrument* via `lpe pilot init-partner`,
-`pilot-protocol/`, and the operator runbook — **not** ready to *claim* §21 /
-causal utility. Analysis plans stay UNFROZEN until a partner signs.
-
-**Explicit non-claims:** [`docs/NON_CLAIMS.md`](docs/NON_CLAIMS.md).
-M6/M7 training stays blocked until `learned_routing_authorized` /
-`synthesis_authorized` (`lpe research status`, `lpe research evaluate-gates`).
+Apache License 2.0. See [`LICENSE`](LICENSE).
