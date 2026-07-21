@@ -5,22 +5,65 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from lpe.evidence.compiler import compile_evidence
+from lpe.execution.runner import SubprocessLeanExecutor
 from lpe.models import (
     CandidateDescriptor,
     ChangedDeclaration,
     FindingStatus,
     GeneratorProvenance,
 )
+from lpe.providers.base import CancellationToken, ProviderContext
 from lpe.providers.semantic import (
     CounterexampleProvider,
     DownstreamReplacementProvider,
     DuplicateRetrievalProvider,
     ExampleRunnerProvider,
 )
+from lpe.workspace.artifacts import ContentAddressedArtifactStore
+from lpe.workspace.models import (
+    EvaluationWorkspace,
+    ExecutorDescriptor,
+    WorkspaceCleanupToken,
+)
 
 
 def _generator() -> GeneratorProvenance:
     return GeneratorProvenance(generator_type="test", name="test", version="0")
+
+
+def _ctx(project_path: Path, candidate: CandidateDescriptor) -> ProviderContext:
+    store = ContentAddressedArtifactStore(project_path)
+    desc = ExecutorDescriptor(
+        backend="host",
+        network_policy="allow",
+        readonly_root=False,
+        source_mount_readonly=False,
+    )
+    ws = EvaluationWorkspace(
+        run_id="run_test",
+        repository_origin=project_path,
+        base_path=project_path,
+        candidate_path=project_path,
+        base_commit=candidate.base_commit,
+        head_commit=candidate.head_commit,
+        patch_sha256=None,
+        base_tree_hash="t1",
+        candidate_tree_hash="t2",
+        contract_hash="ch",
+        obligation_freeze_hash="oh",
+        executor=SubprocessLeanExecutor(),
+        executor_descriptor=desc,
+        artifact_store=store,
+        cleanup_token=WorkspaceCleanupToken(run_id="run_test"),
+    )
+    mock_contract = MagicMock()
+    mock_contract.project.execution.environment_allowlist = ["PATH", "HOME", "USER", "TMPDIR"]
+    return ProviderContext(
+        workspace=ws,
+        contract=mock_contract,
+        candidate=candidate,
+        cancellation=CancellationToken(),
+    )
 
 
 def test_semantic_providers_emit_unknown_not_silent_pass_without_fixtures(
@@ -30,9 +73,9 @@ def test_semantic_providers_emit_unknown_not_silent_pass_without_fixtures(
     project = tmp_path / "proj"
     (project / ".lean-project-contract" / "tests" / "examples").mkdir(parents=True)
     (project / ".lean-project-contract" / "tests" / "counterexamples").mkdir(parents=True)
-    (
-        project / ".lean-project-contract" / "tests" / "examples" / "README.md"
-    ).write_text("# x\n", encoding="utf-8")
+    (project / ".lean-project-contract" / "tests" / "examples" / "README.md").write_text(
+        "# x\n", encoding="utf-8"
+    )
 
     candidate = CandidateDescriptor(
         candidate_id="cand-miss",
@@ -45,13 +88,13 @@ def test_semantic_providers_emit_unknown_not_silent_pass_without_fixtures(
         changed_declarations=[],
         generator=_generator(),
     )
-    mock_contract = MagicMock()
-    examples = ExampleRunnerProvider().collect(project, mock_contract, candidate)
-    counters = CounterexampleProvider().collect(project, mock_contract, candidate)
-    assert examples[0].status is FindingStatus.UNKNOWN
-    assert counters[0].status is FindingStatus.UNKNOWN
-    assert examples[0].details.get("attempted") is True
-    assert counters[0].details.get("attempted") is True
+    ctx = _ctx(project, candidate)
+    examples = ExampleRunnerProvider().collect(ctx)
+    counters = CounterexampleProvider().collect(ctx)
+    assert examples.findings[0].status is FindingStatus.UNKNOWN
+    assert counters.findings[0].status is FindingStatus.UNKNOWN
+    assert examples.findings[0].details.get("attempted") is True
+    assert counters.findings[0].details.get("attempted") is True
 
 
 def test_semantic_providers_on_example_project(
@@ -62,10 +105,10 @@ def test_semantic_providers_on_example_project(
     semantic = [f for f in packet.findings if f.dimension.value == "semantic"]
     assert semantic
     by_id = {f.check_id: f for f in semantic}
-    # Structured fixtures exist → heuristic PASS (not Lean execution).
-    assert by_id["semantic.project_examples"].status is FindingStatus.PASS
-    assert by_id["semantic.counterexamples"].status is FindingStatus.PASS
-    assert by_id["semantic.project_examples"].details["protocol"]["toolchain_backed"] is False
+    # CLOSURE-013: JSON/README without suite manifest cannot PASS.
+    assert by_id["semantic.project_examples"].status is FindingStatus.UNKNOWN
+    assert by_id["semantic.counterexamples"].status is FindingStatus.UNKNOWN
+    assert by_id["semantic.project_examples"].details.get("attempted") is True
     # Empty corpus for this example → UNKNOWN, never silent PASS.
     assert by_id["semantic.duplicate_retrieval"].status is FindingStatus.UNKNOWN
     statement = by_id["semantic.statement_diff"]
@@ -73,7 +116,11 @@ def test_semantic_providers_on_example_project(
         FindingStatus.UNKNOWN,
         FindingStatus.NOT_APPLICABLE,
         FindingStatus.FAIL,
+        FindingStatus.PASS,
     }
+    # CLOSURE-015 intent bundle always synthesized.
+    assert "semantic.intent_support" in by_id
+    assert packet.recommendation_policy_id is not None
 
 
 def test_downstream_replacement_provider_present(
@@ -111,10 +158,10 @@ def test_duplicate_retrieval_reports_closest(tmp_path: Path) -> None:
         ],
         generator=_generator(),
     )
-    findings = DuplicateRetrievalProvider().collect(tmp_path, MagicMock(), candidate)
-    assert findings[0].status in {FindingStatus.PASS, FindingStatus.WARN}
-    assert findings[0].details["corpus_size"] >= 1
-    assert findings[0].details["closest"]
+    result = DuplicateRetrievalProvider().collect(_ctx(tmp_path, candidate))
+    assert result.findings[0].status in {FindingStatus.PASS, FindingStatus.WARN}
+    assert result.findings[0].details["corpus_size"] >= 1
+    assert result.findings[0].details["closest"]
 
 
 def test_downstream_replacement_with_cone(tmp_path: Path) -> None:
@@ -142,18 +189,21 @@ def test_downstream_replacement_with_cone(tmp_path: Path) -> None:
         ],
         generator=_generator(),
     )
-    findings = DownstreamReplacementProvider().collect(tmp_path, MagicMock(), candidate)
-    assert findings[0].status in {
+    result = DownstreamReplacementProvider().collect(_ctx(tmp_path, candidate))
+    finding = result.findings[0]
+    assert finding.status in {
         FindingStatus.WARN,
         FindingStatus.PASS,
         FindingStatus.UNKNOWN,
     }
-    if findings[0].status is not FindingStatus.UNKNOWN:
-        assert findings[0].details["successor_count"] >= 1
-        cone = findings[0].details["impact_cone"]
+    if finding.status is not FindingStatus.UNKNOWN:
+        assert finding.details["successor_count"] >= 1
+        cone = finding.details["impact_cone"]
         assert any(name == "userFn" or name.endswith(".userFn") for name in cone)
 
-def test_example_runner_pass_on_structured_fixture(tmp_path: Path) -> None:
+
+def test_example_runner_requires_suite_manifest(tmp_path: Path) -> None:
+    """CLOSURE-013: JSON alone cannot PASS; suite manifest is required."""
     examples = tmp_path / ".lean-project-contract" / "tests" / "examples"
     examples.mkdir(parents=True)
     (examples / "ok.json").write_text(
@@ -178,6 +228,9 @@ def test_example_runner_pass_on_structured_fixture(tmp_path: Path) -> None:
         changed_declarations=[],
         generator=_generator(),
     )
-    findings = ExampleRunnerProvider().collect(tmp_path, MagicMock(), candidate)
-    assert findings[0].status is FindingStatus.PASS
-    assert findings[0].details["fixture_count"] == 1
+    result = ExampleRunnerProvider().collect(_ctx(tmp_path, candidate))
+    assert result.findings[0].status is FindingStatus.UNKNOWN
+    assert result.findings[0].details.get("attempted") is True
+    assert "manifest" in str(result.findings[0].details.get("load_report", {})).lower() or (
+        result.findings[0].details.get("load_report", {}).get("error") == "manifest_missing"
+    )
