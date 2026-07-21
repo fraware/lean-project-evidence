@@ -43,9 +43,7 @@ def test_historical_packet_reload_validates_after_delay(
     assert model.hard_gate_passed is packet.hard_gate_passed
 
     schema = json.loads(
-        (repository_root / "schemas" / "evidence-packet.schema.json").read_text(
-            encoding="utf-8"
-        )
+        (repository_root / "schemas" / "evidence-packet.schema.json").read_text(encoding="utf-8")
     )
     Draft202012Validator(schema).validate(reloaded)
 
@@ -58,9 +56,7 @@ def test_golden_skip_build_packets_remain_schema_valid(
 ) -> None:
     """Compile a small matrix, archive, then batch-reload against schema."""
     schema = json.loads(
-        (repository_root / "schemas" / "evidence-packet.schema.json").read_text(
-            encoding="utf-8"
-        )
+        (repository_root / "schemas" / "evidence-packet.schema.json").read_text(encoding="utf-8")
     )
     validator = Draft202012Validator(schema)
     candidates_dir = repository_root / "examples" / "candidates"
@@ -68,9 +64,7 @@ def test_golden_skip_build_packets_remain_schema_valid(
     archive_dir.mkdir()
 
     for path in sorted(candidates_dir.glob("R*.json")):
-        candidate = CandidateDescriptor.model_validate(
-            json.loads(path.read_text(encoding="utf-8"))
-        )
+        candidate = CandidateDescriptor.model_validate(json.loads(path.read_text(encoding="utf-8")))
         packet = compile_evidence(example_project, candidate, skip_build=True)
         out = archive_dir / f"{path.stem}.json"
         out.write_text(packet.model_dump_json(indent=2), encoding="utf-8")

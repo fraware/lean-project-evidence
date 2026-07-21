@@ -1,0 +1,1132 @@
+{
+  "$defs": {
+    "AcceptanceAggregatedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "AcceptanceAggregatedPayload",
+          "default": "AcceptanceAggregatedPayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "attestation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0,
+          "title": "Attestation Ids",
+          "type": "array"
+        },
+        "quorum_policy_id": {
+          "title": "Quorum Policy Id",
+          "type": "string"
+        },
+        "evidence_fingerprint": {
+          "title": "Evidence Fingerprint",
+          "type": "string"
+        },
+        "semantic_fidelity": {
+          "title": "Semantic Fidelity",
+          "type": "boolean"
+        },
+        "repository_accepted": {
+          "title": "Repository Accepted",
+          "type": "boolean"
+        },
+        "implementation_accepted": {
+          "title": "Implementation Accepted",
+          "type": "boolean"
+        },
+        "accepted_obligation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Accepted Obligation Ids",
+          "type": "array"
+        },
+        "accepted_at": {
+          "format": "date-time",
+          "title": "Accepted At",
+          "type": "string"
+        },
+        "risk_class": {
+          "title": "Risk Class",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attestation_ids",
+        "quorum_policy_id",
+        "evidence_fingerprint",
+        "semantic_fidelity",
+        "repository_accepted",
+        "implementation_accepted",
+        "accepted_at",
+        "risk_class"
+      ],
+      "title": "AcceptanceAggregatedPayload",
+      "type": "object"
+    },
+    "CandidateRegisteredPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "CandidateRegisteredPayload",
+          "default": "CandidateRegisteredPayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "root_candidate_id": {
+          "title": "Root Candidate Id",
+          "type": "string"
+        },
+        "freeze_id": {
+          "title": "Freeze Id",
+          "type": "string"
+        },
+        "base_ref": {
+          "title": "Base Ref",
+          "type": "string"
+        },
+        "head_ref": {
+          "title": "Head Ref",
+          "type": "string"
+        },
+        "tree_hash": {
+          "title": "Tree Hash",
+          "type": "string"
+        },
+        "risk_class": {
+          "title": "Risk Class",
+          "type": "string"
+        },
+        "prior_candidate_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prior Candidate Id"
+        },
+        "repair_sequence": {
+          "default": 0,
+          "title": "Repair Sequence",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "root_candidate_id",
+        "freeze_id",
+        "base_ref",
+        "head_ref",
+        "tree_hash",
+        "risk_class"
+      ],
+      "title": "CandidateRegisteredPayload",
+      "type": "object"
+    },
+    "ConditionAssignedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "ConditionAssignedPayload",
+          "default": "ConditionAssignedPayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "condition_assignment_id": {
+          "title": "Condition Assignment Id",
+          "type": "string"
+        },
+        "condition_tag": {
+          "title": "Condition Tag",
+          "type": "string"
+        },
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "assignment_hash": {
+          "title": "Assignment Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "condition_assignment_id",
+        "condition_tag",
+        "candidate_id",
+        "assignment_hash"
+      ],
+      "title": "ConditionAssignedPayload",
+      "type": "object"
+    },
+    "CorrectionPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "CorrectionPayload",
+          "default": "CorrectionPayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "target_event_id": {
+          "title": "Target Event Id",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "authorization_role": {
+          "title": "Authorization Role",
+          "type": "string"
+        },
+        "invalidation": {
+          "default": false,
+          "title": "Invalidation",
+          "type": "boolean"
+        },
+        "replacement_payload": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Replacement Payload"
+        }
+      },
+      "required": [
+        "target_event_id",
+        "reason",
+        "authorization_role"
+      ],
+      "title": "CorrectionPayload",
+      "type": "object"
+    },
+    "DownstreamEnabledPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "DownstreamEnabledPayload",
+          "default": "DownstreamEnabledPayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "suite_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Suite Ids",
+          "type": "array"
+        },
+        "evidence_fingerprint": {
+          "title": "Evidence Fingerprint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "suite_ids",
+        "evidence_fingerprint"
+      ],
+      "title": "DownstreamEnabledPayload",
+      "type": "object"
+    },
+    "EventTypeV2": {
+      "description": "Lifecycle + side-channel event types for ledger 0.2.0.",
+      "enum": [
+        "OBLIGATION_FROZEN",
+        "CANDIDATE_REGISTERED",
+        "EVIDENCE_COMPILED",
+        "REVIEW_ASSIGNED",
+        "REVIEW_ATTESTED",
+        "REPAIR_REQUESTED",
+        "REPAIR_COMPLETED",
+        "ARTIFACT_ACCEPTED",
+        "ARTIFACT_REJECTED",
+        "INTEGRATION_CONFIRMED",
+        "DOWNSTREAM_ENABLED",
+        "PERSISTENCE_CONFIRMED",
+        "REGRESSION_DETECTED",
+        "EXPERT_TIME_RECORDED",
+        "OVERHEAD_SNAPSHOT",
+        "CORRECTION_RECORDED",
+        "PROTOCOL_FROZEN",
+        "CONDITION_ASSIGNED",
+        "LEGACY_UNRESOLVED"
+      ],
+      "title": "EventTypeV2",
+      "type": "string"
+    },
+    "EvidenceCompiledPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "EvidenceCompiledPayload",
+          "default": "EvidenceCompiledPayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "packet_id": {
+          "title": "Packet Id",
+          "type": "string"
+        },
+        "evidence_fingerprint": {
+          "title": "Evidence Fingerprint",
+          "type": "string"
+        },
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "run_manifest_hash": {
+          "title": "Run Manifest Hash",
+          "type": "string"
+        },
+        "finding_count": {
+          "minimum": 0,
+          "title": "Finding Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "packet_id",
+        "evidence_fingerprint",
+        "candidate_id",
+        "run_manifest_hash",
+        "finding_count"
+      ],
+      "title": "EvidenceCompiledPayload",
+      "type": "object"
+    },
+    "ExpertTimePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "ExpertTimePayload",
+          "default": "ExpertTimePayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "hours": {
+          "minimum": 0,
+          "title": "Hours",
+          "type": "number"
+        },
+        "minutes": {
+          "minimum": 0,
+          "title": "Minutes",
+          "type": "number"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "condition_tag": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition Tag"
+        },
+        "measurement_confidence": {
+          "default": "contemporaneous_entry",
+          "enum": [
+            "exact_timer",
+            "contemporaneous_entry",
+            "retrospective_estimate"
+          ],
+          "title": "Measurement Confidence",
+          "type": "string"
+        },
+        "evidence_fingerprint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Fingerprint"
+        }
+      },
+      "required": [
+        "hours",
+        "minutes",
+        "category"
+      ],
+      "title": "ExpertTimePayload",
+      "type": "object"
+    },
+    "IntegrationConfirmedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "IntegrationConfirmedPayload",
+          "default": "IntegrationConfirmedPayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "integration_ref": {
+          "title": "Integration Ref",
+          "type": "string"
+        },
+        "merged_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Merged At"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "integration_ref"
+      ],
+      "title": "IntegrationConfirmedPayload",
+      "type": "object"
+    },
+    "LegacyUnresolvedPayload": {
+      "additionalProperties": false,
+      "description": "Typed wrapper for ambiguous 0.1→0.2 migrations (never invents acceptance).",
+      "properties": {
+        "payload_type": {
+          "const": "LegacyUnresolvedPayload",
+          "default": "LegacyUnresolvedPayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "legacy_event_type": {
+          "title": "Legacy Event Type",
+          "type": "string"
+        },
+        "legacy_payload": {
+          "additionalProperties": true,
+          "title": "Legacy Payload",
+          "type": "object"
+        },
+        "unresolved_fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Unresolved Fields",
+          "type": "array"
+        },
+        "migration_note": {
+          "default": "LEGACY_UNRESOLVED",
+          "title": "Migration Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "legacy_event_type"
+      ],
+      "title": "LegacyUnresolvedPayload",
+      "type": "object"
+    },
+    "ObligationFreezePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "ObligationFreezePayload",
+          "default": "ObligationFreezePayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "freeze_id": {
+          "title": "Freeze Id",
+          "type": "string"
+        },
+        "obligation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Obligation Ids",
+          "type": "array"
+        },
+        "freeze_hash": {
+          "title": "Freeze Hash",
+          "type": "string"
+        },
+        "persistence_rule": {
+          "$ref": "#/$defs/PersistenceRule"
+        },
+        "contract_hash": {
+          "title": "Contract Hash",
+          "type": "string"
+        },
+        "obligation_weights": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Obligation Weights",
+          "type": "object"
+        }
+      },
+      "required": [
+        "freeze_id",
+        "obligation_ids",
+        "freeze_hash",
+        "persistence_rule",
+        "contract_hash"
+      ],
+      "title": "ObligationFreezePayload",
+      "type": "object"
+    },
+    "OverheadSnapshotPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "OverheadSnapshotPayload",
+          "default": "OverheadSnapshotPayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "snapshot_id": {
+          "title": "Snapshot Id",
+          "type": "string"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "minutes": {
+          "minimum": 0,
+          "title": "Minutes",
+          "type": "number"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "category",
+        "minutes"
+      ],
+      "title": "OverheadSnapshotPayload",
+      "type": "object"
+    },
+    "PersistenceConfirmedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "PersistenceConfirmedPayload",
+          "default": "PersistenceConfirmedPayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "persistence_rule_id": {
+          "title": "Persistence Rule Id",
+          "type": "string"
+        },
+        "confirmed_at": {
+          "format": "date-time",
+          "title": "Confirmed At",
+          "type": "string"
+        },
+        "window_elapsed": {
+          "default": true,
+          "title": "Window Elapsed",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "persistence_rule_id",
+        "confirmed_at"
+      ],
+      "title": "PersistenceConfirmedPayload",
+      "type": "object"
+    },
+    "PersistenceRule": {
+      "additionalProperties": false,
+      "description": "Persistence window attached to an obligation freeze (§14.2).",
+      "properties": {
+        "rule_id": {
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "calendar_days",
+            "repository_commits",
+            "release_boundary"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Threshold"
+        },
+        "required_downstream_suite_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Downstream Suite Ids",
+          "type": "array"
+        },
+        "regression_policy": {
+          "default": "revoke",
+          "enum": [
+            "revoke",
+            "suspend",
+            "retain_with_flag"
+          ],
+          "title": "Regression Policy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule_id",
+        "mode",
+        "threshold"
+      ],
+      "title": "PersistenceRule",
+      "type": "object"
+    },
+    "ProtocolFrozenPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "ProtocolFrozenPayload",
+          "default": "ProtocolFrozenPayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "protocol_freeze_id": {
+          "title": "Protocol Freeze Id",
+          "type": "string"
+        },
+        "protocol_hash": {
+          "title": "Protocol Hash",
+          "type": "string"
+        },
+        "component_hashes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Component Hashes",
+          "type": "object"
+        }
+      },
+      "required": [
+        "protocol_freeze_id",
+        "protocol_hash"
+      ],
+      "title": "ProtocolFrozenPayload",
+      "type": "object"
+    },
+    "RegressionDetectedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "RegressionDetectedPayload",
+          "default": "RegressionDetectedPayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "regression_id": {
+          "title": "Regression Id",
+          "type": "string"
+        },
+        "suite_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Suite Id"
+        },
+        "severity": {
+          "default": "blocking",
+          "enum": [
+            "blocking",
+            "warning"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "regression_id",
+        "summary"
+      ],
+      "title": "RegressionDetectedPayload",
+      "type": "object"
+    },
+    "RepairCompletedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "RepairCompletedPayload",
+          "default": "RepairCompletedPayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "repair_request_id": {
+          "title": "Repair Request Id",
+          "type": "string"
+        },
+        "prior_candidate_id": {
+          "title": "Prior Candidate Id",
+          "type": "string"
+        },
+        "new_candidate_id": {
+          "title": "New Candidate Id",
+          "type": "string"
+        },
+        "applied_change_hash": {
+          "title": "Applied Change Hash",
+          "type": "string"
+        },
+        "new_evidence_fingerprint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "New Evidence Fingerprint"
+        }
+      },
+      "required": [
+        "repair_request_id",
+        "prior_candidate_id",
+        "new_candidate_id",
+        "applied_change_hash"
+      ],
+      "title": "RepairCompletedPayload",
+      "type": "object"
+    },
+    "RepairRequestedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "RepairRequestedPayload",
+          "default": "RepairRequestedPayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "repair_request_id": {
+          "title": "Repair Request Id",
+          "type": "string"
+        },
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "attestation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Attestation Ids",
+          "type": "array"
+        },
+        "rationale": {
+          "title": "Rationale",
+          "type": "string"
+        },
+        "required_change": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Required Change"
+        }
+      },
+      "required": [
+        "repair_request_id",
+        "candidate_id",
+        "attestation_ids",
+        "rationale"
+      ],
+      "title": "RepairRequestedPayload",
+      "type": "object"
+    },
+    "ReviewAssignedPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "ReviewAssignedPayload",
+          "default": "ReviewAssignedPayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "assignment_id": {
+          "title": "Assignment Id",
+          "type": "string"
+        },
+        "packet_id": {
+          "title": "Packet Id",
+          "type": "string"
+        },
+        "evidence_fingerprint": {
+          "title": "Evidence Fingerprint",
+          "type": "string"
+        },
+        "reviewer_id": {
+          "title": "Reviewer Id",
+          "type": "string"
+        },
+        "reviewer_role": {
+          "title": "Reviewer Role",
+          "type": "string"
+        },
+        "dimension": {
+          "title": "Dimension",
+          "type": "string"
+        },
+        "risk_class": {
+          "title": "Risk Class",
+          "type": "string"
+        }
+      },
+      "required": [
+        "assignment_id",
+        "packet_id",
+        "evidence_fingerprint",
+        "reviewer_id",
+        "reviewer_role",
+        "dimension",
+        "risk_class"
+      ],
+      "title": "ReviewAssignedPayload",
+      "type": "object"
+    },
+    "ReviewAttestationPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_type": {
+          "const": "ReviewAttestationPayload",
+          "default": "ReviewAttestationPayload",
+          "title": "Payload Type",
+          "type": "string"
+        },
+        "attestation_id": {
+          "title": "Attestation Id",
+          "type": "string"
+        },
+        "packet_id": {
+          "title": "Packet Id",
+          "type": "string"
+        },
+        "evidence_fingerprint": {
+          "title": "Evidence Fingerprint",
+          "type": "string"
+        },
+        "reviewer_id": {
+          "title": "Reviewer Id",
+          "type": "string"
+        },
+        "reviewer_role": {
+          "title": "Reviewer Role",
+          "type": "string"
+        },
+        "dimension": {
+          "title": "Dimension",
+          "type": "string"
+        },
+        "decision": {
+          "$ref": "#/$defs/ReviewDecisionValue"
+        },
+        "confidence": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "integer"
+        },
+        "conflict_declaration_hash": {
+          "title": "Conflict Declaration Hash",
+          "type": "string"
+        },
+        "finding_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Finding Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "attestation_id",
+        "packet_id",
+        "evidence_fingerprint",
+        "reviewer_id",
+        "reviewer_role",
+        "dimension",
+        "decision",
+        "confidence",
+        "conflict_declaration_hash"
+      ],
+      "title": "ReviewAttestationPayload",
+      "type": "object"
+    },
+    "ReviewDecisionValue": {
+      "enum": [
+        "ACCEPT",
+        "REJECT",
+        "REQUEST_REPAIR",
+        "INDETERMINATE"
+      ],
+      "title": "ReviewDecisionValue",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Typed ledger envelope (§13.2).",
+  "properties": {
+    "schema_version": {
+      "const": "0.2.0",
+      "default": "0.2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "event_id": {
+      "title": "Event Id",
+      "type": "string"
+    },
+    "event_type": {
+      "$ref": "#/$defs/EventTypeV2"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "artifact_id": {
+      "title": "Artifact Id",
+      "type": "string"
+    },
+    "obligation_ids": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Obligation Ids",
+      "type": "array"
+    },
+    "occurred_at": {
+      "format": "date-time",
+      "title": "Occurred At",
+      "type": "string"
+    },
+    "recorded_at": {
+      "format": "date-time",
+      "title": "Recorded At",
+      "type": "string"
+    },
+    "actor_id": {
+      "title": "Actor Id",
+      "type": "string"
+    },
+    "protocol_freeze_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Protocol Freeze Id"
+    },
+    "condition_assignment_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Condition Assignment Id"
+    },
+    "payload": {
+      "discriminator": {
+        "mapping": {
+          "AcceptanceAggregatedPayload": "#/$defs/AcceptanceAggregatedPayload",
+          "CandidateRegisteredPayload": "#/$defs/CandidateRegisteredPayload",
+          "ConditionAssignedPayload": "#/$defs/ConditionAssignedPayload",
+          "CorrectionPayload": "#/$defs/CorrectionPayload",
+          "DownstreamEnabledPayload": "#/$defs/DownstreamEnabledPayload",
+          "EvidenceCompiledPayload": "#/$defs/EvidenceCompiledPayload",
+          "ExpertTimePayload": "#/$defs/ExpertTimePayload",
+          "IntegrationConfirmedPayload": "#/$defs/IntegrationConfirmedPayload",
+          "LegacyUnresolvedPayload": "#/$defs/LegacyUnresolvedPayload",
+          "ObligationFreezePayload": "#/$defs/ObligationFreezePayload",
+          "OverheadSnapshotPayload": "#/$defs/OverheadSnapshotPayload",
+          "PersistenceConfirmedPayload": "#/$defs/PersistenceConfirmedPayload",
+          "ProtocolFrozenPayload": "#/$defs/ProtocolFrozenPayload",
+          "RegressionDetectedPayload": "#/$defs/RegressionDetectedPayload",
+          "RepairCompletedPayload": "#/$defs/RepairCompletedPayload",
+          "RepairRequestedPayload": "#/$defs/RepairRequestedPayload",
+          "ReviewAssignedPayload": "#/$defs/ReviewAssignedPayload",
+          "ReviewAttestationPayload": "#/$defs/ReviewAttestationPayload"
+        },
+        "propertyName": "payload_type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ObligationFreezePayload"
+        },
+        {
+          "$ref": "#/$defs/CandidateRegisteredPayload"
+        },
+        {
+          "$ref": "#/$defs/EvidenceCompiledPayload"
+        },
+        {
+          "$ref": "#/$defs/ReviewAssignedPayload"
+        },
+        {
+          "$ref": "#/$defs/ReviewAttestationPayload"
+        },
+        {
+          "$ref": "#/$defs/RepairRequestedPayload"
+        },
+        {
+          "$ref": "#/$defs/RepairCompletedPayload"
+        },
+        {
+          "$ref": "#/$defs/AcceptanceAggregatedPayload"
+        },
+        {
+          "$ref": "#/$defs/IntegrationConfirmedPayload"
+        },
+        {
+          "$ref": "#/$defs/DownstreamEnabledPayload"
+        },
+        {
+          "$ref": "#/$defs/PersistenceConfirmedPayload"
+        },
+        {
+          "$ref": "#/$defs/RegressionDetectedPayload"
+        },
+        {
+          "$ref": "#/$defs/ExpertTimePayload"
+        },
+        {
+          "$ref": "#/$defs/OverheadSnapshotPayload"
+        },
+        {
+          "$ref": "#/$defs/CorrectionPayload"
+        },
+        {
+          "$ref": "#/$defs/ProtocolFrozenPayload"
+        },
+        {
+          "$ref": "#/$defs/ConditionAssignedPayload"
+        },
+        {
+          "$ref": "#/$defs/LegacyUnresolvedPayload"
+        }
+      ],
+      "title": "Payload"
+    },
+    "supersedes_event_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Supersedes Event Id"
+    }
+  },
+  "required": [
+    "event_id",
+    "event_type",
+    "project_id",
+    "artifact_id",
+    "actor_id",
+    "payload"
+  ],
+  "title": "UtilityEventV2",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.2.0/utility-event-v2.schema.json"
+}

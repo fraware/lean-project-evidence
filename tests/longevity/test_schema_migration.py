@@ -26,13 +26,7 @@ BUMP_PATH_HINT = "docs/18_CONTRACT_MIGRATION.md"
 
 @pytest.mark.longevity
 def test_unknown_schema_version_refused(repository_root: Path) -> None:
-    fixture = (
-        repository_root
-        / "tests"
-        / "fixtures"
-        / "contracts"
-        / "unsupported-schema-version"
-    )
+    fixture = repository_root / "tests" / "fixtures" / "contracts" / "unsupported-schema-version"
     with pytest.raises(ValueError, match="unsupported schema_version"):
         check_contract_schema_versions(fixture)
 
@@ -46,14 +40,16 @@ def test_unknown_schema_version_refused(repository_root: Path) -> None:
 @pytest.mark.longevity
 def test_supported_schema_version_loads(example_project: Path) -> None:
     assert SCHEMA_VERSION in SUPPORTED_SCHEMA_VERSIONS
+    assert "0.1.0" in SUPPORTED_SCHEMA_VERSIONS
     report = check_contract_schema_versions(example_project)
-    assert set(report["versions"].values()) == {SCHEMA_VERSION}
+    # Contracts may remain on 0.1.0 while writers emit SCHEMA_VERSION 0.2.0.
+    assert set(report["versions"].values()).issubset(SUPPORTED_SCHEMA_VERSIONS)
     contract = load_contract(example_project)
-    assert contract.project.schema_version == SCHEMA_VERSION
+    assert contract.project.schema_version in SUPPORTED_SCHEMA_VERSIONS
 
     result = runner.invoke(app, ["contract", "schema-check", str(example_project)])
     assert result.exit_code == 0, result.stdout
-    assert SCHEMA_VERSION in result.stdout
+    assert contract.project.schema_version in result.stdout
     assert "bump_path" in result.stdout
 
 
@@ -61,7 +57,7 @@ def test_supported_schema_version_loads(example_project: Path) -> None:
 def test_schema_bump_path_documented_and_future_minor_refused_until_listed(
     example_project: Path, tmp_path: Path, repository_root: Path
 ) -> None:
-    """A future minor (e.g. 0.2.0) is refused until listed in SUPPORTED_SCHEMA_VERSIONS.
+    """A future minor (e.g. 0.3.0) is refused until listed in SUPPORTED_SCHEMA_VERSIONS.
 
     Documented bump steps (``docs/18_CONTRACT_MIGRATION.md``):
     1. Export schemas via ``scripts/export_schemas.py``.
@@ -74,7 +70,7 @@ def test_schema_bump_path_documented_and_future_minor_refused_until_listed(
     assert "SUPPORTED_SCHEMA_VERSIONS" in doc_text
     assert "schema-check" in doc_text
 
-    future = "0.2.0"
+    future = "0.3.0"
     assert future not in SUPPORTED_SCHEMA_VERSIONS
 
     dest = tmp_path / "future-contract-project"

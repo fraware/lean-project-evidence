@@ -24,23 +24,13 @@ def test_contract_schema_check_example_project(example_project: Path) -> None:
 
 
 def test_contract_schema_check_rejects_unsupported(repository_root: Path) -> None:
-    fixture = (
-        repository_root
-        / "tests"
-        / "fixtures"
-        / "contracts"
-        / "unsupported-schema-version"
-    )
+    fixture = repository_root / "tests" / "fixtures" / "contracts" / "unsupported-schema-version"
     result = runner.invoke(app, ["contract", "schema-check", str(fixture)])
     assert result.exit_code == 1
 
 
-def test_candidate_validate_r3_example(
-    repository_root: Path, example_project: Path
-) -> None:
-    candidate = (
-        repository_root / "examples" / "candidates" / "R3-definition-change.json"
-    )
+def test_candidate_validate_r3_example(repository_root: Path, example_project: Path) -> None:
+    candidate = repository_root / "examples" / "candidates" / "R3-definition-change.json"
     result = runner.invoke(
         app,
         [

@@ -1,0 +1,147 @@
+{
+  "$defs": {
+    "EvidenceBasis": {
+      "description": "Discrete evidence production basis (CLOSURE-010 / spec §10).",
+      "enum": [
+        "KERNEL_CHECKED",
+        "ELABORATOR_EXTRACTED",
+        "EXECUTED_TEST",
+        "STRUCTURAL_COMPARISON",
+        "HEURISTIC_RETRIEVAL",
+        "HUMAN_ATTESTED",
+        "EXTERNAL_ASSERTION"
+      ],
+      "title": "EvidenceBasis",
+      "type": "string"
+    },
+    "FixtureEntry": {
+      "additionalProperties": false,
+      "description": "One executable or structural fixture in a suite manifest (CLOSURE-013).",
+      "properties": {
+        "fixture_id": {
+          "title": "Fixture Id",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "expected_exit": {
+          "default": 0,
+          "title": "Expected Exit",
+          "type": "integer"
+        },
+        "expected_diagnostics": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Expected Diagnostics",
+          "type": "array"
+        },
+        "expected_diagnostic_regex": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Diagnostic Regex"
+        },
+        "basis": {
+          "$ref": "#/$defs/EvidenceBasis",
+          "default": "EXECUTED_TEST"
+        },
+        "run_on": {
+          "default": "candidate",
+          "pattern": "^(base|candidate|both)$",
+          "title": "Run On",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "default": 120,
+          "maximum": 86400,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        },
+        "obligation_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Obligation Ids",
+          "type": "array"
+        },
+        "semantic_interpretation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Semantic Interpretation"
+        },
+        "command_kind": {
+          "default": "lake_env_lean",
+          "title": "Command Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fixture_id",
+        "path"
+      ],
+      "title": "FixtureEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "YAML suite for examples / counterexamples (schema fixture-suite).",
+  "properties": {
+    "schema_version": {
+      "default": "0.2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "suite_id": {
+      "title": "Suite Id",
+      "type": "string"
+    },
+    "obligation_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Obligation Ids",
+      "type": "array"
+    },
+    "fixtures": {
+      "items": {
+        "$ref": "#/$defs/FixtureEntry"
+      },
+      "minItems": 1,
+      "title": "Fixtures",
+      "type": "array"
+    },
+    "suite_kind": {
+      "default": "examples",
+      "pattern": "^(examples|counterexamples)$",
+      "title": "Suite Kind",
+      "type": "string"
+    }
+  },
+  "required": [
+    "suite_id",
+    "obligation_ids",
+    "fixtures"
+  ],
+  "title": "FixtureSuite",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.2.0/fixture-suite.schema.json"
+}

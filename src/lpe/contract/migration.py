@@ -35,9 +35,7 @@ MigrationRewriter = Callable[[dict[str, Any], str, str], None]
 MIGRATION_REWRITERS: dict[tuple[str, str], MigrationRewriter] = {}
 
 
-def _rewrite_schema_version_field(
-    raw: dict[str, Any], _from_version: str, to_version: str
-) -> None:
+def _rewrite_schema_version_field(raw: dict[str, Any], _from_version: str, to_version: str) -> None:
     """Default productized rewrite: set schema_version only (identity fields)."""
     raw["schema_version"] = to_version
 
@@ -117,9 +115,7 @@ def dry_run_contract_migration(
         current[filename] = version
 
     supported = sorted(SUPPORTED_SCHEMA_VERSIONS)
-    files_to_rewrite = [
-        name for name, ver in current.items() if ver != target
-    ]
+    files_to_rewrite = [name for name, ver in current.items() if ver != target]
 
     if target not in SUPPORTED_SCHEMA_VERSIONS:
         return {

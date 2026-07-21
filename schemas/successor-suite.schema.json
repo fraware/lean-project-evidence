@@ -1,0 +1,109 @@
+{
+  "$defs": {
+    "SuccessorEntry": {
+      "additionalProperties": false,
+      "description": "One downstream successor test (CLOSURE-014 / §11.6).",
+      "properties": {
+        "successor_id": {
+          "title": "Successor Id",
+          "type": "string"
+        },
+        "command": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Command",
+          "type": "array"
+        },
+        "module": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Module"
+        },
+        "declarations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Declarations",
+          "type": "array"
+        },
+        "required": {
+          "default": true,
+          "title": "Required",
+          "type": "boolean"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
+        },
+        "timeout_seconds": {
+          "default": 300,
+          "maximum": 86400,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "successor_id",
+        "command"
+      ],
+      "title": "SuccessorEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Successor suite manifest for paired base/candidate runs.",
+  "properties": {
+    "schema_version": {
+      "default": "0.2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "suite_id": {
+      "title": "Suite Id",
+      "type": "string"
+    },
+    "obligation_ids": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Obligation Ids",
+      "type": "array"
+    },
+    "successors": {
+      "items": {
+        "$ref": "#/$defs/SuccessorEntry"
+      },
+      "minItems": 1,
+      "title": "Successors",
+      "type": "array"
+    }
+  },
+  "required": [
+    "suite_id",
+    "obligation_ids",
+    "successors"
+  ],
+  "title": "SuccessorSuite",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.2.0/successor-suite.schema.json"
+}
