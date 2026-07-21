@@ -11,9 +11,7 @@ def required_roles_for_risk(contract: ProjectContract, risk_class: RiskClass) ->
     return list(contract.policies.risk_rules[risk_class].required_roles)
 
 
-def _authority_roles(
-    contract: ProjectContract, reviewer_id: str
-) -> set[str] | None:
+def _authority_roles(contract: ProjectContract, reviewer_id: str) -> set[str] | None:
     """Return roles granted to reviewer_id by review.yaml, or None if unknown."""
     for authority in contract.review.authorities:
         if authority.reviewer_id == reviewer_id:
@@ -41,9 +39,7 @@ def validate_reviewer_authority(
 
     held = _authority_roles(contract, reviewer_id)
     if held is None:
-        raise AuthorityError(
-            f"reviewer {reviewer_id!r} is not listed in review.yaml authorities"
-        )
+        raise AuthorityError(f"reviewer {reviewer_id!r} is not listed in review.yaml authorities")
 
     missing = required - held
     if missing:
@@ -67,9 +63,18 @@ def validate_decision_for_risk(
 
 
 def can_record_acceptance(risk_class: RiskClass) -> bool:
-    """ADR 0003: R3/R4 never auto-accept; v0 refuses recording ACCEPT for them.
+    """Whether single-reviewer ``lpe review record`` may emit ACCEPT.
 
-    Human ACCEPT for R3/R4 requires a future multi-authority protocol. Until then,
-    fail closed: only R0–R2 ACCEPT decisions may be recorded via ``lpe review record``.
+    ADR 0003: R3/R4 never auto-accept and cannot be accepted via the single-reviewer
+    CLI path. Qualified human acceptance for R3/R4 goes through
+    ``lpe review accept-quorum`` after distinct dimension attestations.
     """
     return risk_class not in {RiskClass.R3, RiskClass.R4}
+
+
+def can_record_quorum_acceptance(risk_class: RiskClass) -> bool:
+    """Whether quorum-aggregated human acceptance is allowed for ``risk_class``.
+
+    R0-R4 may accept via the quorum state machine. R3/R4 still cannot auto-accept.
+    """
+    return True

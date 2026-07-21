@@ -82,9 +82,7 @@ def test_can_record_acceptance_blocks_r3_r4() -> None:
     assert can_record_acceptance(RiskClass.R4) is False
 
 
-def test_record_review_accept_sets_tppr_flags(
-    tmp_path: Path, example_project: Path
-) -> None:
+def test_record_review_accept_sets_tppr_flags(tmp_path: Path, example_project: Path) -> None:
     """ACCEPT review events carry obligation_id + fidelity flags for TPPR."""
     del example_project  # authority not required for direct ledger append
     ledger_path = tmp_path / "ledger-accept.db"
@@ -131,9 +129,7 @@ def test_record_review_decision(tmp_path: Path, example_project: Path) -> None:
         reviewer_roles=decision.reviewer_roles,
         risk_class=RiskClass.R3,
     )
-    digest = record_review_decision(
-        ledger_path, decision, project_id=contract.project.project_id
-    )
+    digest = record_review_decision(ledger_path, decision, project_id=contract.project.project_id)
     assert digest
     store = LedgerStore(ledger_path)
     store.verify()
@@ -146,9 +142,7 @@ def test_record_review_decision(tmp_path: Path, example_project: Path) -> None:
     assert events[1].payload["minutes"] == 15.0
 
 
-def test_cli_review_record_rejects_forged_roles(
-    tmp_path: Path, example_project: Path
-) -> None:
+def test_cli_review_record_rejects_forged_roles(tmp_path: Path, example_project: Path) -> None:
     decision_path = tmp_path / "decision.json"
     decision_path.write_text(
         json.dumps(
@@ -183,14 +177,14 @@ def test_cli_review_record_rejects_forged_roles(
         ],
     )
     assert result.exit_code == 1
-    assert "not listed" in (result.stderr or result.stdout).lower() or "authority" in (
-        result.stderr or result.stdout
-    ).lower() or "reviewer" in (result.stderr or result.stdout).lower()
+    assert (
+        "not listed" in (result.stderr or result.stdout).lower()
+        or "authority" in (result.stderr or result.stdout).lower()
+        or "reviewer" in (result.stderr or result.stdout).lower()
+    )
 
 
-def test_cli_review_record_blocks_r3_accept(
-    tmp_path: Path, example_project: Path
-) -> None:
+def test_cli_review_record_blocks_r3_accept(tmp_path: Path, example_project: Path) -> None:
     """AUDIT-009: even authorized reviewers cannot record R3 ACCEPT in v0."""
     decision_path = tmp_path / "decision.json"
     decision_path.write_text(
@@ -230,9 +224,7 @@ def test_cli_review_record_blocks_r3_accept(
     assert "ACCEPT" in combined or "ADR" in combined or "R3" in combined
 
 
-def test_cli_review_record_authorized_r1_accept(
-    tmp_path: Path, example_project: Path
-) -> None:
+def test_cli_review_record_authorized_r1_accept(tmp_path: Path, example_project: Path) -> None:
     decision_path = tmp_path / "decision.json"
     decision_path.write_text(
         json.dumps(

@@ -1,0 +1,85 @@
+{
+  "additionalProperties": false,
+  "description": "Signed conflict questionnaire (§12.3).",
+  "properties": {
+    "schema_version": {
+      "const": "0.2.0",
+      "default": "0.2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "reviewer_id": {
+      "title": "Reviewer Id",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "candidate_id": {
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "candidate_author": {
+      "default": false,
+      "title": "Candidate Author",
+      "type": "boolean"
+    },
+    "source_artifact_author": {
+      "default": false,
+      "title": "Source Artifact Author",
+      "type": "boolean"
+    },
+    "historical_reviewer": {
+      "default": false,
+      "title": "Historical Reviewer",
+      "type": "boolean"
+    },
+    "direct_collaborator": {
+      "default": false,
+      "title": "Direct Collaborator",
+      "type": "boolean"
+    },
+    "packet_constructor": {
+      "default": false,
+      "title": "Packet Constructor",
+      "type": "boolean"
+    },
+    "outcome_seen_before_review": {
+      "default": false,
+      "title": "Outcome Seen Before Review",
+      "type": "boolean"
+    },
+    "other_conflict": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Other Conflict"
+    },
+    "eligible": {
+      "title": "Eligible",
+      "type": "boolean"
+    },
+    "signed_at": {
+      "format": "date-time",
+      "title": "Signed At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "reviewer_id",
+    "project_id",
+    "candidate_id",
+    "eligible"
+  ],
+  "title": "ReviewerConflictDeclaration",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.2.0/reviewer-conflict.schema.json"
+}

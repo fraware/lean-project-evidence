@@ -104,10 +104,7 @@ def test_cli_rejects_role_forgery(tmp_path: Path, example_project: Path) -> None
     )
     assert result.exit_code == 1
     combined = (result.stderr or "") + (result.stdout or "")
-    assert any(
-        token in combined.lower()
-        for token in ("not listed", "authority", "reviewer")
-    )
+    assert any(token in combined.lower() for token in ("not listed", "authority", "reviewer"))
 
 
 def test_cli_rejects_r3_accept_even_for_authorized_reviewer(
@@ -150,9 +147,7 @@ def test_cli_rejects_r3_accept_even_for_authorized_reviewer(
     assert "ACCEPT" in combined or "ADR" in combined or "R3" in combined
 
 
-def test_cli_rejects_r4_accept_regression(
-    tmp_path: Path, example_project: Path
-) -> None:
+def test_cli_rejects_r4_accept_regression(tmp_path: Path, example_project: Path) -> None:
     """Regression: ADR 0003 R4 ACCEPT must remain unrecordable via CLI."""
     decision_path = tmp_path / "decision.json"
     decision_path.write_text(
