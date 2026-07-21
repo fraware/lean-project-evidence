@@ -48,7 +48,17 @@ def validate_build_command(command: list[str]) -> list[str]:
 
     # Refuse shell/interpreter forms that would bypass the allowlist.
     basename = normalize_command_basename(executable)
-    if basename in {"sh", "bash", "zsh", "cmd.exe", "cmd", "powershell", "pwsh", "python", "python3"}:
+    if basename in {
+        "sh",
+        "bash",
+        "zsh",
+        "cmd.exe",
+        "cmd",
+        "powershell",
+        "pwsh",
+        "python",
+        "python3",
+    }:
         raise CommandAllowlistError(
             f"build_command executable {executable!r} is a shell/interpreter and is not "
             f"allowed. Use a direct allowlisted tool ({sorted(ALLOWED_BUILD_COMMANDS)})."

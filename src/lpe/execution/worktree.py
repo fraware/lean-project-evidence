@@ -23,7 +23,15 @@ class WorktreeSession:
 
     def cleanup(self) -> None:
         result = subprocess.run(
-            ["git", "-C", str(self.repository), "worktree", "remove", "--force", str(self.worktree_path)],
+            [
+                "git",
+                "-C",
+                str(self.repository),
+                "worktree",
+                "remove",
+                "--force",
+                str(self.worktree_path),
+            ],
             capture_output=True,
             text=True,
             check=False,
@@ -78,7 +86,9 @@ def create_isolated_worktree(
     )
 
 
-def store_execution_logs(session: WorktreeSession, *, stdout: str, stderr: str) -> tuple[Path, Path]:
+def store_execution_logs(
+    session: WorktreeSession, *, stdout: str, stderr: str
+) -> tuple[Path, Path]:
     stdout_path = session.log_dir / "stdout.log"
     stderr_path = session.log_dir / "stderr.log"
     stdout_path.write_text(stdout, encoding="utf-8")

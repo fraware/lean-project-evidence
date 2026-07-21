@@ -133,9 +133,7 @@ def test_skip_build_isolation_is_not_pass(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(DockerSandboxExecutor, "is_available", staticmethod(lambda: True))
-    packet = compile_evidence(
-        example_project, _candidate(), skip_build=True, use_sandbox=True
-    )
+    packet = compile_evidence(example_project, _candidate(), skip_build=True, use_sandbox=True)
     isolation = next(f for f in packet.findings if f.check_id == "execution.isolation")
     assert isolation.status is FindingStatus.NOT_APPLICABLE
     assert isolation.status is not FindingStatus.PASS
@@ -310,7 +308,21 @@ def test_network_allow_permits_insecure_host_exec(
                 timed_out=False,
             )
 
+        def run(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            from lpe.execution.protocol import ExecutionResult
+
+            return ExecutionResult(
+                command=("lake", "env", "lean"),
+                cwd=kwargs.get("cwd") or ".",
+                exit_code=0,
+                stdout="ok",
+                stderr="",
+                elapsed_ms=1,
+                timed_out=False,
+            )
+
     monkeypatch.setattr("lpe.evidence.compiler.SubprocessLeanExecutor", FakeExecutor)
+    monkeypatch.setattr("lpe.workspace.manager.SubprocessLeanExecutor", FakeExecutor)
     packet = compile_evidence(
         project,
         _candidate(),

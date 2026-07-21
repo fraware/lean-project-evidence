@@ -6,11 +6,15 @@ import shutil
 import subprocess
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING, Literal
 
 from lpe.execution.env import scrub_environment
 from lpe.execution.protocol import ExecutionResult, LeanExecutor
 from lpe.execution.redact import redact_secrets
 from lpe.execution.runner import _truncate
+
+if TYPE_CHECKING:
+    from lpe.workspace.models import ExecutorDescriptor
 
 # Default is a generic base image (no Lean/Lake). Prefer a Lean-capable image via
 # LPE_DOCKER_IMAGE — e.g. local `lpe-lean:4.14` from docker/lpe-lean/ (elan + Lean
@@ -23,11 +27,8 @@ DEFAULT_MEMORY_LIMIT = "2g"
 
 # Linux PATH used inside containers when the host PATH is Windows-flavored
 # (Docker Desktop on Windows). Includes common elan install prefixes.
-_CONTAINER_PATH = (
-    "/root/.elan/bin:/home/lean/.elan/bin:"
-    "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-)
 _WIN_PATH_HINT = re.compile(r"[A-Za-z]:\\|;")
+_DIGEST_UNRESOLVED = object()
 
 # Combined build+extract runs inside one ``docker run`` via a fixed script body.
 # User argv is never interpolated into the script — only passed as ``"$@"``.
@@ -88,15 +89,24 @@ def validate_extract_out_rel(extract_out: str) -> str:
     return raw
 
 
-def _container_environment(allowlist: list[str]) -> dict[str, str]:
+# Linux PATH used for unprivileged container user (elan may live under /home/lpe).
+_CONTAINER_PATH_LPE = (
+    "/home/lpe/.elan/bin:/root/.elan/bin:/home/lean/.elan/bin:"
+    "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+)
+
+
+def _container_environment(allowlist: list[str], *, uid: int | None = None) -> dict[str, str]:
     """Scrub host env, then rewrite Windows PATH/HOME for Linux containers."""
     env = scrub_environment(allowlist)
     path = env.get("PATH", "")
     if path and _WIN_PATH_HINT.search(path):
-        env["PATH"] = os.environ.get("LPE_DOCKER_PATH", _CONTAINER_PATH)
+        env["PATH"] = os.environ.get("LPE_DOCKER_PATH", _CONTAINER_PATH_LPE)
     home = env.get("HOME", "")
-    if home and _WIN_PATH_HINT.search(home):
-        env["HOME"] = os.environ.get("LPE_DOCKER_HOME", "/root")
+    # Prefer /root when running as root so preinstalled elan under /root/.elan works.
+    default_home = "/root" if uid == 0 else "/home/lpe"
+    if not home or (home and _WIN_PATH_HINT.search(home)):
+        env["HOME"] = os.environ.get("LPE_DOCKER_HOME", default_home)
     return env
 
 
@@ -113,17 +123,83 @@ def docker_image_present(image: str) -> bool:
     return result.returncode == 0
 
 
+def resolve_docker_image_digest(image: str) -> str | None:
+    """Resolve a RepoDigest (preferred) or Image Id for ``image`` (CLOSURE-004)."""
+    if shutil.which("docker") is None:
+        return None
+    result = subprocess.run(
+        [
+            "docker",
+            "image",
+            "inspect",
+            "--format",
+            "{{if .RepoDigests}}{{index .RepoDigests 0}}{{else}}{{.Id}}{{end}}",
+            image,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    raw = (result.stdout or "").strip()
+    if not raw:
+        return None
+    if "@sha256:" in raw:
+        return "sha256:" + raw.split("@sha256:", 1)[1]
+    if raw.startswith("sha256:"):
+        return raw
+    return None
+
+
+def _parse_memory_bytes(limit: str) -> int:
+    text = (limit or "2g").strip().lower()
+    try:
+        if text.endswith("g"):
+            return int(float(text[:-1]) * 1024 * 1024 * 1024)
+        if text.endswith("m"):
+            return int(float(text[:-1]) * 1024 * 1024)
+        if text.endswith("k"):
+            return int(float(text[:-1]) * 1024)
+        return int(text)
+    except ValueError:
+        return 2 * 1024 * 1024 * 1024
+
+
+def _format_memory(memory_bytes: int) -> str:
+    if memory_bytes % (1024 * 1024 * 1024) == 0:
+        return f"{memory_bytes // (1024 * 1024 * 1024)}g"
+    if memory_bytes % (1024 * 1024) == 0:
+        return f"{memory_bytes // (1024 * 1024)}m"
+    return str(memory_bytes)
+
+
+def _host_uid_gid() -> tuple[int, int]:
+    uid = os.environ.get("LPE_DOCKER_UID")
+    gid = os.environ.get("LPE_DOCKER_GID")
+    if uid is not None and gid is not None:
+        return int(uid), int(gid)
+    try:
+        return os.getuid(), os.getgid()  # type: ignore[attr-defined]
+    except AttributeError:
+        # Windows / non-POSIX Docker Desktop: images currently ship elan under
+        # /root. Default to root until the published digest image is unprivileged.
+        # Linux CI should rely on getuid/getgid or explicit LPE_DOCKER_UID/GID.
+        return 0, 0
+
+
 class DockerNotAvailableError(RuntimeError):
     pass
 
 
 class DockerSandboxExecutor:
-    """Run build commands inside Docker with network-none and scrubbed environment.
+    """Run commands in a hardened Docker sandbox (CLOSURE-004).
 
-    Mount policy: the repository is mounted read-write at ``/work`` so Lake/Lean can
-    write build artifacts (``.lake/``, ``build/``). Prefer ``--worktree`` so the live
-    checkout is not mutated. Set ``LPE_DOCKER_READONLY=1`` to force ``:ro``; builds that
-    need write access will then fail with a Docker permission/IO error (fail closed).
+    Hardening: ``--read-only`` root, non-root ``--user``, cap-drop, no-new-privileges,
+    network none (when configured), memory=swap, cpus, pids, fsize ulimit, tmpfs for
+    ``/tmp`` and ``/home/lpe``, ephemeral mounts for ``/worktree-output`` and
+    ``/lake-cache``. The evaluated tree is an ephemeral worktree mounted at ``/work``
+    (writable); the operator checkout is never the mount target for writes.
 
     Prefer ``verify_build_and_extract`` for Docker toolchain compiles: one
     ``docker run`` executes allowlisted ``lake build`` then ``lake exe lpe_extract``
@@ -135,13 +211,31 @@ class DockerSandboxExecutor:
         *,
         image: str | None = None,
         memory_limit: str | None = None,
+        memory_bytes: int | None = None,
+        cpu_quota: float = 2.0,
+        pids_limit: int = 256,
+        fsize_bytes: int = 512 * 1024 * 1024,
         readonly_mount: bool | None = None,
+        readonly_root: bool = True,
+        source_mount_readonly: bool = True,
         network_none: bool = True,
+        uid: int | None = None,
+        gid: int | None = None,
     ) -> None:
         self.image = image or os.environ.get("LPE_DOCKER_IMAGE", DEFAULT_DOCKER_IMAGE)
-        self.memory_limit = memory_limit or os.environ.get(
-            "LPE_DOCKER_MEMORY", DEFAULT_MEMORY_LIMIT
-        )
+        if memory_bytes is not None:
+            self.memory_bytes = memory_bytes
+            self.memory_limit = _format_memory(memory_bytes)
+        else:
+            self.memory_limit = memory_limit or os.environ.get(
+                "LPE_DOCKER_MEMORY", DEFAULT_MEMORY_LIMIT
+            )
+            self.memory_bytes = _parse_memory_bytes(self.memory_limit)
+        self.cpu_quota = cpu_quota
+        self.pids_limit = pids_limit
+        self.fsize_bytes = fsize_bytes
+        # Legacy flag: when True, mount /work as :ro (breaks Lake). Default False —
+        # ephemeral candidate worktrees are mounted rw; rootfs stays --read-only.
         if readonly_mount is None:
             readonly_mount = os.environ.get("LPE_DOCKER_READONLY", "").lower() in {
                 "1",
@@ -149,11 +243,23 @@ class DockerSandboxExecutor:
                 "yes",
             }
         self.readonly_mount = readonly_mount
+        self.readonly_root = readonly_root
+        self.source_mount_readonly = source_mount_readonly
         self.network_none = network_none
+        host_uid, host_gid = _host_uid_gid()
+        self.uid = uid if uid is not None else host_uid
+        self.gid = gid if gid is not None else host_gid
+        self._resolved_digest: str | None | object = _DIGEST_UNRESOLVED
 
     @staticmethod
     def is_available() -> bool:
         return shutil.which("docker") is not None
+
+    def image_digest(self) -> str | None:
+        if self._resolved_digest is _DIGEST_UNRESOLVED:
+            self._resolved_digest = resolve_docker_image_digest(self.image)
+        assert self._resolved_digest is not _DIGEST_UNRESOLVED
+        return self._resolved_digest  # type: ignore[return-value]
 
     def verify_build(
         self,
@@ -169,6 +275,35 @@ class DockerSandboxExecutor:
             timeout_seconds=timeout_seconds,
             max_output_bytes=max_output_bytes,
             environment_allowlist=environment_allowlist,
+        )
+
+    def run(
+        self,
+        *,
+        workspace: object,
+        command: object,
+        resource_profile: object,
+        environment_allowlist: list[str] | None = None,
+    ) -> ExecutionResult:
+        from lpe.execution.protocol import ProviderResourceProfile, ValidatedCommand
+
+        assert isinstance(command, ValidatedCommand)
+        assert isinstance(resource_profile, ProviderResourceProfile)
+        root_attr = (
+            "base_path"
+            if getattr(command, "snapshot_root", "candidate") == "base"
+            else "candidate_path"
+        )
+        root = Path(getattr(workspace, root_attr))
+        cwd = (root / command.working_directory).resolve()
+        if not cwd.is_relative_to(root.resolve()):
+            raise ValueError(f"command working_directory escapes {root_attr} workspace")
+        return self.verify_build(
+            repository=cwd,
+            command=list(command.argv),
+            timeout_seconds=resource_profile.timeout_seconds,
+            max_output_bytes=resource_profile.max_output_bytes,
+            environment_allowlist=list(environment_allowlist or ["PATH", "HOME", "USER", "TMPDIR"]),
         )
 
     def verify_build_and_extract(
@@ -215,14 +350,20 @@ class DockerSandboxExecutor:
         max_output_bytes: int,
         environment_allowlist: list[str],
         extra_env: dict[str, str] | None = None,
+        source_origin: Path | None = None,
     ) -> ExecutionResult:
         if not self.is_available():
             raise DockerNotAvailableError("docker is not available on PATH")
 
-        env = _container_environment(environment_allowlist)
+        env = _container_environment(environment_allowlist, uid=self.uid)
         if extra_env:
             env.update(extra_env)
-        mount_mode = "ro" if self.readonly_mount else "rw"
+        env.setdefault("ELAN_HOME", "/lake-cache/elan")
+        env.setdefault("XDG_CACHE_HOME", "/lake-cache/xdg")
+
+        # Ephemeral candidate / worktree is writable at /work. Operator origin
+        # (when provided) is mounted read-only at /source and never used as cwd.
+        work_mode = "ro" if self.readonly_mount else "rw"
         docker_cmd = [
             "docker",
             "run",
@@ -230,14 +371,29 @@ class DockerSandboxExecutor:
             "--cap-drop=ALL",
             "--security-opt=no-new-privileges",
             f"--memory={self.memory_limit}",
-            "--pids-limit=256",
+            f"--memory-swap={self.memory_limit}",
+            f"--cpus={self.cpu_quota}",
+            f"--pids-limit={self.pids_limit}",
+            f"--ulimit=fsize={self.fsize_bytes}",
+            "--user",
+            f"{self.uid}:{self.gid}",
             "-v",
-            f"{repository.resolve()}:/work:{mount_mode}",
+            f"{repository.resolve()}:/work:{work_mode}",
             "-w",
             "/work",
             "--tmpfs",
-            "/tmp:rw,noexec,nosuid,size=256m",
+            "/tmp:rw,noexec,nosuid,nodev,size=256m",
+            "--tmpfs",
+            "/home/lpe:rw,noexec,nosuid,nodev,size=256m",
+            "--tmpfs",
+            "/worktree-output:rw,noexec,nosuid,nodev,size=512m",
+            "--tmpfs",
+            "/lake-cache:rw,noexec,nosuid,nodev,size=512m",
         ]
+        if self.readonly_root:
+            docker_cmd.append("--read-only")
+        if source_origin is not None and self.source_mount_readonly:
+            docker_cmd.extend(["-v", f"{source_origin.resolve()}:/source:ro"])
         if self.network_none:
             docker_cmd.append("--network=none")
         for key, value in env.items():
@@ -261,14 +417,21 @@ class DockerSandboxExecutor:
         except subprocess.TimeoutExpired as exc:
             timed_out = True
             exit_code = 124
-            stdout = exc.stdout or ""
-            stderr = exc.stderr or ""
+            stdout = (
+                exc.stdout.decode("utf-8", errors="replace")
+                if isinstance(exc.stdout, (bytes, bytearray))
+                else (exc.stdout or "")
+            )
+            stderr = (
+                exc.stderr.decode("utf-8", errors="replace")
+                if isinstance(exc.stderr, (bytes, bytearray))
+                else (exc.stderr or "")
+            )
 
         if self.readonly_mount and exit_code != 0:
             hint = (
-                "Docker mount is read-only (LPE_DOCKER_READONLY). "
-                "Lake/Lean builds need a writable mount for artifacts; unset "
-                "LPE_DOCKER_READONLY or use --worktree with the default rw mount."
+                "Docker /work mount is read-only (LPE_DOCKER_READONLY). "
+                "Lake/Lean builds need a writable ephemeral worktree mount."
             )
             stderr = f"{stderr}\n{hint}" if stderr else hint
 
@@ -284,49 +447,57 @@ class DockerSandboxExecutor:
         )
 
 
+def build_executor_descriptor(
+    executor: DockerSandboxExecutor,
+    *,
+    network_policy: str,
+    image_digest: str | None = None,
+) -> ExecutorDescriptor:
+    from lpe.workspace.models import ExecutorDescriptor
+
+    digest = image_digest if image_digest is not None else executor.image_digest()
+    policy: Literal["deny", "allow"] = "deny" if network_policy == "deny" else "allow"
+    return ExecutorDescriptor(
+        backend="docker",
+        image_reference=executor.image,
+        image_digest=digest,
+        network_policy=policy,
+        uid=executor.uid,
+        gid=executor.gid,
+        memory_bytes=executor.memory_bytes,
+        cpu_quota=executor.cpu_quota,
+        pids_limit=executor.pids_limit,
+        readonly_root=executor.readonly_root,
+        source_mount_readonly=executor.source_mount_readonly,
+    )
+
+
 def isolation_status_for_executor(
     executor: LeanExecutor,
     *,
     build_ran: bool = False,
     skip_build: bool = False,
     network_isolated: bool = False,
+    image_digest_resolved: bool | None = None,
 ) -> tuple[str, str]:
     """Return (status, executor_name) for execution.isolation finding.
 
-    Isolation PASS requires an actual sandboxed build with network isolation.
-    skip_build never claims PASS (NOT_APPLICABLE). Host subprocess never claims PASS.
+    Isolation PASS requires an actual sandboxed build with network isolation and
+    a resolved image digest. skip_build never claims PASS (NOT_APPLICABLE).
+    Host subprocess never claims PASS. Unresolved digest → UNKNOWN.
     """
     name = (
-        "docker-sandbox"
-        if isinstance(executor, DockerSandboxExecutor)
-        else type(executor).__name__
+        "docker-sandbox" if isinstance(executor, DockerSandboxExecutor) else type(executor).__name__
     )
     if skip_build or not build_ran:
         return "NOT_APPLICABLE", name
     if isinstance(executor, DockerSandboxExecutor) and network_isolated:
-        return "PASS", name
-    return "UNKNOWN", name
-
-
-def isolation_status_for_executor(
-    executor: LeanExecutor,
-    *,
-    build_ran: bool = False,
-    skip_build: bool = False,
-    network_isolated: bool = False,
-) -> tuple[str, str]:
-    """Return (status, executor_name) for execution.isolation finding.
-
-    Isolation PASS requires an actual sandboxed build with network isolation.
-    skip_build never claims PASS (NOT_APPLICABLE). Host subprocess never claims PASS.
-    """
-    name = (
-        "docker-sandbox"
-        if isinstance(executor, DockerSandboxExecutor)
-        else type(executor).__name__
-    )
-    if skip_build or not build_ran:
-        return "NOT_APPLICABLE", name
-    if isinstance(executor, DockerSandboxExecutor) and network_isolated:
-        return "PASS", name
+        digest_ok = (
+            image_digest_resolved
+            if image_digest_resolved is not None
+            else bool(executor.image_digest())
+        )
+        if digest_ok:
+            return "PASS", name
+        return "UNKNOWN", name
     return "UNKNOWN", name

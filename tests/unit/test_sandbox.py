@@ -27,7 +27,9 @@ def test_validate_extract_out_rel_rejects_traversal() -> None:
         validate_extract_out_rel("/abs/path")
 
 
-def test_verify_build_and_extract_single_docker_argv(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_verify_build_and_extract_single_docker_argv(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Combined path packs build+extract into one docker run argv (no second container)."""
     from lpe.execution.sandbox import (
         COMBINED_BUILD_EXTRACT_SCRIPT,
@@ -84,6 +86,7 @@ def test_isolation_pass_for_docker_when_build_ran() -> None:
         build_ran=True,
         skip_build=False,
         network_isolated=True,
+        image_digest_resolved=True,
     )
     assert status == "PASS"
     assert name == "docker-sandbox"
@@ -110,9 +113,9 @@ def test_container_env_rewrites_windows_path(monkeypatch: pytest.MonkeyPatch) ->
 
     monkeypatch.setenv("PATH", r"C:\Windows\System32;C:\Program Files\Git\cmd")
     monkeypatch.setenv("HOME", r"C:\Users\mateo")
-    env = _container_environment(["PATH", "HOME", "USER", "TMPDIR"])
+    env = _container_environment(["PATH", "HOME", "USER", "TMPDIR"], uid=0)
     assert "C:\\" not in env["PATH"]
-    assert "/root/.elan/bin" in env["PATH"]
+    assert "/root/.elan/bin" in env["PATH"] or "/home/lpe/.elan/bin" in env["PATH"]
     assert env["HOME"] == "/root"
 
 
