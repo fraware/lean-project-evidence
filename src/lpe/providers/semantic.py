@@ -9,15 +9,21 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 from lpe import __version__
+from lpe.evidence.payloads import (
+    FindingPayload,
+    executed_check_payload,
+    opaque_finding_payload,
+    structural_diff_payload,
+)
+from lpe.execution.protocol import ValidatedCommand
 from lpe.hashing import sha256_text, sha256_value
-from lpe.ids import new_id
 from lpe.lean.extractor import (
     TOOLCHAIN_EXTRACTOR,
     build_dependency_graph,
@@ -29,18 +35,43 @@ from lpe.lean.extractor import (
 )
 from lpe.lean.toolchain import has_lakefile
 from lpe.models import (
-    CandidateDescriptor,
+    EvidenceBasis,
+    EvidenceCoverage,
     EvidenceDimension,
     EvidenceFinding,
     FindingStatus,
-    ProjectContract,
     Provenance,
     Severity,
+    SubjectReference,
 )
+from lpe.providers.base import ProviderContext, ProviderResult
+from lpe.workspace.manager import make_stable_finding_id
 
 # Structured fixtures under contract tests/ (README alone does not count).
 _STRUCTURED_SUFFIXES = {".lean", ".json", ".yaml", ".yml"}
 _META_NAMES = {"readme.md", "readme.txt", ".gitkeep"}
+
+
+def _provider_result(
+    provider: Any,
+    context: ProviderContext,
+    findings: list[EvidenceFinding],
+    *,
+    started: datetime,
+    finished: datetime,
+    status: str = "COMPLETED",
+    artifact_refs: list[Any] | None = None,
+) -> ProviderResult:
+    return ProviderResult(
+        provider_id=str(provider.provider_id),
+        provider_version=str(provider.provider_version),
+        snapshot_fingerprint=context.snapshot_fingerprint,
+        findings=findings,
+        artifact_refs=list(artifact_refs or []),
+        started_at=started,
+        finished_at=finished,
+        status=status,  # type: ignore[arg-type]
+    )
 
 
 def _provenance(
@@ -63,6 +94,31 @@ def _provenance(
     )
 
 
+def _statement_diff_payload(details: dict[str, Any]) -> FindingPayload:
+    return structural_diff_payload(details)
+
+
+def _downstream_replacement_payload(check_id: str, details: dict[str, Any]) -> FindingPayload:
+    """Prefer executed payload when Lake/signature checks ran; else structural."""
+    lake = details.get("lake_dependent_check")
+    hash_check = details.get("signature_hash_check")
+    if isinstance(lake, dict) and lake.get("attempted"):
+        return executed_check_payload(check_id, details)
+    if isinstance(hash_check, dict) and hash_check.get("ran"):
+        return executed_check_payload(check_id, details)
+    if details.get("changed") or details.get("impact_cone") is not None:
+        return structural_diff_payload(details)
+    return opaque_finding_payload(details)
+
+
+def _default_semantic_payload(check_id: str, details: dict[str, Any]) -> FindingPayload:
+    if check_id == "semantic.statement_diff":
+        return _statement_diff_payload(details)
+    if check_id == "downstream.replacement_tests":
+        return _downstream_replacement_payload(check_id, details)
+    return opaque_finding_payload(details)
+
+
 def _finding(
     *,
     check_id: str,
@@ -73,11 +129,25 @@ def _finding(
     details: dict[str, Any],
     started: datetime,
     finished: datetime,
+    basis: EvidenceBasis | None = None,
+    coverage: EvidenceCoverage | None = None,
+    subject_refs: list[SubjectReference] | None = None,
+    required_basis: EvidenceBasis | None = None,
+    payload: FindingPayload | None = None,
 ) -> EvidenceFinding:
+    check_version = "0.2.0"
+    typed_payload: FindingPayload = (
+        payload if payload is not None else _default_semantic_payload(check_id, details)
+    )
     return EvidenceFinding(
-        finding_id=new_id("finding"),
+        finding_id=make_stable_finding_id(
+            check_id=check_id,
+            dimension=dimension,
+            details=details,
+            check_version=check_version,
+        ),
         check_id=check_id,
-        check_version="0.1.0",
+        check_version=check_version,
         dimension=dimension,
         status=status,
         severity=severity,
@@ -89,6 +159,11 @@ def _finding(
             finished=finished,
             output={"status": status, "summary": summary},
         ),
+        basis=basis,
+        coverage=coverage,
+        subject_refs=list(subject_refs or []),
+        payload=typed_payload,
+        required_basis=required_basis,
     )
 
 
@@ -182,41 +257,39 @@ def _redact_log_snippet(text: str, *, limit: int = 400) -> str:
     return cleaned[:limit]
 
 
-def _try_lake_env_lean(project_path: Path, rel_lean: str) -> dict[str, Any]:
-    """Run ``lake env lean <rel>``; return ok/exit/stderr (redacted)."""
-    import shutil
-    import subprocess
+def _try_lake_env_lean(context: ProviderContext, rel_lean: str) -> dict[str, Any]:
+    """Run ``lake env lean <rel>`` via the workspace executor (CLOSURE-003)."""
 
-    lake = shutil.which("lake")
-    if lake is None:
-        return {
-            "ok": False,
-            "reason": "lake_unavailable",
-            "exit_code": None,
-            "stderr": "",
-        }
+    profile = context.resource_profile_for("semantic.example-runner")
+    allowlist = list(context.contract.project.execution.environment_allowlist)
     try:
-        proc = subprocess.run(
-            [lake, "env", "lean", rel_lean.replace("\\", "/")],
-            cwd=project_path,
-            capture_output=True,
-            text=True,
-            timeout=180,
-            check=False,
+        command = ValidatedCommand.from_argv(["lake", "env", "lean", rel_lean.replace("\\", "/")])
+        result = context.workspace.executor.run(
+            workspace=context.workspace,
+            command=command,
+            resource_profile=profile,
+            environment_allowlist=allowlist,
         )
-    except (OSError, subprocess.TimeoutExpired) as exc:
+    except (OSError, TimeoutError, ValueError) as exc:
         return {
             "ok": False,
             "reason": "lake_invoke_error",
             "exit_code": None,
             "stderr": _redact_log_snippet(str(exc)),
         }
-    ok = proc.returncode == 0
+    ok = result.exit_code == 0 and not result.timed_out
+    if result.timed_out:
+        return {
+            "ok": False,
+            "reason": "lake_invoke_error",
+            "exit_code": result.exit_code,
+            "stderr": _redact_log_snippet(result.stderr or "timed out"),
+        }
     return {
         "ok": ok,
         "reason": "lake_env_ok" if ok else "lake_env_failed",
-        "exit_code": proc.returncode,
-        "stderr": _redact_log_snippet(proc.stderr or proc.stdout or ""),
+        "exit_code": result.exit_code,
+        "stderr": _redact_log_snippet(result.stderr or result.stdout or ""),
     }
 
 
@@ -244,7 +317,11 @@ def _load_structured_document(path: Path) -> dict[str, Any] | list[Any] | str | 
     return None
 
 
-def _example_document_ok(doc: dict[str, Any] | list[Any] | str, *, obligation_ids: list[str]) -> tuple[bool, str]:
+def _example_document_ok(
+    doc: dict[str, Any] | list[Any] | str,
+    *,
+    obligation_ids: list[str],
+) -> tuple[bool, str]:
     """Heuristic structural validity for an example fixture (not Lean execution)."""
     if isinstance(doc, str):
         if not doc.strip():
@@ -315,509 +392,274 @@ def _jaccard(a: set[str], b: set[str]) -> float:
 
 
 class StatementDiffProvider:
-    """Structural statement/signature comparison from extracted declarations.
+    """Statement comparison preferring elaborated base/head types (§11.1).
 
-    Performs a real lexical signature hash comparison when Lean sources are
-    available. Does not claim semantic/intent fidelity (AUDIT-010).
+    Never treats a single patch line as authoritative when elaborated snapshots
+    exist. Does not claim semantic/intent fidelity.
     """
 
     provider_id = "semantic.statement-diff"
-    provider_version = "0.3.0"
+    provider_version = "0.2.0"
+    required_basis = EvidenceBasis.ELABORATOR_EXTRACTED
 
-    def collect(
-        self,
-        project_path: Path,
-        contract: ProjectContract,
-        candidate: CandidateDescriptor,
-    ) -> list[EvidenceFinding]:
-        del contract
-        started = datetime.now(timezone.utc)
+    def collect(self, context: ProviderContext) -> ProviderResult:
+        started = datetime.now(UTC)
+        candidate = context.candidate
+        project_path = context.candidate_path
         changed = [d for d in candidate.changed_declarations if d.signature_changed]
         if not changed:
-            finished = datetime.now(timezone.utc)
-            return [
-                _finding(
-                    check_id="semantic.statement_diff",
-                    dimension=EvidenceDimension.SEMANTIC,
-                    status=FindingStatus.NOT_APPLICABLE,
-                    severity=Severity.INFO,
-                    summary="No signature changes require statement comparison",
-                    details={},
-                    started=started,
-                    finished=finished,
-                )
-            ]
+            finished = datetime.now(UTC)
+            return _provider_result(
+                self,
+                context,
+                [
+                    _finding(
+                        check_id="semantic.statement_diff",
+                        dimension=EvidenceDimension.SEMANTIC,
+                        status=FindingStatus.NOT_APPLICABLE,
+                        severity=Severity.INFO,
+                        summary="No signature changes require statement comparison",
+                        details={},
+                        started=started,
+                        finished=finished,
+                        basis=EvidenceBasis.ELABORATOR_EXTRACTED,
+                        coverage=EvidenceCoverage(
+                            requested_subject_count=0,
+                            evaluated_subject_count=0,
+                            complete_for_declared_scope=True,
+                        ),
+                    )
+                ],
+                started=started,
+                finished=finished,
+            )
 
-        extraction = extract_lean_repository(project_path)
+        head_extraction = context.candidate_extraction or extract_lean_repository(project_path)
+        base_extraction = context.base_extraction
         toolchain_complete = bool(
-            getattr(extraction, "complete", False)
-            and extraction.extractor == TOOLCHAIN_EXTRACTOR
+            getattr(head_extraction, "complete", False)
+            and head_extraction.extractor == TOOLCHAIN_EXTRACTOR
         )
-        by_name = {d.name: d for d in extraction.declarations}
+        base_complete = bool(
+            base_extraction is not None
+            and getattr(base_extraction, "complete", False)
+            and getattr(base_extraction, "extractor", None) == TOOLCHAIN_EXTRACTOR
+        )
+        head_by_name = {d.name: d for d in head_extraction.declarations}
+        base_by_name = {d.name: d for d in base_extraction.declarations} if base_extraction else {}
         compared: list[dict[str, Any]] = []
         missing: list[str] = []
         mismatches: list[str] = []
+        used_patch_fallback = False
+
+        def _resolve(by_name: dict[str, Any], decls: list[Any], name: str) -> Any | None:
+            extracted = by_name.get(name)
+            if extracted is not None:
+                return extracted
+            short = name.split(".")[-1]
+            matches = [d for d in decls if d.name.endswith("." + short) or d.name == short]
+            return matches[0] if len(matches) == 1 else None
 
         for decl in changed:
-            extracted = by_name.get(decl.name)
-            if extracted is None:
-                short = decl.name.split(".")[-1]
-                matches = [
-                    d
-                    for d in extraction.declarations
-                    if d.name.endswith("." + short) or d.name == short
-                ]
-                if len(matches) == 1:
-                    extracted = matches[0]
-                else:
-                    missing.append(decl.name)
-                    continue
+            head_decl = _resolve(head_by_name, list(head_extraction.declarations), decl.name)
+            if head_decl is None:
+                missing.append(decl.name)
+                continue
 
-            candidate_sig = None
-            if candidate.patch_text and decl.name.split(".")[-1] in candidate.patch_text:
+            base_decl = (
+                _resolve(base_by_name, list(base_extraction.declarations), decl.name)
+                if base_extraction is not None
+                else None
+            )
+
+            # Prefer elaborated types; patch line is never authoritative when present.
+            head_sig = getattr(head_decl, "signature", None)
+            head_hash = getattr(head_decl, "signature_hash", None)
+            base_sig = getattr(base_decl, "signature", None) if base_decl else None
+            base_hash = getattr(base_decl, "signature_hash", None) if base_decl else None
+
+            patch_sig = None
+            if (
+                not (toolchain_complete and head_hash)
+                and candidate.patch_text
+                and decl.name.split(".")[-1] in candidate.patch_text
+            ):
                 for line in candidate.patch_text.splitlines():
                     if line.startswith("+") and short_name_in_line(decl.name, line[1:]):
-                        candidate_sig = _normalize_signature(line[1:])
+                        patch_sig = _normalize_signature(line[1:])
+                        used_patch_fallback = True
                         break
 
-            extracted_hash = extracted.signature_hash
-            candidate_hash = sha256_text(candidate_sig) if candidate_sig else None
-            structure = parse_signature_structure(extracted.signature)
+            authority = (
+                "elaborated_pair"
+                if base_complete and toolchain_complete and base_hash and head_hash
+                else ("elaborated_head" if toolchain_complete and head_hash else "patch_fallback")
+            )
+            structure_head = parse_signature_structure(str(head_sig or ""))
+            structure_base = parse_signature_structure(str(base_sig or "")) if base_sig else None
             entry = {
                 "name": decl.name,
-                "resolved_name": extracted.name,
-                "extracted_signature": extracted.signature,
-                "extracted_signature_hash": extracted_hash,
-                "candidate_signature": candidate_sig,
-                "candidate_signature_hash": candidate_hash,
-                "path": extracted.path,
+                "resolved_name": head_decl.name,
+                "authority": authority,
+                "base_signature": base_sig,
+                "base_signature_hash": base_hash,
+                "head_signature": head_sig,
+                "head_signature_hash": head_hash,
+                "patch_signature_fallback": patch_sig,
+                "path": getattr(head_decl, "path", None),
                 "toolchain_backed": toolchain_complete,
-                "structure": structure,
+                "structure_head": structure_head,
+                "structure_base": structure_base,
+                "binder_domain_conclusion": {
+                    "head": structure_head,
+                    "base": structure_base,
+                },
             }
             compared.append(entry)
-            if candidate_hash and candidate_hash != extracted_hash:
-                mismatches.append(decl.name)
+            if authority == "elaborated_pair" and base_hash != head_hash:
+                # Type changed between base and head — expected for signature_changed;
+                # record as compared difference, not integrity mismatch vs patch.
+                entry["type_changed"] = True
+            elif authority == "patch_fallback" and patch_sig:
+                if sha256_text(patch_sig) != head_hash:
+                    mismatches.append(decl.name)
 
-        finished = datetime.now(timezone.utc)
+        finished = datetime.now(UTC)
         details: dict[str, Any] = {
             "compared": compared,
             "missing": missing,
             "mismatches": mismatches,
-            "extractor": extraction.extractor,
-            "complete": getattr(extraction, "complete", False),
+            "extractor": head_extraction.extractor,
+            "complete": getattr(head_extraction, "complete", False),
             "toolchain_backed": toolchain_complete,
+            "base_elaborated": base_complete,
+            "used_patch_fallback": used_patch_fallback,
             "note": (
-                "structural signature compare using toolchain hashes"
-                if toolchain_complete
-                else "structural signature compare only; not semantic intent fidelity"
+                "elaborated base/head types are authoritative when available; "
+                "patch lines are never authority when elaborations exist (§11.1)"
             ),
         }
+        coverage = EvidenceCoverage(
+            requested_subject_count=len(changed),
+            evaluated_subject_count=len(compared),
+            excluded_subject_count=len(missing),
+            exclusion_reasons=[f"missing:{n}" for n in missing],
+            complete_for_declared_scope=not missing,
+        )
+        basis = (
+            EvidenceBasis.ELABORATOR_EXTRACTED
+            if toolchain_complete
+            else EvidenceBasis.STRUCTURAL_COMPARISON
+        )
 
         if missing:
-            return [
-                _finding(
-                    check_id="semantic.statement_diff",
-                    dimension=EvidenceDimension.SEMANTIC,
-                    status=FindingStatus.UNKNOWN,
-                    severity=Severity.L3,
-                    summary=(
-                        "Statement signature comparison incomplete; "
-                        f"missing extracted decls: {missing}"
-                    ),
-                    details=details,
-                    started=started,
-                    finished=finished,
-                )
-            ]
+            return _provider_result(
+                self,
+                context,
+                [
+                    _finding(
+                        check_id="semantic.statement_diff",
+                        dimension=EvidenceDimension.SEMANTIC,
+                        status=FindingStatus.UNKNOWN,
+                        severity=Severity.L3,
+                        summary=(
+                            "Statement signature comparison incomplete; "
+                            f"missing extracted decls: {missing}"
+                        ),
+                        details=details,
+                        started=started,
+                        finished=finished,
+                        basis=basis,
+                        coverage=coverage,
+                    )
+                ],
+                started=started,
+                finished=finished,
+            )
 
         if mismatches:
-            return [
+            return _provider_result(
+                self,
+                context,
+                [
+                    _finding(
+                        check_id="semantic.statement_diff",
+                        dimension=EvidenceDimension.SEMANTIC,
+                        status=FindingStatus.FAIL,
+                        severity=Severity.L3,
+                        summary=(
+                            "Structural signature mismatch between patch fallback and "
+                            f"extracted declarations: {mismatches}"
+                        ),
+                        details=details,
+                        started=started,
+                        finished=finished,
+                        basis=basis,
+                        coverage=coverage,
+                    )
+                ],
+                started=started,
+                finished=finished,
+            )
+
+        if toolchain_complete or (compared and not used_patch_fallback):
+            status = FindingStatus.PASS
+            summary = f"Elaborated statement comparison complete ({len(compared)} decls" + (
+                "; base+head pair)" if base_complete else "; head only)"
+            )
+        elif used_patch_fallback:
+            status = FindingStatus.UNKNOWN
+            summary = (
+                "Statement comparison unresolved: elaborated types unavailable; "
+                "patch-line fallback is not authoritative"
+            )
+        else:
+            status = FindingStatus.UNKNOWN
+            summary = "Statement comparison unresolved; no elaborated signatures"
+
+        return _provider_result(
+            self,
+            context,
+            [
                 _finding(
                     check_id="semantic.statement_diff",
                     dimension=EvidenceDimension.SEMANTIC,
-                    status=FindingStatus.FAIL,
-                    severity=Severity.L3,
-                    summary=(
-                        "Structural signature mismatch between patch and "
-                        f"extracted declarations: {mismatches}"
-                    ),
-                    details=details,
-                    started=started,
-                    finished=finished,
-                )
-            ]
-
-        incomplete = [
-            entry["name"]
-            for entry in compared
-            if not entry.get("candidate_signature_hash")
-        ]
-        if not compared or incomplete:
-            return [
-                _finding(
-                    check_id="semantic.statement_diff",
-                    dimension=EvidenceDimension.SEMANTIC,
-                    status=FindingStatus.UNKNOWN,
-                    severity=Severity.L3,
-                    summary=(
-                        "Structural signature comparison unresolved; "
-                        "candidate patch signatures incomplete"
-                        + (f" for {incomplete}" if incomplete else "")
-                    ),
-                    details=details,
-                    started=started,
-                    finished=finished,
-                )
-            ]
-
-        return [
-            _finding(
-                check_id="semantic.statement_diff",
-                dimension=EvidenceDimension.SEMANTIC,
-                status=FindingStatus.PASS,
-                severity=Severity.INFO,
-                summary=(
-                    "Structural signature hashes match extracted declarations "
-                    f"({len(compared)} compared"
-                    + ("; toolchain-backed)" if toolchain_complete else "); intent fidelity not claimed)")
-                ),
-                details=details,
-                started=started,
-                finished=finished,
-            )
-        ]
-
-
-class ExampleRunnerProvider:
-    """Project-example protocol under contract tests/examples.
-
-    JSON/YAML fixtures are validated structurally. ``.lean`` fixtures prefer
-    sandboxed ``lake env lean`` when a lakefile is present; provider failure
-    stays UNKNOWN (never silent PASS). Heuristic structural PASS remains for
-    non-Lean fixtures when Lake is unavailable.
-    """
-
-    provider_id = "semantic.example-runner"
-    provider_version = "0.3.0"
-
-    def collect(
-        self,
-        project_path: Path,
-        contract: ProjectContract,
-        candidate: CandidateDescriptor,
-    ) -> list[EvidenceFinding]:
-        del contract
-        started = datetime.now(timezone.utc)
-        examples_dir = _contract_tests_root(project_path) / "examples"
-        lake_capable = has_lakefile(project_path) and lean_toolchain_available(
-            project_path
-        )
-        protocol = {
-            "kind": "structured-fixture-scan+optional-lake-env",
-            "toolchain_backed": lake_capable,
-            "note": (
-                "Lean examples executed via lake env lean when available; "
-                "JSON/YAML remain structural"
-                if lake_capable
-                else "heuristic structural check; Lean examples not executed"
-            ),
-        }
-
-        if not examples_dir.is_dir():
-            finished = datetime.now(timezone.utc)
-            return [
-                _finding(
-                    check_id="semantic.project_examples",
-                    dimension=EvidenceDimension.SEMANTIC,
-                    status=FindingStatus.UNKNOWN,
-                    severity=Severity.L2,
-                    summary="Project example suite path is not configured",
-                    details={
-                        "expected_path": str(examples_dir),
-                        "protocol": protocol,
-                        "attempted": True,
-                    },
-                    started=started,
-                    finished=finished,
-                )
-            ]
-
-        fixtures = _list_structured_fixtures(examples_dir)
-        if not fixtures:
-            finished = datetime.now(timezone.utc)
-            return [
-                _finding(
-                    check_id="semantic.project_examples",
-                    dimension=EvidenceDimension.SEMANTIC,
-                    status=FindingStatus.UNKNOWN,
-                    severity=Severity.L2,
-                    summary=(
-                        "Project examples directory exists but has no structured "
-                        "fixtures (README alone does not count)"
-                    ),
-                    details={
-                        "examples_dir": str(examples_dir),
-                        "fixture_count": 0,
-                        "protocol": protocol,
-                        "attempted": True,
-                    },
-                    started=started,
-                    finished=finished,
-                )
-            ]
-
-        results: list[dict[str, Any]] = []
-        failures: list[str] = []
-        load_errors: list[str] = []
-        lake_attempted = False
-        lake_ok = True
-        for path in fixtures:
-            rel = str(path.relative_to(project_path)).replace("\\", "/")
-            if path.suffix.lower() == ".lean" and lake_capable:
-                lake_attempted = True
-                lake_result = _try_lake_env_lean(project_path, rel)
-                results.append({"path": rel, "ok": lake_result["ok"], **lake_result})
-                if not lake_result["ok"]:
-                    lake_ok = False
-                    failures.append(rel)
-                continue
-            doc = _load_structured_document(path)
-            if doc is None:
-                load_errors.append(rel)
-                results.append({"path": rel, "ok": False, "reason": "unreadable or invalid"})
-                continue
-            ok, reason = _example_document_ok(doc, obligation_ids=list(candidate.obligation_ids))
-            results.append({"path": rel, "ok": ok, "reason": reason})
-            if not ok:
-                failures.append(rel)
-
-        finished = datetime.now(timezone.utc)
-        details: dict[str, Any] = {
-            "examples_dir": str(examples_dir),
-            "fixtures": results,
-            "fixture_count": len(fixtures),
-            "protocol": protocol,
-            "attempted": True,
-            "lake_attempted": lake_attempted,
-            "provenance_paths": [r["path"] for r in results],
-        }
-
-        lean_only = all(p.suffix.lower() == ".lean" for p in fixtures)
-        if lake_attempted and not lake_ok and lean_only and not load_errors:
-            # Prefer FAIL for executable Lean failures; UNKNOWN if Lake crashed.
-            exec_errors = [
-                r for r in results if r.get("reason") == "lake_invoke_error"
-            ]
-            status = FindingStatus.UNKNOWN if exec_errors else FindingStatus.FAIL
-            return [
-                _finding(
-                    check_id="semantic.project_examples",
-                    dimension=EvidenceDimension.SEMANTIC,
                     status=status,
-                    severity=Severity.L2,
-                    summary=(
-                        "Project example Lake execution failed: "
-                        f"{failures}"
-                    ),
+                    severity=Severity.INFO if status is FindingStatus.PASS else Severity.L3,
+                    summary=summary,
                     details=details,
                     started=started,
                     finished=finished,
+                    basis=basis,
+                    coverage=coverage,
+                    subject_refs=[
+                        SubjectReference(kind="declaration", ref=d.name) for d in changed
+                    ],
+                    required_basis=EvidenceBasis.ELABORATOR_EXTRACTED
+                    if status is FindingStatus.PASS and toolchain_complete
+                    else None,
                 )
-            ]
-
-        if load_errors or failures:
-            return [
-                _finding(
-                    check_id="semantic.project_examples",
-                    dimension=EvidenceDimension.SEMANTIC,
-                    status=FindingStatus.FAIL,
-                    severity=Severity.L2,
-                    summary=(
-                        "Project example structural checks failed: "
-                        f"{load_errors + failures}"
-                    ),
-                    details=details,
-                    started=started,
-                    finished=finished,
-                )
-            ]
-
-        return [
-            _finding(
-                check_id="semantic.project_examples",
-                dimension=EvidenceDimension.SEMANTIC,
-                status=FindingStatus.PASS,
-                severity=Severity.INFO,
-                summary=(
-                    f"Project examples validated ({len(fixtures)} fixtures"
-                    + (
-                        "; Lake env lean executed)"
-                        if lake_attempted
-                        else "; structural only, Lean execution not performed)"
-                    )
-                ),
-                details=details,
-                started=started,
-                finished=finished,
-            )
-        ]
-
-
-class CounterexampleProvider:
-    """Counterexample protocol under contract tests/counterexamples.
-
-    Records an explicit attempt. Missing fixtures → UNKNOWN. ``.lean`` fixtures
-    prefer ``lake env lean`` when available; structural JSON/YAML otherwise.
-    """
-
-    provider_id = "semantic.counterexample"
-    provider_version = "0.3.0"
-
-    def collect(
-        self,
-        project_path: Path,
-        contract: ProjectContract,
-        candidate: CandidateDescriptor,
-    ) -> list[EvidenceFinding]:
-        del contract, candidate
-        started = datetime.now(timezone.utc)
-        counter_dir = _contract_tests_root(project_path) / "counterexamples"
-        lake_capable = has_lakefile(project_path) and lean_toolchain_available(
-            project_path
+            ],
+            started=started,
+            finished=finished,
         )
-        protocol = {
-            "kind": "structured-counterexample-scan+optional-lake-env",
-            "toolchain_backed": lake_capable,
-            "failure_policy": "UNKNOWN when missing or unreadable; FAIL on structural/Lake errors",
-            "note": (
-                "Lean counterexamples executed via lake env lean when available"
-                if lake_capable
-                else "heuristic structural check; counterexamples are not executed in Lean"
-            ),
-        }
 
-        if not counter_dir.is_dir():
-            finished = datetime.now(timezone.utc)
-            return [
-                _finding(
-                    check_id="semantic.counterexamples",
-                    dimension=EvidenceDimension.SEMANTIC,
-                    status=FindingStatus.UNKNOWN,
-                    severity=Severity.L2,
-                    summary="Counterexample directory missing; protocol attempt recorded",
-                    details={
-                        "counterexample_dir": str(counter_dir),
-                        "protocol": protocol,
-                        "attempted": True,
-                        "outcome": "directory_missing",
-                    },
-                    started=started,
-                    finished=finished,
-                )
-            ]
 
-        fixtures = _list_structured_fixtures(counter_dir)
-        if not fixtures:
-            finished = datetime.now(timezone.utc)
-            return [
-                _finding(
-                    check_id="semantic.counterexamples",
-                    dimension=EvidenceDimension.SEMANTIC,
-                    status=FindingStatus.UNKNOWN,
-                    severity=Severity.L2,
-                    summary=(
-                        "Counterexample protocol attempted; no structured fixtures present"
-                    ),
-                    details={
-                        "counterexample_dir": str(counter_dir),
-                        "protocol": protocol,
-                        "attempted": True,
-                        "outcome": "no_fixtures",
-                        "fixture_count": 0,
-                    },
-                    started=started,
-                    finished=finished,
-                )
-            ]
+# ExampleRunnerProvider / CounterexampleProvider live in fixture_runners (CLOSURE-013).
+from lpe.providers.fixture_runners import (  # noqa: E402
+    CounterexampleProvider,
+    ExampleRunnerProvider,
+)
 
-        results: list[dict[str, Any]] = []
-        failures: list[str] = []
-        load_errors: list[str] = []
-        lake_attempted = False
-        for path in fixtures:
-            rel = str(path.relative_to(project_path)).replace("\\", "/")
-            if path.suffix.lower() == ".lean" and lake_capable:
-                lake_attempted = True
-                lake_result = _try_lake_env_lean(project_path, rel)
-                results.append({"path": rel, "ok": lake_result["ok"], **lake_result})
-                if not lake_result["ok"]:
-                    failures.append(rel)
-                continue
-            doc = _load_structured_document(path)
-            if doc is None:
-                load_errors.append(rel)
-                results.append({"path": rel, "ok": False, "reason": "unreadable or invalid"})
-                continue
-            ok, reason = _counterexample_document_ok(doc)
-            results.append({"path": rel, "ok": ok, "reason": reason})
-            if not ok:
-                failures.append(rel)
-
-        finished = datetime.now(timezone.utc)
-        details: dict[str, Any] = {
-            "counterexample_dir": str(counter_dir),
-            "fixtures": results,
-            "fixture_count": len(fixtures),
-            "protocol": protocol,
-            "attempted": True,
-            "lake_attempted": lake_attempted,
-            "provenance_paths": [r["path"] for r in results],
-        }
-
-        if load_errors or failures:
-            lean_failures = [
-                r for r in results if r.get("path") in failures and "exit_code" in r
-            ]
-            status = FindingStatus.FAIL
-            if lake_attempted and lean_failures and all(
-                r.get("reason") == "lake_invoke_error" for r in lean_failures
-            ):
-                status = FindingStatus.UNKNOWN
-            return [
-                _finding(
-                    check_id="semantic.counterexamples",
-                    dimension=EvidenceDimension.SEMANTIC,
-                    status=status,
-                    severity=Severity.L2,
-                    summary=(
-                        "Counterexample checks failed: "
-                        f"{load_errors + failures}"
-                    ),
-                    details=details,
-                    started=started,
-                    finished=finished,
-                )
-            ]
-
-        return [
-            _finding(
-                check_id="semantic.counterexamples",
-                dimension=EvidenceDimension.SEMANTIC,
-                status=FindingStatus.PASS,
-                severity=Severity.INFO,
-                summary=(
-                    f"Counterexamples validated ({len(fixtures)} fixtures"
-                    + (
-                        "; Lake env lean executed)"
-                        if lake_attempted
-                        else "; structural only, Lean execution not performed)"
-                    )
-                ),
-                details=details,
-                started=started,
-                finished=finished,
-            )
-        ]
+__all__ = [
+    "CounterexampleProvider",
+    "DownstreamReplacementProvider",
+    "DuplicateRetrievalProvider",
+    "ExampleRunnerProvider",
+    "StatementDiffProvider",
+    "parse_signature_structure",
+    "short_name_in_line",
+]
 
 
 class DuplicateRetrievalProvider:
@@ -830,41 +672,45 @@ class DuplicateRetrievalProvider:
     provider_id = "semantic.duplicate-retrieval"
     provider_version = "0.3.0"
 
-    def collect(
-        self,
-        project_path: Path,
-        contract: ProjectContract,
-        candidate: CandidateDescriptor,
-    ) -> list[EvidenceFinding]:
-        del contract
-        started = datetime.now(timezone.utc)
+    def collect(self, context: ProviderContext) -> ProviderResult:
+        started = datetime.now(UTC)
+        candidate = context.candidate
+        project_path = context.candidate_path
         names = [d.name for d in candidate.changed_declarations]
         if not names:
-            finished = datetime.now(timezone.utc)
-            return [
-                _finding(
-                    check_id="semantic.duplicate_retrieval",
-                    dimension=EvidenceDimension.SEMANTIC,
-                    status=FindingStatus.NOT_APPLICABLE,
-                    severity=Severity.INFO,
-                    summary="No changed declarations to scan for near-duplicates",
-                    details={
-                        "protocol": {
-                            "kind": "local-lexical-jaccard",
-                            "toolchain_backed": False,
-                            "note": "name-token Jaccard + signature-hash equality; not embedding retrieval",
+            finished = datetime.now(UTC)
+            return _provider_result(
+                self,
+                context,
+                [
+                    _finding(
+                        check_id="semantic.duplicate_retrieval",
+                        dimension=EvidenceDimension.SEMANTIC,
+                        status=FindingStatus.NOT_APPLICABLE,
+                        severity=Severity.INFO,
+                        summary="No changed declarations to scan for near-duplicates",
+                        details={
+                            "protocol": {
+                                "kind": "local-lexical-jaccard",
+                                "toolchain_backed": False,
+                                "note": (
+                                    "name-token Jaccard + signature-hash equality; "
+                                    "not embedding retrieval"
+                                ),
+                            },
+                            "attempted": True,
                         },
-                        "attempted": True,
-                    },
-                    started=started,
-                    finished=finished,
-                )
-            ]
+                        started=started,
+                        finished=finished,
+                    )
+                ],
+                started=started,
+                finished=finished,
+            )
 
-        extraction = extract_lean_repository(project_path)
+        extraction = context.candidate_extraction or extract_lean_repository(project_path)
         toolchain_complete = bool(
-            getattr(extraction, "complete", False)
-            and extraction.extractor == TOOLCHAIN_EXTRACTOR
+            getattr(extraction, "complete", False) and extraction.extractor == TOOLCHAIN_EXTRACTOR
         )
         protocol = {
             "kind": "local-lexical-jaccard",
@@ -878,26 +724,32 @@ class DuplicateRetrievalProvider:
 
         corpus = list(extraction.declarations)
         if not corpus:
-            finished = datetime.now(timezone.utc)
-            return [
-                _finding(
-                    check_id="semantic.duplicate_retrieval",
-                    dimension=EvidenceDimension.SEMANTIC,
-                    status=FindingStatus.UNKNOWN,
-                    severity=Severity.L2,
-                    summary="Duplicate retrieval unresolved: empty local Lean corpus",
-                    details={
-                        "candidate_declarations": names,
-                        "corpus_size": 0,
-                        "protocol": protocol,
-                        "attempted": True,
-                        "extractor": extraction.extractor,
-                        "toolchain_backed": toolchain_complete,
-                    },
-                    started=started,
-                    finished=finished,
-                )
-            ]
+            finished = datetime.now(UTC)
+            return _provider_result(
+                self,
+                context,
+                [
+                    _finding(
+                        check_id="semantic.duplicate_retrieval",
+                        dimension=EvidenceDimension.SEMANTIC,
+                        status=FindingStatus.UNKNOWN,
+                        severity=Severity.L2,
+                        summary="Duplicate retrieval unresolved: empty local Lean corpus",
+                        details={
+                            "candidate_declarations": names,
+                            "corpus_size": 0,
+                            "protocol": protocol,
+                            "attempted": True,
+                            "extractor": extraction.extractor,
+                            "toolchain_backed": toolchain_complete,
+                        },
+                        started=started,
+                        finished=finished,
+                    )
+                ],
+                started=started,
+                finished=finished,
+            )
 
         # Prefer toolchain signature hashes from extraction; fall back to patch lines.
         candidate_sig_hashes: dict[str, str | None] = {}
@@ -907,11 +759,7 @@ class DuplicateRetrievalProvider:
             extracted = by_name.get(decl.name)
             if extracted is None:
                 short = decl.name.split(".")[-1]
-                matches = [
-                    d
-                    for d in corpus
-                    if d.name.endswith("." + short) or d.name == short
-                ]
+                matches = [d for d in corpus if d.name.endswith("." + short) or d.name == short]
                 if len(matches) == 1:
                     extracted = matches[0]
             if toolchain_complete and extracted is not None and extracted.signature_hash:
@@ -950,8 +798,12 @@ class DuplicateRetrievalProvider:
             if best is not None:
                 closest.append(best)
 
-        finished = datetime.now(timezone.utc)
-        high = [c for c in closest if float(c["score"]) >= 0.5]
+        finished = datetime.now(UTC)
+        exact_matches = [c for c in closest if c.get("signature_hash_match")]
+        heuristic_matches = [
+            c for c in closest if float(c["score"]) >= 0.5 and not c.get("signature_hash_match")
+        ]
+        high = exact_matches + heuristic_matches
         missing_hashes = [
             name
             for name, digest in candidate_sig_hashes.items()
@@ -961,7 +813,17 @@ class DuplicateRetrievalProvider:
             "candidate_declarations": names,
             "corpus_size": len(corpus),
             "closest": closest,
+            "exact_type_hash_matches": exact_matches,
+            "heuristic_token_matches": heuristic_matches,
             "high_similarity": high,
+            "match_classes": {
+                "exact_elaborated_type_hash": len(exact_matches),
+                "token_similarity": len(heuristic_matches),
+                "alpha_equivalent": 0,
+                "mutual_implication": 0,
+                "repository_location": 0,
+                "human_api_overlap": 0,
+            },
             "protocol": protocol,
             "attempted": True,
             "extractor": extraction.extractor,
@@ -971,62 +833,110 @@ class DuplicateRetrievalProvider:
             "provenance": {
                 "paths": sorted({c["match_path"] for c in closest if c.get("match_path")}),
             },
+            "note": (
+                "exact type-hash matches use ELABORATOR_EXTRACTED; "
+                "token similarity remains HEURISTIC_RETRIEVAL (§11.5)"
+            ),
         }
+        coverage = EvidenceCoverage(
+            requested_subject_count=len(names),
+            evaluated_subject_count=len(closest),
+            excluded_subject_count=len(missing_hashes),
+            exclusion_reasons=[f"missing_hash:{n}" for n in missing_hashes],
+            complete_for_declared_scope=not missing_hashes,
+        )
 
         if toolchain_complete and missing_hashes:
-            return [
-                _finding(
-                    check_id="semantic.duplicate_retrieval",
-                    dimension=EvidenceDimension.SEMANTIC,
-                    status=FindingStatus.UNKNOWN,
-                    severity=Severity.L2,
-                    summary=(
-                        "Duplicate retrieval unresolved: toolchain-complete corpus "
-                        f"missing signature hashes for {missing_hashes}"
-                    ),
-                    details=details,
-                    started=started,
-                    finished=finished,
-                )
-            ]
-
-        if high:
-            return [
-                _finding(
-                    check_id="semantic.duplicate_retrieval",
-                    dimension=EvidenceDimension.SEMANTIC,
-                    status=FindingStatus.WARN,
-                    severity=Severity.L2,
-                    summary=(
-                        "Near-duplicate declarations found in local corpus "
-                        f"({len(high)} high-similarity matches)"
-                        + ("; toolchain hash proximity" if toolchain_complete else "; heuristic only")
-                    ),
-                    details=details,
-                    started=started,
-                    finished=finished,
-                )
-            ]
-
-        return [
-            _finding(
-                check_id="semantic.duplicate_retrieval",
-                dimension=EvidenceDimension.SEMANTIC,
-                status=FindingStatus.PASS,
-                severity=Severity.INFO,
-                summary=(
-                    f"Local corpus scanned ({len(corpus)} decls); no high-similarity "
-                    + (
-                        "near-duplicates (toolchain hashes)"
-                        if toolchain_complete
-                        else "near-duplicates (lexical/heuristic)"
+            return _provider_result(
+                self,
+                context,
+                [
+                    _finding(
+                        check_id="semantic.duplicate_retrieval",
+                        dimension=EvidenceDimension.SEMANTIC,
+                        status=FindingStatus.UNKNOWN,
+                        severity=Severity.L2,
+                        summary=(
+                            "Duplicate retrieval unresolved: toolchain-complete corpus "
+                            f"missing signature hashes for {missing_hashes}"
+                        ),
+                        details=details,
+                        started=started,
+                        finished=finished,
+                        basis=EvidenceBasis.ELABORATOR_EXTRACTED,
+                        coverage=coverage,
                     )
-                ),
-                details=details,
+                ],
                 started=started,
                 finished=finished,
             )
-        ]
+
+        if high:
+            basis = (
+                EvidenceBasis.ELABORATOR_EXTRACTED
+                if exact_matches and not heuristic_matches
+                else (
+                    EvidenceBasis.HEURISTIC_RETRIEVAL
+                    if heuristic_matches and not exact_matches
+                    else EvidenceBasis.ELABORATOR_EXTRACTED
+                )
+            )
+            return _provider_result(
+                self,
+                context,
+                [
+                    _finding(
+                        check_id="semantic.duplicate_retrieval",
+                        dimension=EvidenceDimension.SEMANTIC,
+                        status=FindingStatus.WARN,
+                        severity=Severity.L2,
+                        summary=(
+                            "Near-duplicate declarations found in local corpus "
+                            f"(exact_hash={len(exact_matches)}, "
+                            f"heuristic_token={len(heuristic_matches)})"
+                        ),
+                        details=details,
+                        started=started,
+                        finished=finished,
+                        basis=basis,
+                        coverage=coverage,
+                    )
+                ],
+                started=started,
+                finished=finished,
+            )
+
+        return _provider_result(
+            self,
+            context,
+            [
+                _finding(
+                    check_id="semantic.duplicate_retrieval",
+                    dimension=EvidenceDimension.SEMANTIC,
+                    status=FindingStatus.PASS,
+                    severity=Severity.INFO,
+                    summary=(
+                        f"Local corpus scanned ({len(corpus)} decls); no high-similarity "
+                        + (
+                            "near-duplicates (exact type hashes separated from heuristics)"
+                            if toolchain_complete
+                            else "near-duplicates (heuristic scan only)"
+                        )
+                    ),
+                    details=details,
+                    started=started,
+                    finished=finished,
+                    basis=(
+                        EvidenceBasis.ELABORATOR_EXTRACTED
+                        if toolchain_complete
+                        else EvidenceBasis.HEURISTIC_RETRIEVAL
+                    ),
+                    coverage=coverage,
+                )
+            ],
+            started=started,
+            finished=finished,
+        )
 
 
 class DownstreamReplacementProvider:
@@ -1048,14 +958,10 @@ class DownstreamReplacementProvider:
     provider_version = "0.3.0"
     _MAX_LAKE_MODULES = 8
 
-    def collect(
-        self,
-        project_path: Path,
-        contract: ProjectContract,
-        candidate: CandidateDescriptor,
-    ) -> list[EvidenceFinding]:
-        del contract
-        started = datetime.now(timezone.utc)
+    def collect(self, context: ProviderContext) -> ProviderResult:
+        started = datetime.now(UTC)
+        candidate = context.candidate
+        project_path = context.candidate_path
         raw_names = {d.name for d in candidate.changed_declarations}
         protocol = {
             "kind": "impact-cone-successor-replacement",
@@ -1066,21 +972,27 @@ class DownstreamReplacementProvider:
         }
 
         if not raw_names:
-            finished = datetime.now(timezone.utc)
-            return [
-                _finding(
-                    check_id="downstream.replacement_tests",
-                    dimension=EvidenceDimension.DOWNSTREAM,
-                    status=FindingStatus.NOT_APPLICABLE,
-                    severity=Severity.INFO,
-                    summary="No changed declarations for downstream replacement analysis",
-                    details={"obligation_ids": candidate.obligation_ids, "protocol": protocol},
-                    started=started,
-                    finished=finished,
-                )
-            ]
+            finished = datetime.now(UTC)
+            return _provider_result(
+                self,
+                context,
+                [
+                    _finding(
+                        check_id="downstream.replacement_tests",
+                        dimension=EvidenceDimension.DOWNSTREAM,
+                        status=FindingStatus.NOT_APPLICABLE,
+                        severity=Severity.INFO,
+                        summary="No changed declarations for downstream replacement analysis",
+                        details={"obligation_ids": candidate.obligation_ids, "protocol": protocol},
+                        started=started,
+                        finished=finished,
+                    )
+                ],
+                started=started,
+                finished=finished,
+            )
 
-        extraction = extract_lean_repository(project_path)
+        extraction = context.candidate_extraction or extract_lean_repository(project_path)
         changed_names, resolution_warnings = resolve_changed_names_detailed(
             candidate.changed_declarations, extraction
         )
@@ -1093,32 +1005,38 @@ class DownstreamReplacementProvider:
         )
 
         if not cone:
-            finished = datetime.now(timezone.utc)
-            return [
-                _finding(
-                    check_id="downstream.replacement_tests",
-                    dimension=EvidenceDimension.DOWNSTREAM,
-                    status=FindingStatus.UNKNOWN,
-                    severity=Severity.L2,
-                    summary=(
-                        "Downstream replacement unresolved: impact cone empty "
-                        "(no successor declarations found)"
-                    ),
-                    details={
-                        "obligation_ids": candidate.obligation_ids,
-                        "changed": sorted(changed_names),
-                        "impact_cone": [],
-                        "extractor": extraction.extractor,
-                        "complete": getattr(extraction, "complete", False),
-                        "toolchain_backed": toolchain_complete,
-                        "protocol": protocol,
-                        "attempted": True,
-                        "replacement_check": "not_applicable_empty_cone",
-                    },
-                    started=started,
-                    finished=finished,
-                )
-            ]
+            finished = datetime.now(UTC)
+            return _provider_result(
+                self,
+                context,
+                [
+                    _finding(
+                        check_id="downstream.replacement_tests",
+                        dimension=EvidenceDimension.DOWNSTREAM,
+                        status=FindingStatus.UNKNOWN,
+                        severity=Severity.L2,
+                        summary=(
+                            "Downstream replacement unresolved: impact cone empty "
+                            "(no successor declarations found)"
+                        ),
+                        details={
+                            "obligation_ids": candidate.obligation_ids,
+                            "changed": sorted(changed_names),
+                            "impact_cone": [],
+                            "extractor": extraction.extractor,
+                            "complete": getattr(extraction, "complete", False),
+                            "toolchain_backed": toolchain_complete,
+                            "protocol": protocol,
+                            "attempted": True,
+                            "replacement_check": "not_applicable_empty_cone",
+                        },
+                        started=started,
+                        finished=finished,
+                    )
+                ],
+                started=started,
+                finished=finished,
+            )
 
         by_name = {d.name: d for d in extraction.declarations}
         successors: list[dict[str, Any]] = []
@@ -1150,145 +1068,187 @@ class DownstreamReplacementProvider:
         }
 
         if not toolchain_complete:
-            finished = datetime.now(timezone.utc)
+            finished = datetime.now(UTC)
             details["replacement_check"] = "regex_stub_inventory_only"
-            return [
-                _finding(
-                    check_id="downstream.replacement_tests",
-                    dimension=EvidenceDimension.DOWNSTREAM,
-                    status=FindingStatus.WARN,
-                    severity=Severity.L2,
-                    summary=(
-                        f"Downstream replacement cone estimated ({len(successors)} successors) "
-                        "via regex-stub; not elaborator-complete"
-                    ),
-                    details=details,
-                    started=started,
-                    finished=finished,
-                )
-            ]
-
-        hash_report = _successor_hash_integrity(successors)
-        details["signature_hash_check"] = hash_report
-        lake_report = _try_compile_successor_modules(
-            project_path,
-            successors,
-            max_modules=self._MAX_LAKE_MODULES,
-        )
-        details["lake_dependent_check"] = lake_report
-
-        finished = datetime.now(timezone.utc)
-
-        if not hash_report["ran"]:
-            details["replacement_check"] = "unavailable"
-            return [
-                _finding(
-                    check_id="downstream.replacement_tests",
-                    dimension=EvidenceDimension.DOWNSTREAM,
-                    status=FindingStatus.UNKNOWN,
-                    severity=Severity.L2,
-                    summary=(
-                        "Downstream replacement unresolved: could not run "
-                        "signature-hash check on toolchain successors"
-                    ),
-                    details=details,
-                    started=started,
-                    finished=finished,
-                )
-            ]
-
-        if not hash_report["ok"]:
-            details["replacement_check"] = "signature_hash_failed"
-            return [
-                _finding(
-                    check_id="downstream.replacement_tests",
-                    dimension=EvidenceDimension.DOWNSTREAM,
-                    status=FindingStatus.FAIL,
-                    severity=Severity.L3,
-                    summary=(
-                        "Downstream successor signature hashes failed integrity check "
-                        f"({hash_report['mismatched']} mismatched / "
-                        f"{hash_report['missing_hash']} missing)"
-                    ),
-                    details=details,
-                    started=started,
-                    finished=finished,
-                )
-            ]
-
-        if lake_report["attempted"]:
-            if lake_report["ok"]:
-                details["replacement_check"] = "signature_hash+lake_env"
-                return [
+            return _provider_result(
+                self,
+                context,
+                [
                     _finding(
                         check_id="downstream.replacement_tests",
                         dimension=EvidenceDimension.DOWNSTREAM,
-                        status=FindingStatus.PASS,
-                        severity=Severity.INFO,
+                        status=FindingStatus.WARN,
+                        severity=Severity.L2,
                         summary=(
-                            f"Downstream replacement verified for {len(successors)} "
-                            f"successors (signature hashes + Lake env on "
-                            f"{lake_report['modules_checked']} modules)"
+                            f"Downstream replacement cone estimated ({len(successors)} successors) "
+                            "via regex-stub; not elaborator-complete"
                         ),
                         details=details,
                         started=started,
                         finished=finished,
                     )
-                ]
-            details["replacement_check"] = "lake_env_failed"
-            return [
-                _finding(
-                    check_id="downstream.replacement_tests",
-                    dimension=EvidenceDimension.DOWNSTREAM,
-                    status=FindingStatus.FAIL,
-                    severity=Severity.L3,
-                    summary=(
-                        "Downstream dependent modules failed Lake compile check: "
-                        + (lake_report.get("error") or "non-zero exit")
-                    ),
-                    details=details,
+                ],
+                started=started,
+                finished=finished,
+            )
+
+        hash_report = _successor_hash_integrity(successors)
+        details["signature_hash_check"] = hash_report
+        lake_report = _try_compile_successor_modules(
+            context,
+            successors,
+            max_modules=self._MAX_LAKE_MODULES,
+        )
+        details["lake_dependent_check"] = lake_report
+
+        finished = datetime.now(UTC)
+
+        if not hash_report["ran"]:
+            details["replacement_check"] = "unavailable"
+            return _provider_result(
+                self,
+                context,
+                [
+                    _finding(
+                        check_id="downstream.replacement_tests",
+                        dimension=EvidenceDimension.DOWNSTREAM,
+                        status=FindingStatus.UNKNOWN,
+                        severity=Severity.L2,
+                        summary=(
+                            "Downstream replacement unresolved: could not run "
+                            "signature-hash check on toolchain successors"
+                        ),
+                        details=details,
+                        started=started,
+                        finished=finished,
+                    )
+                ],
+                started=started,
+                finished=finished,
+            )
+
+        if not hash_report["ok"]:
+            details["replacement_check"] = "signature_hash_failed"
+            return _provider_result(
+                self,
+                context,
+                [
+                    _finding(
+                        check_id="downstream.replacement_tests",
+                        dimension=EvidenceDimension.DOWNSTREAM,
+                        status=FindingStatus.FAIL,
+                        severity=Severity.L3,
+                        summary=(
+                            "Downstream successor signature hashes failed integrity check "
+                            f"({hash_report['mismatched']} mismatched / "
+                            f"{hash_report['missing_hash']} missing)"
+                        ),
+                        details=details,
+                        started=started,
+                        finished=finished,
+                    )
+                ],
+                started=started,
+                finished=finished,
+            )
+
+        if lake_report["attempted"]:
+            if lake_report["ok"]:
+                details["replacement_check"] = "signature_hash+lake_env"
+                return _provider_result(
+                    self,
+                    context,
+                    [
+                        _finding(
+                            check_id="downstream.replacement_tests",
+                            dimension=EvidenceDimension.DOWNSTREAM,
+                            status=FindingStatus.PASS,
+                            severity=Severity.INFO,
+                            summary=(
+                                f"Downstream replacement verified for {len(successors)} "
+                                f"successors (signature hashes + Lake env on "
+                                f"{lake_report['modules_checked']} modules)"
+                            ),
+                            details=details,
+                            started=started,
+                            finished=finished,
+                        )
+                    ],
                     started=started,
                     finished=finished,
                 )
-            ]
+            details["replacement_check"] = "lake_env_failed"
+            return _provider_result(
+                self,
+                context,
+                [
+                    _finding(
+                        check_id="downstream.replacement_tests",
+                        dimension=EvidenceDimension.DOWNSTREAM,
+                        status=FindingStatus.FAIL,
+                        severity=Severity.L3,
+                        summary=(
+                            "Downstream dependent modules failed Lake compile check: "
+                            + (lake_report.get("error") or "non-zero exit")
+                        ),
+                        details=details,
+                        started=started,
+                        finished=finished,
+                    )
+                ],
+                started=started,
+                finished=finished,
+            )
 
         # Lake not runnable — hash check alone is structured but incomplete.
         # Fail closed: UNKNOWN rather than PASS without an executable check.
         if lake_report.get("reason") == "lake_unavailable":
             details["replacement_check"] = "hash_only_lake_unavailable"
-            return [
+            return _provider_result(
+                self,
+                context,
+                [
+                    _finding(
+                        check_id="downstream.replacement_tests",
+                        dimension=EvidenceDimension.DOWNSTREAM,
+                        status=FindingStatus.UNKNOWN,
+                        severity=Severity.L2,
+                        summary=(
+                            f"Successor signature hashes OK ({len(successors)}), but Lake "
+                            "compile of dependents could not run (fail-closed UNKNOWN)"
+                        ),
+                        details=details,
+                        started=started,
+                        finished=finished,
+                    )
+                ],
+                started=started,
+                finished=finished,
+            )
+
+        details["replacement_check"] = "signature_hash"
+        return _provider_result(
+            self,
+            context,
+            [
                 _finding(
                     check_id="downstream.replacement_tests",
                     dimension=EvidenceDimension.DOWNSTREAM,
-                    status=FindingStatus.UNKNOWN,
-                    severity=Severity.L2,
+                    status=FindingStatus.PASS,
+                    severity=Severity.INFO,
                     summary=(
-                        f"Successor signature hashes OK ({len(successors)}), but Lake "
-                        "compile of dependents could not run (fail-closed UNKNOWN)"
+                        f"Downstream replacement signature hashes verified for "
+                        f"{len(successors)} toolchain successors "
+                        f"(no Lake modules selected: {lake_report.get('reason')})"
                     ),
                     details=details,
                     started=started,
                     finished=finished,
                 )
-            ]
-
-        details["replacement_check"] = "signature_hash"
-        return [
-            _finding(
-                check_id="downstream.replacement_tests",
-                dimension=EvidenceDimension.DOWNSTREAM,
-                status=FindingStatus.PASS,
-                severity=Severity.INFO,
-                summary=(
-                    f"Downstream replacement signature hashes verified for "
-                    f"{len(successors)} toolchain successors "
-                    f"(no Lake modules selected: {lake_report.get('reason')})"
-                ),
-                details=details,
-                started=started,
-                finished=finished,
-            )
-        ]
+            ],
+            started=started,
+            finished=finished,
+        )
 
 
 def _successor_hash_integrity(successors: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1310,12 +1270,7 @@ def _successor_hash_integrity(successors: list[dict[str, Any]]) -> dict[str, Any
             continue
         if digest != expected:
             mismatched += 1
-    ok = (
-        checked > 0
-        and mismatched == 0
-        and missing_hash == 0
-        and missing_signature == 0
-    )
+    ok = checked > 0 and mismatched == 0 and missing_hash == 0 and missing_signature == 0
     return {
         "ran": len(successors) > 0 and checked > 0,
         "ok": ok,
@@ -1327,19 +1282,14 @@ def _successor_hash_integrity(successors: list[dict[str, Any]]) -> dict[str, Any
 
 
 def _try_compile_successor_modules(
-    project_path: Path,
+    context: ProviderContext,
     successors: list[dict[str, Any]],
     *,
     max_modules: int,
 ) -> dict[str, Any]:
-    """Compile unique successor ``.lean`` paths with ``lake env lean`` when possible."""
-    import shutil
-    import subprocess
-
-    lake = shutil.which("lake")
-    if lake is None or not lean_toolchain_available(project_path) or not has_lakefile(
-        project_path
-    ):
+    """Compile unique successor ``.lean`` paths via the workspace executor."""
+    project_path = context.candidate_path
+    if not lean_toolchain_available(project_path) or not has_lakefile(project_path):
         return {
             "attempted": False,
             "ok": False,
@@ -1379,24 +1329,14 @@ def _try_compile_successor_modules(
         if not lean_file.is_file():
             failures.append({"module": rel, "error": "file_missing"})
             continue
-        try:
-            proc = subprocess.run(
-                [lake, "env", "lean", rel.replace("\\", "/")],
-                cwd=project_path,
-                capture_output=True,
-                text=True,
-                timeout=180,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            failures.append({"module": rel, "error": str(exc)})
-            continue
-        if proc.returncode != 0:
+        lake_result = _try_lake_env_lean(context, rel)
+        if not lake_result["ok"]:
             failures.append(
                 {
                     "module": rel,
-                    "exit_code": proc.returncode,
-                    "stderr": (proc.stderr or proc.stdout or "")[:400],
+                    "exit_code": lake_result.get("exit_code"),
+                    "stderr": lake_result.get("stderr", "")[:400],
+                    "error": lake_result.get("reason"),
                 }
             )
 
@@ -1408,9 +1348,7 @@ def _try_compile_successor_modules(
             "modules_checked": len(modules),
             "modules": modules,
             "failures": failures,
-            "error": failures[0].get("error")
-            or failures[0].get("stderr")
-            or "non-zero exit",
+            "error": failures[0].get("error") or failures[0].get("stderr") or "non-zero exit",
         }
 
     return {

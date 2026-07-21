@@ -20,7 +20,6 @@ from collections import defaultdict
 
 from lpe.models import EventType, TPPRReport, UtilityEvent
 
-
 TIME_CATEGORIES = {
     "specification": "specification_hours",
     "review": "review_hours",
@@ -69,16 +68,12 @@ def compute_tppr(events: list[UtilityEvent], project_id: str) -> TPPRReport:
                 # Legacy / mis-keyed payloads: convert rather than KeyError.
                 hours_val = float(event.payload["minutes"]) / 60.0
             else:
-                exclusions.append(
-                    f"expert time event {event.event_id} missing hours/minutes"
-                )
+                exclusions.append(f"expert time event {event.event_id} missing hours/minutes")
                 continue
             hours[TIME_CATEGORIES[category]] += hours_val
         elif event.event_type is EventType.CORRECTION_RECORDED:
             target = event.supersedes_event_id or "unknown"
-            exclusions.append(
-                f"correction {event.event_id} recorded for superseded event {target}"
-            )
+            exclusions.append(f"correction {event.event_id} recorded for superseded event {target}")
 
         compute_cost_usd += float(event.payload.get("compute_cost_usd", 0.0))
         wall_clock_hours += float(event.payload.get("wall_clock_hours", 0.0))

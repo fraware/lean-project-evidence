@@ -1,14 +1,29 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 
-SCHEMA_VERSION = "0.1.0"
-SUPPORTED_SCHEMA_VERSIONS: frozenset[str] = frozenset({SCHEMA_VERSION})
+def _coerce_finding_payload(value: Any) -> Any:
+    from lpe.evidence.payloads import parse_finding_payload
+
+    return parse_finding_payload(value)
+
+
+SCHEMA_VERSION = "0.2.0"
+# 0.1.0 remains readable (contracts, golden packets); writers emit SCHEMA_VERSION.
+SUPPORTED_SCHEMA_VERSIONS: frozenset[str] = frozenset({"0.1.0", "0.2.0"})
+LEGACY_SCHEMA_VERSION = "0.1.0"
 
 
 def parse_schema_version(version: str) -> tuple[int, int, int]:
@@ -82,6 +97,52 @@ class FindingStatus(StrEnum):
     WARN = "WARN"
     UNKNOWN = "UNKNOWN"
     NOT_APPLICABLE = "NOT_APPLICABLE"
+
+
+class EvidenceBasis(StrEnum):
+    """Discrete evidence production basis (CLOSURE-010 / spec §10)."""
+
+    KERNEL_CHECKED = "KERNEL_CHECKED"
+    ELABORATOR_EXTRACTED = "ELABORATOR_EXTRACTED"
+    EXECUTED_TEST = "EXECUTED_TEST"
+    STRUCTURAL_COMPARISON = "STRUCTURAL_COMPARISON"
+    HEURISTIC_RETRIEVAL = "HEURISTIC_RETRIEVAL"
+    HUMAN_ATTESTED = "HUMAN_ATTESTED"
+    EXTERNAL_ASSERTION = "EXTERNAL_ASSERTION"
+
+
+# Higher value = stronger basis. PASS with weaker basis cannot satisfy a stronger required basis.
+BASIS_STRENGTH: dict[EvidenceBasis, int] = {
+    EvidenceBasis.HEURISTIC_RETRIEVAL: 10,
+    EvidenceBasis.EXTERNAL_ASSERTION: 20,
+    EvidenceBasis.STRUCTURAL_COMPARISON: 30,
+    EvidenceBasis.EXECUTED_TEST: 40,
+    EvidenceBasis.ELABORATOR_EXTRACTED: 50,
+    EvidenceBasis.KERNEL_CHECKED: 60,
+    EvidenceBasis.HUMAN_ATTESTED: 70,
+}
+
+
+def basis_satisfies(actual: EvidenceBasis, required: EvidenceBasis) -> bool:
+    """Return True when ``actual`` is at least as strong as ``required``."""
+    return BASIS_STRENGTH[actual] >= BASIS_STRENGTH[required]
+
+
+class EvidenceCoverage(StrictModel):
+    """Declared-scope coverage for a finding (CLOSURE-010)."""
+
+    requested_subject_count: int = Field(default=0, ge=0)
+    evaluated_subject_count: int = Field(default=0, ge=0)
+    excluded_subject_count: int = Field(default=0, ge=0)
+    exclusion_reasons: list[str] = Field(default_factory=list)
+    complete_for_declared_scope: bool = False
+    # Explicit opt-in: incomplete coverage may PASS only when this is True.
+    allows_partial_pass: bool = False
+
+
+class SubjectReference(StrictModel):
+    kind: str = Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")
+    ref: str = Field(min_length=1, max_length=1024)
 
 
 class Severity(StrEnum):
@@ -187,7 +248,7 @@ class ObligationsFile(VersionedStrictModel):
 
         def visit(node: str, visiting: set[str], path: list[str]) -> list[str] | None:
             if node in visiting:
-                return path[path.index(node) :] + [node]
+                return [*path[path.index(node) :], node]
             if node in visited:
                 return None
             visiting.add(node)
@@ -209,14 +270,13 @@ class ObligationsFile(VersionedStrictModel):
         return None
 
     @model_validator(mode="after")
-    def validate_graph(self) -> "ObligationsFile":
+    def validate_graph(self) -> ObligationsFile:
         ids = [o.obligation_id for o in self.obligations]
         if len(ids) != len(set(ids)):
             raise ValueError("obligation IDs must be unique")
         known = set(ids)
         graph = {
-            obligation.obligation_id: list(obligation.downstream)
-            for obligation in self.obligations
+            obligation.obligation_id: list(obligation.downstream) for obligation in self.obligations
         }
         for obligation in self.obligations:
             unknown = set(obligation.downstream) - known
@@ -226,14 +286,10 @@ class ObligationsFile(VersionedStrictModel):
                     f"{sorted(unknown)}"
                 )
             if obligation.obligation_id in obligation.downstream:
-                raise ValueError(
-                    f"{obligation.obligation_id} cannot depend downstream on itself"
-                )
+                raise ValueError(f"{obligation.obligation_id} cannot depend downstream on itself")
         cycle = self._find_obligation_cycle(graph)
         if cycle is not None:
-            raise ValueError(
-                "obligation downstream graph contains a cycle: " + " -> ".join(cycle)
-            )
+            raise ValueError("obligation downstream graph contains a cycle: " + " -> ".join(cycle))
         return self
 
 
@@ -302,7 +358,7 @@ class CandidateDescriptor(VersionedStrictModel):
     generator: GeneratorProvenance
 
     @model_validator(mode="after")
-    def validate_source(self) -> "CandidateDescriptor":
+    def validate_source(self) -> CandidateDescriptor:
         if self.head_commit is None and self.patch_path is None and self.patch_text is None:
             raise ValueError("one of head_commit, patch_path, or patch_text is required")
         return self
@@ -319,9 +375,21 @@ class Provenance(StrictModel):
     elapsed_ms: int = Field(ge=0)
     deterministic: bool = True
     provider_metadata: dict[str, Any] = Field(default_factory=dict)
+    # ProvenanceV2 enrichment (CLOSURE-010); optional for 0.1.0 compatibility.
+    producer_id: str | None = None
+    producer_version: str | None = None
+    run_manifest_hash: str | None = None
+    environment_keys_forwarded: list[str] = Field(default_factory=list)
+    image_digest: str | None = None
+    toolchain_hash: str | None = None
+    input_artifact_hashes: list[str] = Field(default_factory=list)
+    output_artifact_hashes: list[str] = Field(default_factory=list)
+    random_seed: str | None = None
 
 
 class EvidenceFinding(StrictModel):
+    """Evidence finding with additive 0.2.0 basis/coverage fields (CLOSURE-010)."""
+
     finding_id: str
     check_id: str
     check_version: str
@@ -331,6 +399,40 @@ class EvidenceFinding(StrictModel):
     summary: str
     details: dict[str, Any] = Field(default_factory=dict)
     provenance: Provenance
+    basis: EvidenceBasis | None = None
+    coverage: EvidenceCoverage | None = None
+    subject_refs: list[SubjectReference] = Field(default_factory=list)
+    # Typed FindingPayload union (spec §10.1) or legacy bare dict without discriminator.
+    payload: Annotated[
+        Any | None,
+        BeforeValidator(_coerce_finding_payload),
+    ] = None
+    artifact_refs: list[str] = Field(default_factory=list)
+    required_basis: EvidenceBasis | None = None
+    # Spec §10.1 EvidenceFindingV2 — optional so historical packets still load.
+    snapshot_fingerprint: str | None = None
+
+    @model_validator(mode="after")
+    def enforce_basis_and_coverage_rules(self) -> EvidenceFinding:
+        if self.status is FindingStatus.PASS:
+            if (
+                self.coverage is not None
+                and not self.coverage.complete_for_declared_scope
+                and not self.coverage.allows_partial_pass
+            ):
+                raise ValueError(
+                    f"incomplete coverage cannot silent-PASS (check_id={self.check_id!r})"
+                )
+            if (
+                self.basis is not None
+                and self.required_basis is not None
+                and not basis_satisfies(self.basis, self.required_basis)
+            ):
+                raise ValueError(
+                    f"PASS with basis {self.basis.value} cannot satisfy required "
+                    f"basis {self.required_basis.value} (check_id={self.check_id!r})"
+                )
+        return self
 
 
 class ReviewQuestion(StrictModel):
@@ -343,6 +445,24 @@ class ReviewQuestion(StrictModel):
     supporting_finding_ids: list[str] = Field(default_factory=list)
     # Explicit M6 comparison id (deterministic scaffold; no learning until §21).
     baseline_id: str = "deterministic_baseline.v1"
+
+
+class UncertaintyRecord(StrictModel):
+    """Typed unresolved uncertainty entry (spec §10.4 EvidencePacketV2)."""
+
+    code: str = Field(min_length=1, max_length=128)
+    message: str = Field(min_length=1, max_length=4096)
+    check_id: str | None = None
+    dimension: EvidenceDimension | None = None
+
+
+class HardGateResult(StrictModel):
+    """Structured hard-gate outcome (spec §10.4); mirrors GateDecision fields."""
+
+    passed: bool
+    hard_failures: list[str] = Field(default_factory=list)
+    unresolved_hard_checks: list[str] = Field(default_factory=list)
+    reasons: list[str] = Field(default_factory=list)
 
 
 class EvidencePacket(VersionedStrictModel):
@@ -364,7 +484,61 @@ class EvidencePacket(VersionedStrictModel):
     # Optional ledger seal / chain tip recorded when the packet is linked to a
     # ledger snapshot (warehouse / review record). Not present at compile time.
     ledger_seal_tip: str | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # 0.2.0: synthesis/gates policy id joins recommendation policy (CLOSURE-015).
+    recommendation_policy_id: str | None = None
+    # EvidencePacketV2 additive fields (CLOSURE-010/011). ``run_manifest`` is a
+    # canonical dump of workspace.RunManifest to avoid import cycles; readers
+    # may re-validate via ``lpe.workspace.models.RunManifest``.
+    run_manifest: dict[str, Any] | None = None
+    coverage_summary: dict[str, EvidenceCoverage] = Field(default_factory=dict)
+    hard_gate: HardGateResult | None = None
+    uncertainty_records: list[UncertaintyRecord] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class FixtureEntry(StrictModel):
+    """One executable or structural fixture in a suite manifest (CLOSURE-013)."""
+
+    fixture_id: str
+    path: str
+    expected_exit: int = 0
+    expected_diagnostics: list[str] = Field(default_factory=list)
+    expected_diagnostic_regex: str | None = None
+    basis: EvidenceBasis = EvidenceBasis.EXECUTED_TEST
+    run_on: str = Field(default="candidate", pattern=r"^(base|candidate|both)$")
+    timeout_seconds: int = Field(default=120, ge=1, le=86400)
+    obligation_ids: list[str] = Field(default_factory=list)
+    semantic_interpretation: str | None = None
+    command_kind: str = "lake_env_lean"
+
+
+class FixtureSuite(VersionedStrictModel):
+    """YAML suite for examples / counterexamples (schema fixture-suite)."""
+
+    suite_id: str
+    obligation_ids: list[str] = Field(min_length=1)
+    fixtures: list[FixtureEntry] = Field(min_length=1)
+    suite_kind: str = Field(default="examples", pattern=r"^(examples|counterexamples)$")
+
+
+class SuccessorEntry(StrictModel):
+    """One downstream successor test (CLOSURE-014 / §11.6)."""
+
+    successor_id: str
+    command: list[str] = Field(min_length=1)
+    module: str | None = None
+    declarations: list[str] = Field(default_factory=list)
+    required: bool = True
+    path: str | None = None
+    timeout_seconds: int = Field(default=300, ge=1, le=86400)
+
+
+class SuccessorSuite(VersionedStrictModel):
+    """Successor suite manifest for paired base/candidate runs."""
+
+    suite_id: str
+    obligation_ids: list[str] = Field(min_length=1)
+    successors: list[SuccessorEntry] = Field(min_length=1)
 
 
 class ReviewDecision(VersionedStrictModel):
@@ -378,7 +552,7 @@ class ReviewDecision(VersionedStrictModel):
     answer: dict[str, Any] = Field(default_factory=dict)
     required_repair: str | None = None
     review_minutes: float = Field(gt=0)
-    submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    submitted_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class UtilityEvent(VersionedStrictModel):
@@ -387,7 +561,7 @@ class UtilityEvent(VersionedStrictModel):
     project_id: str
     artifact_id: str
     obligation_id: str | None = None
-    occurred_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     actor_id: str
     payload: dict[str, Any] = Field(default_factory=dict)
     supersedes_event_id: str | None = None

@@ -21,9 +21,7 @@ runner = CliRunner()
 def test_evidence_compile_skip_build_cli(
     example_project: Path, repository_root: Path, tmp_path: Path
 ) -> None:
-    candidate = (
-        repository_root / "examples" / "candidates" / "R3-definition-change.json"
-    )
+    candidate = repository_root / "examples" / "candidates" / "R3-definition-change.json"
     output = tmp_path / "packet.json"
     markdown = tmp_path / "packet.md"
     result = runner.invoke(
@@ -57,9 +55,7 @@ def test_compile_review_ledger_tppr_path(
     tmp_path: Path,
 ) -> None:
     """End-to-end fixture path without Docker/Lean: skip-build + REJECT review + TPPR."""
-    candidate = (
-        repository_root / "examples" / "candidates" / "R3-definition-change.json"
-    )
+    candidate = repository_root / "examples" / "candidates" / "R3-definition-change.json"
     packet_path = tmp_path / "packet.json"
     compile_result = runner.invoke(
         app,
@@ -152,9 +148,7 @@ def test_compile_review_ledger_tppr_path(
     assert report["weighted_accepted_sustained_obligations"] == 0
 
 
-def test_review_expert_time_emits_hours_for_tppr(
-    example_project: Path, tmp_path: Path
-) -> None:
+def test_review_expert_time_emits_hours_for_tppr(example_project: Path, tmp_path: Path) -> None:
     """Regression: review record must store hours so TPPR does not KeyError."""
     ledger = tmp_path / "ledger.db"
     decision = ReviewDecision(
@@ -167,9 +161,7 @@ def test_review_expert_time_emits_hours_for_tppr(
         rationale="hours payload regression",
         review_minutes=30.0,
     )
-    record_review_decision(
-        ledger, decision, project_id="example-category-project"
-    )
+    record_review_decision(ledger, decision, project_id="example-category-project")
     store = LedgerStore(ledger)
     events = store.events("example-category-project")
     expert = next(e for e in events if e.event_type is EventType.EXPERT_TIME_RECORDED)

@@ -46,9 +46,7 @@ from lpe.paths import PathTraversalError, assert_safe_repo_relative
         "\\\\server\\share",
     ],
 )
-def test_assert_safe_repo_relative_rejects_adversarial(
-    tmp_path: Path, relative: str
-) -> None:
+def test_assert_safe_repo_relative_rejects_adversarial(tmp_path: Path, relative: str) -> None:
     with pytest.raises(PathTraversalError):
         assert_safe_repo_relative(tmp_path, relative)
 

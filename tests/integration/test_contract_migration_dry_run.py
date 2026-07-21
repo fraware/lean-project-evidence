@@ -12,13 +12,14 @@ from typer.testing import CliRunner
 
 from lpe.cli import app
 from lpe.contract.migration import dry_run_contract_migration
-from lpe.models import SCHEMA_VERSION
+from lpe.models import LEGACY_SCHEMA_VERSION, SCHEMA_VERSION
 
 runner = CliRunner()
 
 
-def test_dry_run_no_op_when_already_current(example_project: Path) -> None:
-    report = dry_run_contract_migration(example_project, target_version=SCHEMA_VERSION)
+def test_dry_run_no_op_when_already_at_target(example_project: Path) -> None:
+    # Example contracts remain on 0.1.0 while SCHEMA_VERSION is 0.2.0.
+    report = dry_run_contract_migration(example_project, target_version=LEGACY_SCHEMA_VERSION)
     assert report["ok"] is True
     assert report["action"] == "no_op"
     assert report["mutated"] is False
@@ -26,9 +27,15 @@ def test_dry_run_no_op_when_already_current(example_project: Path) -> None:
     assert "18_CONTRACT_MIGRATION" in report["bump_path"]
 
 
-def test_dry_run_refuses_unsupported_target(
-    example_project: Path, tmp_path: Path
-) -> None:
+def test_dry_run_would_rewrite_0_1_to_current(example_project: Path) -> None:
+    report = dry_run_contract_migration(example_project, target_version=SCHEMA_VERSION)
+    assert report["ok"] is True
+    assert report["action"] == "would_rewrite"
+    assert report["mutated"] is False
+    assert len(report["files_to_rewrite"]) == 5
+
+
+def test_dry_run_refuses_unsupported_target(example_project: Path, tmp_path: Path) -> None:
     dest = tmp_path / "proj"
     shutil.copytree(example_project, dest)
     before = {
@@ -41,11 +48,11 @@ def test_dry_run_refuses_unsupported_target(
             "review.yaml",
         )
     }
-    report = dry_run_contract_migration(dest, target_version="0.2.0")
+    report = dry_run_contract_migration(dest, target_version="0.3.0")
     assert report["ok"] is False
     assert report["action"] == "would_refuse"
     assert report["mutated"] is False
-    assert report["target_version"] == "0.2.0"
+    assert report["target_version"] == "0.3.0"
     after = {
         name: (dest / ".lean-project-contract" / name).read_text(encoding="utf-8")
         for name in before
@@ -64,12 +71,12 @@ def test_dry_run_would_rewrite_when_files_differ(
     monkeypatch.setattr(
         models,
         "SUPPORTED_SCHEMA_VERSIONS",
-        frozenset({SCHEMA_VERSION, "0.1.1"}),
+        frozenset({SCHEMA_VERSION, LEGACY_SCHEMA_VERSION, "0.1.1"}),
     )
     monkeypatch.setattr(
         migration,
         "SUPPORTED_SCHEMA_VERSIONS",
-        frozenset({SCHEMA_VERSION, "0.1.1"}),
+        frozenset({SCHEMA_VERSION, LEGACY_SCHEMA_VERSION, "0.1.1"}),
     )
 
     report = dry_run_contract_migration(dest, target_version="0.1.1")
@@ -80,12 +87,19 @@ def test_dry_run_would_rewrite_when_files_differ(
     raw = yaml.safe_load(
         (dest / ".lean-project-contract" / "project.yaml").read_text(encoding="utf-8")
     )
-    assert raw["schema_version"] == SCHEMA_VERSION
+    assert raw["schema_version"] == LEGACY_SCHEMA_VERSION
 
 
 def test_cli_migrate_dry_run(example_project: Path) -> None:
     result = runner.invoke(
-        app, ["contract", "migrate-dry-run", str(example_project), "--to", SCHEMA_VERSION]
+        app,
+        [
+            "contract",
+            "migrate-dry-run",
+            str(example_project),
+            "--to",
+            LEGACY_SCHEMA_VERSION,
+        ],
     )
     assert result.exit_code == 0, result.stdout
     data = json.loads(result.stdout)

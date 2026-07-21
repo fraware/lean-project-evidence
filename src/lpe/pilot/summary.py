@@ -53,9 +53,7 @@ class PilotSummary:
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
-        payload["conditions"] = {
-            tag: asdict(bucket) for tag, bucket in self.conditions.items()
-        }
+        payload["conditions"] = {tag: asdict(bucket) for tag, bucket in self.conditions.items()}
         return payload
 
 
@@ -92,9 +90,7 @@ def summarize_pilot(
     candidates: dict[str, dict[str, Any]] = {}
     minutes_by_category: dict[str, float] = defaultdict(float)
     minutes_by_condition: dict[str, float] = defaultdict(float)
-    outcomes_by_condition: dict[str, dict[str, int]] = defaultdict(
-        lambda: defaultdict(int)
-    )
+    outcomes_by_condition: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     overhead_snapshots: list[dict[str, Any]] = []
     reproduction_exact = 0
     reproduction_known = 0
@@ -165,7 +161,7 @@ def summarize_pilot(
                     reproduction_exact += 1
 
     conditions: dict[str, ConditionBucket] = {}
-    for cid, meta in candidates.items():
+    for _cid, meta in candidates.items():
         tag = str(meta.get("condition_tag") or "untagged")
         if tag not in conditions:
             conditions[tag] = ConditionBucket(condition_tag=tag)
@@ -184,12 +180,8 @@ def summarize_pilot(
         conditions[tag].outcomes = dict(outcomes)
 
     candidate_count = len(candidates)
-    automated_count = sum(
-        1 for meta in candidates.values() if meta.get("packet_automated")
-    )
-    automation_rate = (
-        automated_count / candidate_count if candidate_count else 0.0
-    )
+    automated_count = sum(1 for meta in candidates.values() if meta.get("packet_automated"))
+    automation_rate = automated_count / candidate_count if candidate_count else 0.0
 
     return PilotSummary(
         project_id=project_id,

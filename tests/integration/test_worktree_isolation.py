@@ -104,20 +104,27 @@ def test_compile_cleans_worktree_even_when_build_raises(
     path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
 
     created: list[Path] = []
-    real_create = create_isolated_worktree
+    from lpe.workspace.snapshots import create_snapshot_pair
+
+    real_create = create_snapshot_pair
 
     def tracking_create(*args, **kwargs):  # type: ignore[no-untyped-def]
-        session = real_create(*args, **kwargs)
-        created.append(session.worktree_path)
-        return session
+        pair = real_create(*args, **kwargs)
+        created.append(pair.candidate_path)
+        return pair
 
-    monkeypatch.setattr("lpe.evidence.compiler.create_isolated_worktree", tracking_create)
+    monkeypatch.setattr("lpe.workspace.manager.create_snapshot_pair", tracking_create)
+    monkeypatch.setattr("lpe.evidence.compiler.create_snapshot_pair", tracking_create)
     monkeypatch.setattr(DockerSandboxExecutor, "is_available", staticmethod(lambda: False))
 
     class ExplodingExecutor:
         def verify_build(self, **kwargs):  # type: ignore[no-untyped-def]
             raise RuntimeError("simulated build failure")
 
+        def run(self, **kwargs):  # type: ignore[no-untyped-def]
+            raise RuntimeError("simulated build failure")
+
+    monkeypatch.setattr("lpe.workspace.manager.SubprocessLeanExecutor", ExplodingExecutor)
     monkeypatch.setattr("lpe.evidence.compiler.SubprocessLeanExecutor", ExplodingExecutor)
 
     candidate = CandidateDescriptor(
@@ -177,7 +184,18 @@ def test_compile_uses_worktree_path_for_build(
                 timed_out=False,
             )
 
+        def run(self, **kwargs):  # type: ignore[no-untyped-def]
+            workspace = kwargs["workspace"]
+            return self.verify_build(
+                repository=Path(workspace.candidate_path),
+                command=list(kwargs["command"].argv),
+                timeout_seconds=kwargs["resource_profile"].timeout_seconds,
+                max_output_bytes=kwargs["resource_profile"].max_output_bytes,
+                environment_allowlist=kwargs.get("environment_allowlist") or [],
+            )
+
     monkeypatch.setattr(DockerSandboxExecutor, "is_available", staticmethod(lambda: False))
+    monkeypatch.setattr("lpe.workspace.manager.SubprocessLeanExecutor", CapturingExecutor)
     monkeypatch.setattr("lpe.evidence.compiler.SubprocessLeanExecutor", CapturingExecutor)
 
     candidate = CandidateDescriptor(

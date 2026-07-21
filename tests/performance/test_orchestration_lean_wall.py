@@ -41,9 +41,7 @@ def _candidate() -> CandidateDescriptor:
                 public=True,
             )
         ],
-        generator=GeneratorProvenance(
-            generator_type="test", name="orch-wall", version="0"
-        ),
+        generator=GeneratorProvenance(generator_type="test", name="orch-wall", version="0"),
     )
 
 

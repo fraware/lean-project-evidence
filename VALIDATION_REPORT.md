@@ -2,7 +2,9 @@
 
 ## Release
 
-Lean Project Evidence engineering scaffold `0.1.0` (post security-hardening Phases 1–5 + Weeks 1–4 + toolchain extraction + elaborator dependency IR schema 1.1 + E2E Lake compile path + optional `lpe-lean:4.14` Docker sandbox + audit gap closure fixture-excellence).
+Lean Project Evidence engineering scaffold `0.2.0` (Phase A–C closure engineering
+present; Phase D–E engineering present under Unreleased toward 0.3.0; formal
+acceptance checklists still open — see `docs/closure/REMAINING_ACCEPTANCE.md`).
 
 ## Honesty preamble
 
@@ -13,12 +15,12 @@ Mirror audit non-claims in `docs/26_SPEC_ROADMAP_AUDIT.md` §9.
 
 ## Completed checks (current)
 
-- **583 unit + integration + security + performance + longevity + pilot warehouse/dry-run + partner scaffold + durability/adapter + property tests** collected under default `pytest -q` (`-m "not slow"`; **583 passed**, 1 env-gated GitHub Check E2E skipped when unset, 1 slow deselected). Prior baseline was **575**. `@pytest.mark.lean` runs when Lake/Lean is installed; otherwise skips. `@pytest.mark.docker` retries `docker info` briefly before skipping when the daemon is down. Docker Lean E2E (`lpe-lean:4.14`) does not require host Lake for extract; prefers one combined sandbox invocation (`sandbox_invocations: 1`). See `docs/23_TEST_EXECUTION_LOG.md`.
+- **693+ unit + integration + security + performance + longevity + pilot warehouse/dry-run + partner scaffold + durability/adapter + property tests** collected under `pytest -q -m "not slow and not lean and not docker"` (**693 passed** after closure gap pass, 1 env-gated GitHub Check E2E skipped when unset, 29 lean/docker/slow deselected on this host). Includes synthetic §21 pass/fail golden fixtures and compatibility-matrix selection workflow tests. Default `pytest -q` (`-m "not slow"`) additionally collects lean/docker-marked tests that skip when tooling is absent. Prior engineering baseline was **583** under default `not slow`. `@pytest.mark.lean` runs when Lake/Lean is installed; otherwise skips. `@pytest.mark.docker` retries `docker info` briefly before skipping when the daemon is down. Docker Lean E2E (`lpe-lean:4.14`) does not require host Lake for extract; prefers one combined sandbox invocation (`sandbox_invocations: 1`). See `docs/23_TEST_EXECUTION_LOG.md`.
 - **R0/R1 ACCEPT E2E (Docker):** with `lpe-lean:4.14`, sandboxed build+extract yields toolchain-complete packets; R0 docs-only can gate-`ACCEPT`; R1 policy-`ESCALATE` then authorized human ACCEPT; ledger + TPPR sustained path. R3/R4 ACCEPT still refused (ADR 0003).
 - **E2E Lean path (host):** real `lake build` without `--skip-build` on `tests/fixtures/lean_project/` via `--insecure-host-exec` produces toolchain-complete axiom/impact findings (schema 1.1). Default Docker image lacks Lean — isolation PASS under Docker does not imply typecheck.
 - **E2E Lean path (Docker):** with local image `LPE_DOCKER_IMAGE=lpe-lean:4.14` (`docker/lpe-lean/`, built on this host), `network_policy: deny` yields sandboxed Lake build+extract in one container, isolation PASS, and toolchain-complete findings. Image absent → test skips via `docker image inspect` (pytest never rebuilds).
 - **Multi-module fixture:** LibA→LibB→LibC→Cross (+ Consumer fan-in) hand-audited cones under `@pytest.mark.lean` (Docker when image present). No Mathlib.
-- 11 JSON Schemas exported and validated as Draft 2020-12 schemas.
+- 20 JSON Schemas under `schemas/` exported and validated as Draft 2020-12 schemas.
 - Split example Project Contract loads; `lpe contract validate` and `lpe contract schema-check` pass.
 - Obligation references, uniqueness, and cycle detection covered.
 - Risk/gate matrix: R3 definition-change escalates; `hard_gate_passed` false on UNKNOWN hard checks.
@@ -42,7 +44,7 @@ Mirror audit non-claims in `docs/26_SPEC_ROADMAP_AUDIT.md` §9.
 
 | Area | Status |
 |------|--------|
-| Contracts / schemas / IDs | Working for `schema_version` 0.1.0 |
+| Contracts / schemas / IDs | Working for `schema_version` 0.1.0 (readable) and 0.2.0 (writers emit) |
 | Evidence compile (skip_build) | Deterministic findings + fail-closed uncertainty |
 | Evidence compile (Lean E2E) | Host-exec Lake → toolchain-complete; optional `lpe-lean:4.14` Docker → isolation PASS + typecheck; R0/R1 ACCEPT review path when image present |
 | Docker sandbox path | Preferred when Docker available; rw mount default; isolation PASS only after sandboxed build; Lean image optional |
@@ -95,7 +97,7 @@ Mirror audit non-claims in `docs/26_SPEC_ROADMAP_AUDIT.md` §9.
 
 ## Engineering test-complete (§9.1)
 
-Scaffold `0.1.x` meets the **engineering** exit criteria in `docs/22_COMPREHENSIVE_TEST_PLAN.md` §9.1 (automated coverage, longevity 10k, honest validation report). This does **not** imply §9.2 research clearance.
+Package `0.2.0` meets the **engineering** exit criteria in `docs/22_COMPREHENSIVE_TEST_PLAN.md` §9.1 (automated coverage, longevity 10k, honest validation report). Formal release-acceptance checklists remain open (`docs/closure/REMAINING_ACCEPTANCE.md`). This does **not** imply §9.2 research clearance or a tagged release claim.
 
 ## Explicit non-claims (audit §9 mirror)
 
@@ -106,8 +108,8 @@ Canonical list: [`docs/28_NON_CLAIMS.md`](docs/28_NON_CLAIMS.md).
 - No WORM / external root of trust for the utility ledger.
 - No R3/R4 auto-ACCEPT.
 - No opaque quality scalars (ADR 0002).
-- Partner pilot / §21 remain deferred until humans and frozen protocol exist.
-- M6/M7 training entrypoints do not exist (`lpe research status` / `lpe routing` exit non-zero).
+- Partner pilot / §21 remain deferred until humans and frozen protocol exist; ready to *instrument*, not to *claim*.
+- M6/M7 training entrypoints do not exist (`lpe research status` / `lpe routing` / `lpe research train` exit non-zero / raise `ResearchGateBlocked`).
 
 ## Execution boundary
 

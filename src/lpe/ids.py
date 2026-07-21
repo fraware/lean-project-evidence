@@ -21,5 +21,5 @@ def validate_id_format(identifier: str, prefix: str) -> bool:
     expected_prefix = f"{prefix}_"
     if not identifier.startswith(expected_prefix):
         return False
-    suffix = identifier[len(expected_prefix):]
+    suffix = identifier[len(expected_prefix) :]
     return len(suffix) == 32 and all(char in "0123456789abcdef" for char in suffix)

@@ -1,0 +1,32 @@
+schema_version: 0.3.0
+protocol_id: proto.example-partner.v1
+project_id: example-partner
+repository_remote: https://github.com/example/partner-lean.git
+repository_commit_at_freeze: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+contract_freeze_id: contract-freeze-example-1
+sample_size_min: 30
+sample_size_max: 50
+recruitment_window_start: '2026-08-01'
+recruitment_window_end: '2026-10-31'
+persistence_followup_days: 30
+condition_design:
+  control_pct: 40
+  instrumented_pct: 40
+  shadow_pct: 20
+  block_size: 5
+endpoints:
+  primary_operational: weighted_accepted_with_quorum / (H_review + H_repair)
+  primary_safety: proportion_adjudicated_L2_L3_before_integration
+  primary_north_star: tppr_v2_by_condition
+  secondary:
+  - median_review_minutes
+  - automation_rate
+exclusion_rules:
+- rule_id: ex-author
+  description: Author cannot review own candidate
+stopping_rules:
+- rule_id: stop-safety
+  description: Stop instrumented arm on additional integrated L3
+held_out_set_hash: f175aed8e6a767abce1a5b1769fd825c59b3461b9d79f77bad4a476d6a30c07e
+analysis_plan_hash: 9a1fd6532e58e3c499bb14d8bdd18f517bea3980b2ceecb083523535c18eb240
+reviewer_roster_hash: f3e5c1f0b8fa99bdd4475e044acdd4a99b341252596c558ee4a21d109686dc20

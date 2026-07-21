@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from lpe.pilot.overhead import OverheadReport
@@ -52,8 +52,7 @@ class FieldOverheadEntry:
             within_budget=report.within_budget,
             budget_fraction=budget_fraction,
             category=OVERHEAD_CATEGORY,
-            recorded_at=recorded_at
-            or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            recorded_at=recorded_at or datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             note=note,
             candidate_id=candidate_id,
             condition_tag=condition_tag,

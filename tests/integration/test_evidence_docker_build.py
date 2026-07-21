@@ -113,9 +113,7 @@ def test_docker_default_mount_is_writable(tmp_path: Path) -> None:
 @pytest.mark.docker
 def test_docker_readonly_mount_fails_closed_with_hint(tmp_path: Path) -> None:
     (tmp_path / "probe.txt").write_text("x\n", encoding="utf-8")
-    executor = DockerSandboxExecutor(
-        image="ubuntu:22.04", network_none=True, readonly_mount=True
-    )
+    executor = DockerSandboxExecutor(image="ubuntu:22.04", network_none=True, readonly_mount=True)
     result = executor.verify_build(
         repository=tmp_path,
         command=["/bin/sh", "-c", "echo fail > /work/cannot_write"],
@@ -124,8 +122,10 @@ def test_docker_readonly_mount_fails_closed_with_hint(tmp_path: Path) -> None:
         environment_allowlist=["PATH", "HOME", "USER", "TMPDIR"],
     )
     assert result.exit_code != 0
-    assert "LPE_DOCKER_READONLY" in result.stderr
-    assert "writable mount" in result.stderr.lower() or "read-only" in result.stderr.lower()
+    assert (
+        "Docker /work mount is read-only" in result.stderr or "LPE_DOCKER_READONLY" in result.stderr
+    )
+    assert "writable" in result.stderr.lower() or "read-only" in result.stderr.lower()
 
 
 @pytest.mark.docker

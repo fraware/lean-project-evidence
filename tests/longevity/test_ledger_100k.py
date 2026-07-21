@@ -41,6 +41,5 @@ def test_ledger_100k_append_sample_verify_and_export(tmp_path: Path) -> None:
     assert written == N_100K
     assert verified == N_100K
     assert elapsed_s <= LEDGER_100K_EXPORT_S, (
-        f"100k export+verify took {elapsed_s:.3f}s; "
-        f"soft ceiling {LEDGER_100K_EXPORT_S}s"
+        f"100k export+verify took {elapsed_s:.3f}s; soft ceiling {LEDGER_100K_EXPORT_S}s"
     )

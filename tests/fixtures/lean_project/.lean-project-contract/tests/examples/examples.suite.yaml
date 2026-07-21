@@ -1,0 +1,13 @@
+schema_version: 0.2.0
+suite_id: examples-o01-v1
+suite_kind: examples
+obligation_ids: [O-01]
+fixtures:
+  - fixture_id: helper-ok
+    path: .lean-project-contract/tests/examples/helper_ok.lean
+    expected_exit: 0
+    expected_diagnostics: []
+    basis: EXECUTED_TEST
+    run_on: candidate
+    timeout_seconds: 120
+    command_kind: lake_env_lean

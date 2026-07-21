@@ -124,11 +124,7 @@ def _t(*parts: str) -> str:
         ),
     ],
 )
-
-
-def test_redact_secrets_corpus_replaces_known_shapes(
-    raw: str, must_not_appear: str
-) -> None:
+def test_redact_secrets_corpus_replaces_known_shapes(raw: str, must_not_appear: str) -> None:
     """Invariant: known secret shapes never survive redaction into evidence logs."""
     out = redact_secrets(raw)
     assert must_not_appear not in out

@@ -155,11 +155,12 @@ def test_e2e_host_exec_toolchain_complete_packet(tmp_path: Path) -> None:
     # Body-only change that still builds; keep well-formed FQN candidate (no
     # head_commit so git enrichment does not replace FQNs with short names).
     _bump_helper(project)
-    # Commit the change for a real git-backed tree, but omit head_commit so
-    # self-declared FQN declarations drive the impact cone.
-    _commit_all(project, "bump helper")
+    # Commit the change and evaluate at head (candidate snapshot = head tree).
+    head = _commit_all(project, "bump helper")
 
-    candidate = _helper_candidate(base_commit=base, head_commit=None)
+    candidate = _helper_candidate(base_commit=base, head_commit=head)
+    # Head-based candidates do not need illustrative patch_text.
+    candidate = candidate.model_copy(update={"patch_text": None})
     packet = compile_evidence(
         project,
         candidate,
@@ -194,9 +195,7 @@ def test_e2e_host_exec_toolchain_complete_packet(tmp_path: Path) -> None:
     assert isolation.details.get("skip_build") is False
     assert isolation.details.get("extract_executor") == "SubprocessLeanExecutor"
 
-    replacement = next(
-        f for f in packet.findings if f.check_id == "downstream.replacement_tests"
-    )
+    replacement = next(f for f in packet.findings if f.check_id == "downstream.replacement_tests")
     assert replacement.details.get("toolchain_backed") is True
     assert replacement.details.get("successor_count", 0) >= 1
     # With Lake on PATH, structured check should PASS (hash + lake env).
@@ -222,17 +221,18 @@ def test_e2e_git_worktree_cleanup_and_persisted_extraction(
     (project / "dirty-uncommitted.txt").write_text("dirt\n", encoding="utf-8")
 
     created: list[Path] = []
-    from lpe.execution.worktree import create_isolated_worktree
+    from lpe.workspace.snapshots import create_snapshot_pair
 
-    real_create = create_isolated_worktree
+    real_create = create_snapshot_pair
 
     def tracking_create(*args, **kwargs):  # type: ignore[no-untyped-def]
-        session = real_create(*args, **kwargs)
-        created.append(session.worktree_path)
-        assert not (session.worktree_path / "dirty-uncommitted.txt").exists()
-        return session
+        pair = real_create(*args, **kwargs)
+        created.append(pair.candidate_path)
+        assert not (pair.candidate_path / "dirty-uncommitted.txt").exists()
+        return pair
 
-    monkeypatch.setattr("lpe.evidence.compiler.create_isolated_worktree", tracking_create)
+    monkeypatch.setattr("lpe.workspace.manager.create_snapshot_pair", tracking_create)
+    monkeypatch.setattr("lpe.evidence.compiler.create_snapshot_pair", tracking_create)
     monkeypatch.setattr(DockerSandboxExecutor, "is_available", staticmethod(lambda: False))
 
     # head_commit forces worktree + git enrichment (short names). FQN resolution
@@ -321,7 +321,8 @@ def test_docker_without_lean_image_isolation_honest_not_skip_build(
         ),
     )
 
-    candidate = _helper_candidate(base_commit=base, head_commit=None)
+    candidate = _helper_candidate(base_commit=base, head_commit=base)
+    candidate = candidate.model_copy(update={"patch_text": None})
     packet = compile_evidence(
         project,
         candidate,

@@ -21,9 +21,7 @@ runner = CliRunner()
 def test_warehouse_durable_across_store_restart(tmp_path: Path) -> None:
     ledger = tmp_path / "pilot.sqlite3"
     store = LedgerStore(ledger)
-    warehouse = PilotWarehouse(
-        store, actor_id="pilot-operator", project_id="proj-a"
-    )
+    warehouse = PilotWarehouse(store, actor_id="pilot-operator", project_id="proj-a")
     warehouse.register_candidate(
         candidate_id="c1",
         obligation_ids=["O-01"],
@@ -63,12 +61,8 @@ def test_warehouse_durable_across_store_restart(tmp_path: Path) -> None:
 def test_warehouse_summary_aggregates_by_condition(tmp_path: Path) -> None:
     store = LedgerStore(tmp_path / "pilot.sqlite3")
     wh = PilotWarehouse(store, actor_id="ops", project_id="proj")
-    wh.register_candidate(
-        candidate_id="a", obligation_ids=["O-01"], condition_tag="control"
-    )
-    wh.register_candidate(
-        candidate_id="b", obligation_ids=["O-01"], condition_tag="instrumented"
-    )
+    wh.register_candidate(candidate_id="a", obligation_ids=["O-01"], condition_tag="control")
+    wh.register_candidate(candidate_id="b", obligation_ids=["O-01"], condition_tag="instrumented")
     wh.mark_packet_automated(candidate_id="b", condition_tag="instrumented")
     wh.record_expert_time(
         candidate_id="a", category="review", minutes=10.0, condition_tag="control"
@@ -84,9 +78,7 @@ def test_warehouse_summary_aggregates_by_condition(tmp_path: Path) -> None:
         condition_tag="control",
         decision="REQUEST_REPAIR",
     )
-    overhead = OverheadReport.compute(
-        baseline_minutes=100.0, instrumented_minutes=105.0
-    )
+    overhead = OverheadReport.compute(baseline_minutes=100.0, instrumented_minutes=105.0)
     wh.record_overhead_snapshot(artifact_id="corpus", report=overhead)
 
     summary = summarize_pilot(LedgerStore(tmp_path / "pilot.sqlite3"), project_id="proj")
@@ -234,14 +226,10 @@ def test_overhead_category_excluded_from_tppr_denominator(tmp_path: Path) -> Non
     )
     wh.record_overhead_snapshot(
         artifact_id="corpus",
-        report=OverheadReport.compute(
-            baseline_minutes=100.0, instrumented_minutes=110.0
-        ),
+        report=OverheadReport.compute(baseline_minutes=100.0, instrumented_minutes=110.0),
     )
     events = LedgerStore(tmp_path / "pilot.sqlite3").events("proj")
-    assert any(
-        e.payload.get("category") == OVERHEAD_CATEGORY for e in events
-    )
+    assert any(e.payload.get("category") == OVERHEAD_CATEGORY for e in events)
     report = compute_tppr(events, "proj")
     # Only review hour counts; overhead is exclusion, not denominator.
     assert report.expert_hours_total == pytest.approx(1.0)

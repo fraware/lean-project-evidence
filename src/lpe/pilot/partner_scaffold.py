@@ -62,7 +62,8 @@ def _readme(project_id: str, ledger_name: str) -> str:
 **Status:** Ready to *instrument* — **not** ready to *claim* causal utility or §21 clearance.
 
 - **Project id (suggested):** `{project_id}`
-- **Ledger path:** `ledger/{ledger_name}` (created empty; first `lpe pilot record` initializes SQLite)
+- **Ledger path:** `ledger/{ledger_name}`
+  (created empty; first `lpe pilot record` initializes SQLite)
 - **Scaffold:** `{SCAFFOLD_VERSION}`
 
 ## Quick start
@@ -87,7 +88,8 @@ lpe pilot overhead --ledger ledger/{ledger_name} --project-id {project_id} \\
   --note "packet compile + UI wall clock"
 
 # Aggregate software metrics only
-lpe pilot summary ledger/{ledger_name} --project-id {project_id} --format both --output ./reports/out
+lpe pilot summary ledger/{ledger_name} --project-id {project_id} \\
+  --format both --output ./reports/out
 ```
 
 ## Required reading
@@ -106,8 +108,7 @@ def _non_claims() -> str:
     from lpe.honesty.non_claims import NON_CLAIMS_MARKDOWN
 
     return (
-        NON_CLAIMS_MARKDOWN
-        + "\nCopy this block into any external report until the analysis plan "
+        NON_CLAIMS_MARKDOWN + "\nCopy this block into any external report until the analysis plan "
         "is frozen and domain-lead + research-lead gates clear.\n"
     )
 
@@ -232,9 +233,10 @@ def _field_log_template() -> str:
 Use one row (or ledger append) per candidate. Keep **review minutes** and
 **instrumentation wall-clock** in separate columns / commands.
 
-| Date | Candidate | Condition | Obligation IDs | Review minutes (category) | Wall overhead baseline | Wall overhead instrumented | Notes |
+| Date | Candidate | Condition | Obligation IDs | Review minutes |
+| Wall overhead baseline | Wall overhead instrumented | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| | | control / instrumented / shadow | | review / repair / … | | | |
+| | | control / instrumented / shadow | | review / repair / ... | | | |
 
 Commands:
 
@@ -274,18 +276,12 @@ def init_partner_pilot(
     (ledger_dir / ".gitkeep").write_text("", encoding="utf-8")
     (overhead_dir / ".gitkeep").write_text("", encoding="utf-8")
 
-    (root / "README.md").write_text(
-        _readme(project_id, ledger_name), encoding="utf-8"
-    )
+    (root / "README.md").write_text(_readme(project_id, ledger_name), encoding="utf-8")
     (root / "NON_CLAIMS.md").write_text(_non_claims(), encoding="utf-8")
     (root / "PROTOCOL_LINKS.md").write_text(_protocol_links(), encoding="utf-8")
     (root / "condition_tags.json").write_text(_condition_tags_json(), encoding="utf-8")
-    (root / "analysis_plan.md").write_text(
-        _analysis_plan_stub(project_id), encoding="utf-8"
-    )
-    (reports_dir / "field_log_template.md").write_text(
-        _field_log_template(), encoding="utf-8"
-    )
+    (root / "analysis_plan.md").write_text(_analysis_plan_stub(project_id), encoding="utf-8")
+    (reports_dir / "field_log_template.md").write_text(_field_log_template(), encoding="utf-8")
 
     # Prefer copying the canonical report template when the repo layout is known.
     report_src = _find_repo_doc("docs/pilot_report_template.md")
@@ -294,8 +290,7 @@ def init_partner_pilot(
         report_dst.write_text(report_src.read_text(encoding="utf-8"), encoding="utf-8")
     else:
         report_dst.write_text(
-            "# Pilot report template\n\n"
-            "See repository `docs/pilot_report_template.md`.\n",
+            "# Pilot report template\n\nSee repository `docs/pilot_report_template.md`.\n",
             encoding="utf-8",
         )
 
@@ -310,9 +305,7 @@ def init_partner_pilot(
         "ready_to_claim": False,
         "analysis_plan_status": ANALYSIS_PLAN_STATUS_UNFROZEN,
     }
-    (root / "scaffold.json").write_text(
-        json.dumps(meta, indent=2) + "\n", encoding="utf-8"
-    )
+    (root / "scaffold.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
 
     # Do not pre-create an empty .sqlite3 file (invalid DB). First
     # ``lpe ledger init`` / ``lpe pilot record`` creates the store.
@@ -363,9 +356,7 @@ def validate_partner_scaffold(root: Path) -> ScaffoldValidation:
                 if required not in tags:
                     errors.append(f"condition_tags.json missing tag {required!r}")
             if data.get("section_21_cleared") is True:
-                errors.append(
-                    "condition_tags.json must not claim section_21_cleared=true"
-                )
+                errors.append("condition_tags.json must not claim section_21_cleared=true")
         except (json.JSONDecodeError, TypeError, AttributeError) as exc:
             errors.append(f"condition_tags.json invalid: {exc}")
     else:

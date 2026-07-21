@@ -12,7 +12,6 @@ from lpe.lean.extractor import (
     lean_toolchain_available,
 )
 
-
 MATHLIB_SCALE_WARNING = (
     "not Mathlib-scale: fixture / project toolchain extraction is not "
     "elaborator-complete Mathlib evidence; do not claim Mathlib-scale kernel truth"

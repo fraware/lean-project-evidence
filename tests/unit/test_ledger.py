@@ -136,6 +136,7 @@ def test_ledger_export_hash_tamper_detected(tmp_path: Path) -> None:
     with pytest.raises(LedgerIntegrityError, match="invalid event_hash"):
         LedgerStore.verify_exported_jsonl(export_path)
 
+
 def test_ledger_concurrent_appends_preserve_integrity(tmp_path: Path) -> None:
     path = tmp_path / "ledger.sqlite3"
     store = LedgerStore(path)

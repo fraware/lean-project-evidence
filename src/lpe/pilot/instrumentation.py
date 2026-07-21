@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -14,7 +14,7 @@ class PilotCandidate:
     project_id: str
     obligation_ids: list[str]
     condition_tag: str
-    registered_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    registered_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     packet_automated: bool = False
     reproduction_exact: bool | None = None
 
@@ -25,7 +25,7 @@ class ExpertTimeEvent:
     category: str
     minutes: float
     condition_tag: str
-    recorded_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    recorded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class PilotInstrumentation:

@@ -1,0 +1,449 @@
+{
+  "$defs": {
+    "DeclarationEdge": {
+      "additionalProperties": false,
+      "description": "Dependency edge as ``(dependee, depender)`` — dependee is used by depender.",
+      "properties": {
+        "dependee": {
+          "title": "Dependee",
+          "type": "string"
+        },
+        "depender": {
+          "title": "Depender",
+          "type": "string"
+        }
+      },
+      "required": [
+        "dependee",
+        "depender"
+      ],
+      "title": "DeclarationEdge",
+      "type": "object"
+    },
+    "DeclarationRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "fqn": {
+          "title": "Fqn",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "axiom",
+            "theorem",
+            "opaque",
+            "definition",
+            "inductive",
+            "constructor",
+            "recursor",
+            "instance",
+            "abbrev",
+            "structure",
+            "class"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "module": {
+          "title": "Module",
+          "type": "string"
+        },
+        "source_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Path"
+        },
+        "source_start_line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Start Line"
+        },
+        "source_start_column": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Start Column"
+        },
+        "public_visibility": {
+          "default": "unknown",
+          "enum": [
+            "public",
+            "protected",
+            "private",
+            "internal",
+            "unknown"
+          ],
+          "title": "Public Visibility",
+          "type": "string"
+        },
+        "type_pretty": {
+          "default": "",
+          "title": "Type Pretty",
+          "type": "string"
+        },
+        "type_expr_hash": {
+          "default": "",
+          "title": "Type Expr Hash",
+          "type": "string"
+        },
+        "value_expr_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Expr Hash"
+        },
+        "universe_params": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Universe Params",
+          "type": "array"
+        },
+        "attributes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Attributes",
+          "type": "array"
+        },
+        "axioms_used": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Axioms Used",
+          "type": "array"
+        }
+      },
+      "required": [
+        "fqn",
+        "kind",
+        "module"
+      ],
+      "title": "DeclarationRecord",
+      "type": "object"
+    },
+    "ExtractionCompleteness": {
+      "additionalProperties": false,
+      "description": "Per-dimension completeness — never collapse to a single global bool (§9.7).",
+      "properties": {
+        "environment_loaded": {
+          "default": false,
+          "title": "Environment Loaded",
+          "type": "boolean"
+        },
+        "all_project_modules_imported": {
+          "default": false,
+          "title": "All Project Modules Imported",
+          "type": "boolean"
+        },
+        "declaration_types_complete": {
+          "default": false,
+          "title": "Declaration Types Complete",
+          "type": "boolean"
+        },
+        "declaration_values_available_where_exposed": {
+          "default": false,
+          "title": "Declaration Values Available Where Exposed",
+          "type": "boolean"
+        },
+        "axiom_collection_complete_for_loaded_environment": {
+          "default": false,
+          "title": "Axiom Collection Complete For Loaded Environment",
+          "type": "boolean"
+        },
+        "source_positions_complete": {
+          "default": false,
+          "title": "Source Positions Complete",
+          "type": "boolean"
+        },
+        "known_limitations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Known Limitations",
+          "type": "array"
+        }
+      },
+      "title": "ExtractionCompleteness",
+      "type": "object"
+    },
+    "ExtractionError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "actionable": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actionable"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ExtractionError",
+      "type": "object"
+    },
+    "ImportEdge": {
+      "additionalProperties": false,
+      "description": "Module import edge as ``(imported, importing)``.",
+      "properties": {
+        "imported": {
+          "title": "Imported",
+          "type": "string"
+        },
+        "importing": {
+          "title": "Importing",
+          "type": "string"
+        }
+      },
+      "required": [
+        "imported",
+        "importing"
+      ],
+      "title": "ImportEdge",
+      "type": "object"
+    },
+    "ModuleRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "source_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Path"
+        },
+        "imported": {
+          "default": true,
+          "title": "Imported",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ModuleRecord",
+      "type": "object"
+    },
+    "PlaceholderRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "token": {
+          "title": "Token",
+          "type": "string"
+        },
+        "declaration": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Declaration"
+        },
+        "module": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Module"
+        },
+        "source_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Path"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line"
+        }
+      },
+      "required": [
+        "token"
+      ],
+      "title": "PlaceholderRecord",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Protocol v2 extraction artifact (§9.5).",
+  "properties": {
+    "schema_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "snapshot_fingerprint": {
+      "title": "Snapshot Fingerprint",
+      "type": "string"
+    },
+    "lean_version": {
+      "default": "",
+      "title": "Lean Version",
+      "type": "string"
+    },
+    "lake_version": {
+      "default": "",
+      "title": "Lake Version",
+      "type": "string"
+    },
+    "toolchain_spec": {
+      "default": "",
+      "title": "Toolchain Spec",
+      "type": "string"
+    },
+    "imported_modules": {
+      "items": {
+        "$ref": "#/$defs/ModuleRecord"
+      },
+      "title": "Imported Modules",
+      "type": "array"
+    },
+    "declarations": {
+      "items": {
+        "$ref": "#/$defs/DeclarationRecord"
+      },
+      "title": "Declarations",
+      "type": "array"
+    },
+    "declaration_dependency_edges": {
+      "items": {
+        "$ref": "#/$defs/DeclarationEdge"
+      },
+      "title": "Declaration Dependency Edges",
+      "type": "array"
+    },
+    "import_edges": {
+      "items": {
+        "$ref": "#/$defs/ImportEdge"
+      },
+      "title": "Import Edges",
+      "type": "array"
+    },
+    "axioms_by_declaration": {
+      "additionalProperties": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "title": "Axioms By Declaration",
+      "type": "object"
+    },
+    "placeholders": {
+      "items": {
+        "$ref": "#/$defs/PlaceholderRecord"
+      },
+      "title": "Placeholders",
+      "type": "array"
+    },
+    "errors": {
+      "items": {
+        "$ref": "#/$defs/ExtractionError"
+      },
+      "title": "Errors",
+      "type": "array"
+    },
+    "completeness": {
+      "$ref": "#/$defs/ExtractionCompleteness"
+    },
+    "extractor": {
+      "default": "lean.generic-inject",
+      "title": "Extractor",
+      "type": "string"
+    },
+    "extractor_version": {
+      "default": "0.1.0",
+      "title": "Extractor Version",
+      "type": "string"
+    },
+    "notes": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Notes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "snapshot_fingerprint"
+  ],
+  "title": "LeanExtractionResultV2",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/2.0/lean-extraction-v2.schema.json"
+}

@@ -12,8 +12,9 @@ import json
 import re
 import shutil
 import subprocess
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping
+from typing import Any
 
 # Sentinels that must never be POSTed as head_sha (dry-run plan also refuses).
 _REFUSED_HEAD_SHAS = frozenset({"", "mock-sha", "unavailable-sha"})
@@ -113,9 +114,7 @@ def build_check_run_api_argv(
     if not owner_clean or not repo_clean:
         raise GitHubSubmitError("owner and repo must be non-empty")
     if "/" in owner_clean or "/" in repo_clean:
-        raise GitHubSubmitError(
-            "owner and repo must be separate arguments (not 'owner/repo')"
-        )
+        raise GitHubSubmitError("owner and repo must be separate arguments (not 'owner/repo')")
     endpoint = f"repos/{owner_clean}/{repo_clean}/check-runs"
     return [
         "gh",
@@ -210,7 +209,5 @@ def parse_owner_repo(slug: str) -> tuple[str, str]:
     """Parse ``owner/repo`` into components."""
     parts = slug.strip().split("/")
     if len(parts) != 2 or not parts[0] or not parts[1]:
-        raise GitHubSubmitError(
-            f"expected owner/repo slug, got {slug!r}"
-        )
+        raise GitHubSubmitError(f"expected owner/repo slug, got {slug!r}")
     return parts[0], parts[1]

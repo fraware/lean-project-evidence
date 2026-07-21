@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.3.0/section21-gates.schema.json",
+  "title": "Section21GateReport",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "data_lock_hash",
+    "gates",
+    "shadow_pilot_passed",
+    "learned_routing_authorized",
+    "synthesis_authorized",
+    "blocking_reasons",
+    "evaluator_version"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.3.0" },
+    "protocol_id": { "type": "string" },
+    "data_lock_hash": { "type": "string" },
+    "gates": { "type": "array" },
+    "shadow_pilot_passed": { "type": "boolean" },
+    "learned_routing_authorized": { "type": "boolean" },
+    "synthesis_authorized": { "type": "boolean" },
+    "blocking_reasons": { "type": "array", "items": { "type": "string" } },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "evaluator_version": { "type": "string" },
+    "report_hash": { "type": "string" }
+  }
+}

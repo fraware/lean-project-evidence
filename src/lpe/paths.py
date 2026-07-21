@@ -38,9 +38,7 @@ def _reject_encoded_or_control(text: str, *, label: str) -> None:
             )
     for ch in _DOT_LOOKALIKES:
         if ch in text:
-            raise PathTraversalError(
-                f"{label} must not contain Unicode lookalike dots: {text!r}"
-            )
+            raise PathTraversalError(f"{label} must not contain Unicode lookalike dots: {text!r}")
 
 
 def assert_safe_repo_relative(repository: Path, relative: str, *, label: str = "path") -> Path:
@@ -69,7 +67,5 @@ def assert_safe_repo_relative(repository: Path, relative: str, *, label: str = "
     repo = repository.resolve()
     resolved = (repo / text).resolve()
     if resolved != repo and not resolved.is_relative_to(repo):
-        raise PathTraversalError(
-            f"{label} escapes repository root: {relative!r} → {resolved}"
-        )
+        raise PathTraversalError(f"{label} escapes repository root: {relative!r} → {resolved}")
     return resolved

@@ -50,19 +50,19 @@ def test_exported_schemas_are_valid(repository_root: Path) -> None:
 
 
 def test_exported_schemas_match_models(repository_root: Path) -> None:
-  script = repository_root / "scripts" / "export_schemas.py"
-  result = subprocess.run(
-      [sys.executable, str(script)],
-      cwd=repository_root,
-      capture_output=True,
-      text=True,
-      check=True,
-  )
-  assert result.returncode == 0
-  schema_dir = repository_root / "schemas"
-  for path in sorted(schema_dir.glob("*.schema.json")):
-      schema = json.loads(path.read_text(encoding="utf-8"))
-      Draft202012Validator.check_schema(schema)
+    script = repository_root / "scripts" / "export_schemas.py"
+    result = subprocess.run(
+        [sys.executable, str(script)],
+        cwd=repository_root,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert result.returncode == 0
+    schema_dir = repository_root / "schemas"
+    for path in sorted(schema_dir.glob("*.schema.json")):
+        schema = json.loads(path.read_text(encoding="utf-8"))
+        Draft202012Validator.check_schema(schema)
 
 
 @pytest.mark.parametrize("model_cls", VERSIONED_MODELS)

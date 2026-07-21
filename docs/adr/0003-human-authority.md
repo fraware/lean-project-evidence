@@ -6,7 +6,14 @@ Accepted.
 
 ## Decision
 
-`R3` and `R4` artifacts require authorized human acceptance in version 0.
+`R3` and `R4` artifacts require authorized human acceptance. Automatic
+acceptance for `R3`/`R4` remains impossible.
+
+Single-reviewer `lpe review record` refuses `R3`/`R4` ACCEPT.
+
+Qualified human acceptance for `R3`/`R4` is allowed only through the
+multi-attestation quorum path (`lpe review attest` + `lpe review accept-quorum`)
+with distinct eligible reviewers per dimension.
 
 ## Rationale
 

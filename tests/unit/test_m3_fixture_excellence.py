@@ -51,11 +51,7 @@ def test_regex_stub_impact_and_axioms_never_pass(example_project: Path) -> None:
 
 def test_ambiguous_short_name_surfaces_warning() -> None:
     extraction = AdaptiveLeanExtractor()._regex.extract_repository(FIXTURE)
-    decls = [
-        ChangedDeclaration(
-            name="twin", kind="definition", path="", signature_changed=True
-        )
-    ]
+    decls = [ChangedDeclaration(name="twin", kind="definition", path="", signature_changed=True)]
     _resolved, warnings = resolve_changed_names_detailed(decls, extraction)
     assert any("ambiguous" in w for w in warnings)
 

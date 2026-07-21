@@ -73,9 +73,7 @@ def test_ledger_export_tamper_detected_on_previous_hash(tmp_path: Path) -> None:
     lines = export_path.read_text(encoding="utf-8").strip().splitlines()
     records = [json.loads(line) for line in lines]
     records[1]["previous_hash"] = "deadbeef" * 8
-    export_path.write_text(
-        "\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8"
-    )
+    export_path.write_text("\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8")
     with pytest.raises(LedgerIntegrityError, match="previous_hash"):
         LedgerStore.verify_exported_jsonl(export_path)
 

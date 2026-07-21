@@ -181,7 +181,11 @@ def test_resolve_changed_names_short_to_fqn() -> None:
     """Git short names map to module FQNs when extraction is available."""
     from types import SimpleNamespace
 
-    from lpe.lean.extractor import LeanDeclaration, LeanExtractionResult, resolve_changed_names_for_cone
+    from lpe.lean.extractor import (
+        LeanDeclaration,
+        LeanExtractionResult,
+        resolve_changed_names_for_cone,
+    )
 
     extraction = LeanExtractionResult(
         declarations=[
@@ -224,7 +228,11 @@ def test_resolve_changed_names_short_to_fqn() -> None:
 def test_resolve_changed_names_keeps_existing_fqn() -> None:
     from types import SimpleNamespace
 
-    from lpe.lean.extractor import LeanDeclaration, LeanExtractionResult, resolve_changed_names_for_cone
+    from lpe.lean.extractor import (
+        LeanDeclaration,
+        LeanExtractionResult,
+        resolve_changed_names_for_cone,
+    )
 
     extraction = LeanExtractionResult(
         declarations=[
@@ -243,9 +251,7 @@ def test_resolve_changed_names_keeps_existing_fqn() -> None:
     decls = [
         SimpleNamespace(name="LpeFixture.Core.helper", path="LpeFixture/Core.lean"),
     ]
-    assert resolve_changed_names_for_cone(decls, extraction) == {
-        "LpeFixture.Core.helper"
-    }
+    assert resolve_changed_names_for_cone(decls, extraction) == {"LpeFixture.Core.helper"}
 
 
 def test_placeholders_extracted_from_body() -> None:

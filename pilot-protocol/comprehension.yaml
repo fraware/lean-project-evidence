@@ -1,0 +1,10 @@
+config_id: comprehension.example.v1
+calibration_case_ids:
+- ext-cal-01
+- ext-cal-02
+- ext-cal-03
+- ext-cal-04
+- ext-cal-05
+pass_threshold_material: 4
+pass_threshold_basis: 4
+max_attempts: 2

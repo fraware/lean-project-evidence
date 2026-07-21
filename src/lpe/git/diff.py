@@ -62,7 +62,10 @@ def _is_public_path(path: str, public_api_prefixes: tuple[str, ...]) -> bool:
     if not public_api_prefixes:
         return False
     normalized = path.replace("\\", "/")
-    return any(normalized.startswith(prefix.rstrip("/") + "/") or normalized == prefix for prefix in public_api_prefixes)
+    return any(
+        normalized.startswith(prefix.rstrip("/") + "/") or normalized == prefix
+        for prefix in public_api_prefixes
+    )
 
 
 def classify_added_declarations(
@@ -102,6 +105,8 @@ def classify_added_declarations(
     for key in sorted(all_keys):
         path, name = key.split("::", 1)
         kind_name = added.get(key) or removed.get(key)
+        if kind_name is None:
+            continue
         kind = KIND_MAP[kind_name]
         is_new = key in added and key not in removed
         is_removed = key in removed and key not in added

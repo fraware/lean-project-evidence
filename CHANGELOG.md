@@ -1,10 +1,63 @@
 # Changelog
 
-## Unreleased
+## Unreleased — toward 0.3.0 (pilot readiness engineering)
+
+Phase D–E engineering for CLOSURE-018–032 is present on the tree. **Package
+version remains `0.2.0`** until formal release-acceptance checklists close
+(see `docs/closure/REMAINING_ACCEPTANCE.md`). This section is **not** a `0.3.0`
+tag claim: no partner study, causal TPPR improvement, or §21 clearance.
+
+### Added
+
+- **TPPR v2 (CLOSURE-025):** `src/lpe/metrics/tppr_v2.py` + `schemas/tppr-report-v2.schema.json`; credit-once lifecycle; numerator/denominator audit tables; anti-gaming fail-closed; `lpe tppr compute-v2`.
+- **Pilot protocol bundle (CLOSURE-026):** `src/lpe/pilot/protocol.py`; freeze refuses blanks; `lpe pilot protocol-init` / `freeze-protocol`.
+- **Assignment (CLOSURE-027):** blocked 2:2:1 HMAC-SHA256 shuffle; `lpe pilot assign`.
+- **Comprehension (CLOSURE-028):** five-case calibration scoring with one retry / primary exclusion.
+- **Data lock (CLOSURE-029):** `lpe pilot lock` verifies protocol, ledger, off-host seal, held-out, assignment, analysis image digest.
+- **Analysis + §21 gates (CLOSURE-030):** `lpe pilot analyze`; `lpe research evaluate-gates` writes `Section21GateReport`; fail-closed on missing observables; M6/M7 authorization flags default false; **synthetic sealed pass/fail golden fixtures** (`tests/fixtures/section21/`, `tests/unit/test_section21_golden.py`) — not live pilot data.
+- **GitHub Check productization (CLOSURE-031):** fail-closed ESCALATE; clear missing-auth errors; CI job `github-check-e2e` always visible and skips cleanly without secrets; `docs/github_check_e2e.md`.
+- **Docs/version/inventory sync (CLOSURE-032):** `scripts/check_version_sync.py`, `scripts/sync_repository_inventory.py` (REPOSITORY_TREE + MANIFEST drift), `scripts/check_milestone_status.py`.
+- **Repair / adjudication CLI (CLOSURE-024):** `lpe review repair-lineage` / `repair-request` / `repair-complete` / `adjudicate`.
+- **Phase F scaffolding (CLOSURE-033–036):** `docs/closure/PHASE_F_OPERATOR_STEPS.md` + `PILOT_OPERATOR_RUNBOOK.md` — operator workflows only; no sealed live pilot dataset claimed.
+- **Phase G blocked (CLOSURE-037–038):** documented in `MILESTONE_STATUS.json`; training entrypoints remain `ResearchGateBlocked`.
+- **Remaining acceptance tracker:** `docs/closure/REMAINING_ACCEPTANCE.md` with honest gap matrix.
+- **§19 engineering closure:** `scripts/verify_wheel.py`, `scripts/generate_sbom.py`, `scripts/validate_compatibility_matrix.py`, `scripts/check_doc_links.py`; scheduled Lean/Docker workflow replaced echo stub with skip-clean real jobs; macOS/Windows best-effort on every PR (`continue-on-error`); CI coverage gate hard via `scripts/check_coverage_gates.py` (lines ≥90%, critical packages ≥95%, branch ≥85%).
+- **Extract defaults doc:** `docs/closure/EXTRACT_DEFAULTS.md`; generic extract auto-on when safe; CLI `--paired-extract` / `--prefer-generic-extract`.
+- **EvidencePacket V2 additive fields:** `run_manifest`, `coverage_summary`, `hard_gate`, `uncertainty_records`; finding `snapshot_fingerprint`.
 
 ### Changed
 
-- **Validation baseline:** `pytest -q -m "not slow"` — **583 passed**, 1 env-gated skip, 1 slow deselected (was 575).
+- Semantic / downstream / fixture providers emit stable finding IDs (`finding_<check>_<subject>_<version>`).
+- `docs/closure/MILESTONE_STATUS.json` keeps `current_release: 0.2.0`; downgrades thin IDs (006/008/009/017/004) to documented partials; `0.4.0 = needs_partner`; M6/M7 `authorized: false`.
+- Lexical risk fallback floors at R1 (never R0 auto-accept).
+- CI: version/docs sync, repository inventory drift, dedicated-repo Check E2E path, wheel smoke, SBOM recipe, compatibility matrix validate; §19 coverage/typing gates merge-gated.
+- Compatibility matrix: fixture supported; external projects recorded as selected candidates with `pending_live_validation` SHAs (not claimed complete).
+- Repository hygiene: root coverage dumps, wheels, caches, and local `.lpe/` CAS pollution removed from the working tree; `.gitignore` expanded so they do not return.
+
+## 0.2.0 — Evidence integrity (engineering)
+
+Engineering release for Phase A–C closure work (CLOSURE-001–017). This is **not** a claim that the formal release-acceptance checklist or production readiness is complete; non-claims remain in force. Formal open items: `docs/closure/REMAINING_ACCEPTANCE.md`.
+
+### Added
+
+- **Evidence basis and coverage (CLOSURE-010):** `EvidenceBasis`, `EvidenceCoverage`, `subject_refs`, typed `payload`, and ProvenanceV2 enrichment on findings; PASS with weaker-than-required basis or incomplete coverage is refused.
+- **Fixture suite manifests (CLOSURE-013):** `schemas/fixture-suite.schema.json`; examples/counterexamples require YAML suites; unrelated Lean failure → UNKNOWN; expected diagnostics must match.
+- **Downstream successor suites (CLOSURE-014):** `src/lpe/providers/downstream.py` + successor-suite schema; paired base/candidate runs with enabled/regressed/unchanged reporting.
+- **Synthesis registry (CLOSURE-015):** `src/lpe/evidence/synthesis.py` versioned rules for `repository.api_fit`, `downstream.declared_use`, `semantic.intent_support`; recommendation policy id joins synthesis version; R3/R4 intent satisfaction requires `HUMAN_ATTESTED`.
+- **Schema 0.2.0 migration (CLOSURE-016):** writers emit `0.2.0`; `0.1.0` remains readable; golden packet migration marks `LEGACY_UNRESOLVED` and never invents acceptance/persistence.
+- **CI expansion (CLOSURE-017):** Python 3.12+3.13 Ubuntu matrix; schema drift `--check`; macOS/Windows best-effort on every PR; scheduled Lean/Docker/Mathlib/SBOM/longevity jobs (skip-clean when tooling absent); coverage gate evolved to hard lines ≥90% / critical ≥95% / branch ≥85% (see Unreleased); wheel smoke + SBOM recipe scripts.
+
+### Changed
+
+- Semantic statement diff prefers elaborated base/head types when available.
+- Duplicate retrieval separates exact type-hash matches from heuristic token similarity bases.
+- Package version `0.2.0` (no git tag until formal acceptance).
+
+## Historical notes (pre-0.2.0 engineering)
+
+### Changed
+
+- **Validation baseline:** `pytest -q -m "not slow"` — counts refreshed in `VALIDATION_REPORT.md`.
 - **Seal custody workflow:** `lpe ledger seal --seal` / `verify-seal --seal` write and verify from
   alternate (off-host / read-only) paths; CLI reports `colocated` + `storage_recommendation`;
   `lpe doctor --ledger` warns on missing seal **and** co-located default seals.
@@ -26,10 +79,8 @@
   errors for missing `gh`, auth failures, and sentinel `head_sha` (`mock-sha`,
   `unavailable-sha`); dry-run emits exact `argv` + `command_preview` + payload;
   ESCALATE remains fail-closed (`conclusion=failure`). Optional CI job
-  `github-check-e2e-optional` gated by `vars.LPE_GH_CHECK_E2E=1` (skips cleanly
-  if repo/SHA unset); default `python` job never requires secrets. Expanded
-  runbook `docs/github_check_e2e.md` (throwaway repo, branch protection, ADR
-  0003). Mocked `--post` integration test; live POST still env-gated.
+  gated by dedicated-repo vars (skips cleanly if unset); default `python` job
+  never requires secrets. Expanded runbook `docs/github_check_e2e.md`.
 - **Audit gap closure (honesty):** `VALIDATION_REPORT.md` baseline aligned;
   `docs/22` header refreshed; `ENGINEERING_SPEC` §4.2
   describes shipped M3–M4 interfaces with residual depth (not “fully deferred”);

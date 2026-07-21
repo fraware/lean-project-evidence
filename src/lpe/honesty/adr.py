@@ -12,7 +12,7 @@ ADR_0003_PATH = Path("docs/adr/0003-human-authority.md")
 
 
 def adr_0003_status(*, repository_root: Path | None = None) -> dict[str, Any]:
-    """Confirm ADR 0003 enforcement is active (R3/R4 ACCEPT refused)."""
+    """Confirm ADR 0003 enforcement is active (R3/R4 auto-accept refused)."""
     root = repository_root or Path.cwd()
     adr_path = root / ADR_0003_PATH
     r3_ok = can_record_acceptance(RiskClass.R3) is False
@@ -34,6 +34,8 @@ def adr_0003_status(*, repository_root: Path | None = None) -> dict[str, Any]:
         },
         "enforcement": (
             "lpe review record raises AuthorityError for R3/R4 ACCEPT; "
+            "R3/R4 human acceptance only via quorum (lpe review accept-quorum); "
+            "auto-accept for R3/R4 remains impossible; "
             "evidence gates force ESCALATE for R3/R4 even when hard checks PASS"
         ),
     }

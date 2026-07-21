@@ -33,9 +33,7 @@ def test_candidate_obligations_validate(example_project: Path) -> None:
 def test_candidate_obligations_reject_duplicates(example_project: Path) -> None:
     contract = load_contract(example_project)
     with pytest.raises(ContractError, match="duplicate obligation IDs"):
-        validate_candidate_obligations(
-            contract, "example-category-project", ["O-01", "O-01"]
-        )
+        validate_candidate_obligations(contract, "example-category-project", ["O-01", "O-01"])
 
 
 @pytest.mark.parametrize(

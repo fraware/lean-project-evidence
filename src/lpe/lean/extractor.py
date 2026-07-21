@@ -172,7 +172,7 @@ def _coerce_edges(raw: Any) -> list[tuple[str, str]]:
 class LeanExtractionResult:
     """JSON-serializable extraction protocol result.
 
-    Fields cover ISSUE-023–027 surfaces. ``complete`` is True only for
+    Fields cover ISSUE-023-027 surfaces. ``complete`` is True only for
     toolchain-backed extractions axiom/dependency closure.
 
     Schema 1.1 adds ``declaration_dependency_edges`` and ``import_edges``.
@@ -189,9 +189,7 @@ class LeanExtractionResult:
     # Schema 1.1: module→module (imported, importing).
     import_edges: list[tuple[str, str]] = field(default_factory=list)
     placeholders: list[str] = field(default_factory=list)
-    import_diff: dict[str, list[str]] = field(
-        default_factory=lambda: {"added": [], "removed": []}
-    )
+    import_diff: dict[str, list[str]] = field(default_factory=lambda: {"added": [], "removed": []})
     errors: list[str] = field(default_factory=list)
     extractor: str = REGEX_STUB_EXTRACTOR
     complete: bool = False
@@ -204,11 +202,7 @@ class LeanExtractionResult:
         if self.declaration_dependency_edges:
             return list(self.declaration_dependency_edges)
         decl_names = {d.name for d in self.declarations}
-        return [
-            (a, b)
-            for a, b in self.dependency_edges
-            if a in decl_names and b in decl_names
-        ]
+        return [(a, b) for a, b in self.dependency_edges if a in decl_names and b in decl_names]
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -263,9 +257,7 @@ class LeanExtractionResult:
         edges = _coerce_edges(data.get("dependency_edges"))
         decl_edges = _coerce_edges(data.get("declaration_dependency_edges"))
         import_edges = _coerce_edges(data.get("import_edges"))
-        has_v11_fields = (
-            "declaration_dependency_edges" in data or "import_edges" in data
-        )
+        has_v11_fields = "declaration_dependency_edges" in data or "import_edges" in data
         schema = str(
             data.get("extraction_schema_version")
             or (EXTRACTION_SCHEMA_V1_1 if has_v11_fields else EXTRACTION_SCHEMA_V1_0)
@@ -440,9 +432,7 @@ class RegexLeanExtractor:
             public = vis != "private"
             signature = _signature_from_header(header_line)
             # Body: from this header through the line before the next header.
-            end_line = (
-                decl_headers[idx + 1][0] - 1 if idx + 1 < len(decl_headers) else len(lines)
-            )
+            end_line = decl_headers[idx + 1][0] - 1 if idx + 1 < len(decl_headers) else len(lines)
             body = "\n".join(lines[line_no - 1 : end_line])
             placeholders = _find_placeholders(body)
             placeholders_all.extend(placeholders)
@@ -523,9 +513,7 @@ class RegexLeanExtractor:
             merged.axioms_used.extend(result.axioms_used)
             merged.imports.extend(result.imports)
             merged.dependency_edges.extend(result.dependency_edges)
-            merged.declaration_dependency_edges.extend(
-                result.declaration_dependency_edges
-            )
+            merged.declaration_dependency_edges.extend(result.declaration_dependency_edges)
             merged.import_edges.extend(result.import_edges)
             merged.placeholders.extend(result.placeholders)
             merged.errors.extend(result.errors)
@@ -537,9 +525,7 @@ class RegexLeanExtractor:
             short_index.setdefault(name.split(".")[-1], []).append(name)
 
         refined_edges: list[tuple[str, str]] = []
-        refined_import_edges: list[tuple[str, str]] = list(
-            dict.fromkeys(merged.import_edges)
-        )
+        refined_import_edges: list[tuple[str, str]] = list(dict.fromkeys(merged.import_edges))
         for dependee, depender in merged.dependency_edges:
             if dependee not in known:
                 # Module / import edge (dependee is not a declaration name).
@@ -556,9 +542,7 @@ class RegexLeanExtractor:
             if not path.is_file():
                 continue
             text = path.read_text(encoding="utf-8", errors="replace")
-            file_result = self.extract_text(
-                text, path=str(decl.path).replace("\\", "/")
-            )
+            file_result = self.extract_text(text, path=str(decl.path).replace("\\", "/"))
             local = next((d for d in file_result.declarations if d.name == decl.name), None)
             if local is None:
                 continue
@@ -778,6 +762,8 @@ class AdaptiveLeanExtractor:
     ) -> LeanExtractionResult:
         toolchain_available = lean_toolchain_available(repository)
         requires_toolchain = project_requires_toolchain(repository)
+        generic_errors: list[str] = []
+        generic_notes: list[str] = []
 
         def _regex_fallback(
             *,
@@ -789,10 +775,12 @@ class AdaptiveLeanExtractor:
                 lean_paths=lean_paths,
                 baseline_imports=baseline_imports,
             )
-            if errors:
-                regex_result.errors = list(errors) + list(regex_result.errors)
-            if notes:
-                regex_result.notes = list(dict.fromkeys([*notes, *regex_result.notes]))
+            merged_errors = list(generic_errors) + list(errors or [])
+            merged_notes = list(dict.fromkeys([*generic_notes, *(notes or [])]))
+            if merged_errors:
+                regex_result.errors = merged_errors + list(regex_result.errors)
+            if merged_notes:
+                regex_result.notes = list(dict.fromkeys([*merged_notes, *regex_result.notes]))
             regex_result.toolchain_available = toolchain_available or True
             # Declared extract projects stay incomplete on stub fallback.
             if requires_toolchain:
@@ -811,11 +799,7 @@ class AdaptiveLeanExtractor:
                     errors=list(loaded.errors),
                     notes=["toolchain JSON invalid; fell back to regex-stub"],
                 )
-            if (
-                loaded is not None
-                and loaded.extractor == TOOLCHAIN_EXTRACTOR
-                and not loaded.errors
-            ):
+            if loaded is not None and loaded.extractor == TOOLCHAIN_EXTRACTOR and not loaded.errors:
                 covers, missing = artifact_covers_lean_sources(loaded, repository)
                 if covers:
                     return _apply_path_filters(
@@ -829,20 +813,78 @@ class AdaptiveLeanExtractor:
                 )
                 if not (run_toolchain and toolchain_available):
                     loaded.complete = False
-                    loaded.errors = list(loaded.errors) + [
+                    loaded.errors = [
+                        *list(loaded.errors),
                         "stale lean-extraction.json does not cover current Lean "
-                        f"modules: {missing}"
+                        f"modules: {missing}",
                     ]
-                    loaded.notes.append(
-                        "refusing complete=true on stale artifact (fail closed)"
-                    )
+                    loaded.notes.append("refusing complete=true on stale artifact (fail closed)")
                     return _apply_path_filters(
                         loaded, lean_paths=lean_paths, baseline_imports=baseline_imports
                     )
-                # Fall through to Lake extract with force.
+                # Fall through to generic / Lake extract with force.
                 break
 
-        # 2) Invoke Lake/Lean helper to produce toolchain JSON when available.
+        # 2) Generic injected extractor (CLOSURE-006) when Lake is available.
+        # Default-on when the project does *not* declare ``lpe_extract`` (the
+        # generic injector is the product path for foreign Lake projects).
+        # Opt out with LPE_PREFER_GENERIC_EXTRACT=0; force on with =1 even when
+        # an ``lpe_extract`` target exists.
+        if run_toolchain and toolchain_available:
+            import os as _os
+
+            prefer_env = _os.environ.get("LPE_PREFER_GENERIC_EXTRACT", "").strip().lower()
+            if prefer_env in {"0", "false", "no", "off"}:
+                prefer_generic = False
+            elif prefer_env in {"1", "true", "yes", "on"}:
+                prefer_generic = True
+            else:
+                # Auto: default-on for projects without a dedicated extract target.
+                prefer_generic = not requires_toolchain
+            if prefer_generic:
+                from lpe.lean.generic import try_generic_extract
+                from lpe.lean.models import (
+                    UNSUPPORTED_TOOLCHAIN_CODE,
+                    v2_to_legacy_extraction,
+                )
+
+                try:
+                    v2 = try_generic_extract(
+                        repository,
+                        snapshot_fingerprint="adaptive",
+                    )
+                except Exception as exc:
+                    v2 = None
+                    generic_notes.append(f"generic injection raised: {exc}")
+                if v2 is not None:
+                    if v2.is_unsupported_toolchain:
+                        return LeanExtractionResult(
+                            errors=[
+                                f"{UNSUPPORTED_TOOLCHAIN_CODE}: {e.message}" for e in v2.errors
+                            ],
+                            extractor=REGEX_STUB_EXTRACTOR,
+                            complete=False,
+                            toolchain_available=True,
+                            notes=[
+                                *v2.notes,
+                                "UNSUPPORTED_TOOLCHAIN — regex-stub not authoritative",
+                            ],
+                            extraction_schema_version=EXTRACTION_SCHEMA_V1_1,
+                        )
+                    if not v2.has_blocking_errors and v2.completeness.environment_loaded:
+                        legacy = v2_to_legacy_extraction(v2)
+                        return _apply_path_filters(
+                            legacy,
+                            lean_paths=lean_paths,
+                            baseline_imports=baseline_imports,
+                        )
+                    generic_errors.extend(f"{e.code}: {e.message}" for e in v2.errors)
+                    generic_notes.extend(v2.notes)
+                    generic_notes.append(
+                        "generic injection incomplete; falling back to toolchain/regex paths"
+                    )
+
+        # 3) Invoke Lake/Lean helper to produce toolchain JSON when available.
         lake_result: LeanExtractionResult | None = None
         if run_toolchain and toolchain_available:
             from lpe.lean.toolchain import try_run_lake_extract
@@ -862,8 +904,9 @@ class AdaptiveLeanExtractor:
                         baseline_imports=baseline_imports,
                     )
                 lake_result.complete = False
-                lake_result.errors = list(lake_result.errors) + [
-                    f"fresh extract still missing modules: {missing}"
+                lake_result.errors = [
+                    *list(lake_result.errors),
+                    f"fresh extract still missing modules: {missing}",
                 ]
                 return _apply_path_filters(
                     lake_result, lean_paths=lean_paths, baseline_imports=baseline_imports
@@ -899,12 +942,10 @@ class AdaptiveLeanExtractor:
                     "project declares lpe_extract or ships schema≥1.1 complete "
                     "artifact but toolchain extraction is unavailable or incomplete"
                 ],
-                notes=[
-                    "toolchain-first policy: regex-stub path is incomplete only"
-                ],
+                notes=["toolchain-first policy: regex-stub path is incomplete only"],
             )
 
-        # 3) Lake env probe — confirms toolchain, does not fabricate decls.
+        # 4) Lake env probe — confirms toolchain, does not fabricate decls.
         probe = _try_lake_extract_env(repository)
         if probe is not None and probe.extractor == TOOLCHAIN_EXTRACTOR:
             return _apply_path_filters(
@@ -916,16 +957,20 @@ class AdaptiveLeanExtractor:
             lean_paths=lean_paths,
             baseline_imports=baseline_imports,
         )
-        result.toolchain_available = toolchain_available or (
-            probe.toolchain_available if probe is not None else False
-        ) or (lake_result.toolchain_available if lake_result is not None else False)
-        notes: list[str] = []
+        result.toolchain_available = (
+            toolchain_available
+            or (probe.toolchain_available if probe is not None else False)
+            or (lake_result.toolchain_available if lake_result is not None else False)
+        )
+        notes: list[str] = list(generic_notes)
         if lake_result is not None:
             notes.extend(lake_result.notes)
         if probe is not None:
             notes.extend(probe.notes)
         notes.extend(result.notes)
         result.notes = list(dict.fromkeys(notes))
+        if generic_errors:
+            result.errors = list(generic_errors) + list(result.errors)
         return result
 
 
@@ -959,9 +1004,7 @@ def resolve_changed_names_for_cone(
 
     See ``resolve_changed_names_detailed`` for ambiguity warnings.
     """
-    resolved, _warnings = resolve_changed_names_detailed(
-        changed_declarations, extraction
-    )
+    resolved, _warnings = resolve_changed_names_detailed(changed_declarations, extraction)
     return resolved
 
 

@@ -41,7 +41,7 @@
   "additionalProperties": false,
   "properties": {
     "schema_version": {
-      "default": "0.1.0",
+      "default": "0.2.0",
       "title": "Schema Version",
       "type": "string"
     },
@@ -56,5 +56,5 @@
   "title": "TerminologyFile",
   "type": "object",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.example.org/lpe/0.1.0/terminology.schema.json"
+  "$id": "https://schemas.example.org/lpe/0.2.0/terminology.schema.json"
 }

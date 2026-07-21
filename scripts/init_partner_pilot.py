@@ -20,8 +20,7 @@ from lpe.pilot.partner_scaffold import init_partner_pilot, validate_partner_scaf
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Create or validate a partner pilot working directory "
-            "(instrumentation only; not §21)."
+            "Create or validate a partner pilot working directory (instrumentation only; not §21)."
         )
     )
     parser.add_argument(

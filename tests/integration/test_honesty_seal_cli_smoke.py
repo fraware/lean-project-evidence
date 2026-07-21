@@ -47,18 +47,14 @@ def test_seal_alternate_path_cli_smoke(tmp_path: Path) -> None:
             payload={"smoke": True},
         )
     )
-    sealed = runner.invoke(
-        app, ["ledger", "seal", str(ledger), "--seal", str(seal)]
-    )
+    sealed = runner.invoke(app, ["ledger", "seal", str(ledger), "--seal", str(seal)])
     assert sealed.exit_code == 0, sealed.output
     payload = json.loads(sealed.stdout)
     assert payload["ok"] is True
     assert payload["colocated"] is False
     assert payload["not_worm"] is True
 
-    verified = runner.invoke(
-        app, ["ledger", "verify-seal", str(ledger), "--seal", str(seal)]
-    )
+    verified = runner.invoke(app, ["ledger", "verify-seal", str(ledger), "--seal", str(seal)])
     assert verified.exit_code == 0, verified.output
     assert json.loads(verified.stdout)["ok"] is True
 

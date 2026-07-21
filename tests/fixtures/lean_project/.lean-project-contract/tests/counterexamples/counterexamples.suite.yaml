@@ -1,0 +1,14 @@
+schema_version: 0.2.0
+suite_id: counterexamples-o01-v1
+suite_kind: counterexamples
+obligation_ids: [O-01]
+fixtures:
+  - fixture_id: bad-type
+    path: .lean-project-contract/tests/counterexamples/bad_type.lean
+    expected_exit: 1
+    expected_diagnostic_regex: "type mismatch|failed to synthesize|unknown identifier|error"
+    basis: EXECUTED_TEST
+    run_on: candidate
+    timeout_seconds: 120
+    semantic_interpretation: candidate must reject ill-typed use
+    command_kind: lake_env_lean

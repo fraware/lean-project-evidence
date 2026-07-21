@@ -67,9 +67,7 @@ def render_summary_markdown(summary: PilotSummary) -> str:
                 f"expert_minutes={bucket.expert_minutes:.2f}"
             )
             if bucket.outcomes:
-                outcomes = ", ".join(
-                    f"{k}={v}" for k, v in sorted(bucket.outcomes.items())
-                )
+                outcomes = ", ".join(f"{k}={v}" for k, v in sorted(bucket.outcomes.items()))
                 lines.append(f"  - outcomes: {outcomes}")
     else:
         lines.append("- (none)")

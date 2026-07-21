@@ -90,8 +90,7 @@ def test_pilot_frozen_corpus_dry_run_durable_warehouse(
 
     # Review path still wrote REQUEST_REPAIR into the same ledger.
     assert any(
-        e.event_type is EventType.REVIEW_SUBMITTED
-        and e.payload.get("decision") == "REQUEST_REPAIR"
+        e.event_type is EventType.REVIEW_SUBMITTED and e.payload.get("decision") == "REQUEST_REPAIR"
         for e in events
     )
 
@@ -142,9 +141,7 @@ def test_pilot_dry_run_cli(
 
 @pytest.mark.longevity
 def test_pilot_dry_run_docs_disclaim_section_21(repository_root: Path) -> None:
-    protocol = (repository_root / "docs" / "pilot_study_protocol.md").read_text(
-        encoding="utf-8"
-    )
+    protocol = (repository_root / "docs" / "pilot_study_protocol.md").read_text(encoding="utf-8")
     dry_run = repository_root / "docs" / "pilot_dry_run.md"
     assert dry_run.is_file(), "docs/pilot_dry_run.md must document dry-run honesty"
     text = dry_run.read_text(encoding="utf-8")

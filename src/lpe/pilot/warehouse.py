@@ -24,9 +24,7 @@ PILOT_PAYLOAD_SCHEMA = "pilot.warehouse.v1"
 PILOT_SOURCE = "pilot_warehouse"
 
 # Expert-time categories that contribute to TPPR (must match metrics.tppr).
-TPPR_TIME_CATEGORIES = frozenset(
-    {"specification", "review", "repair", "integration"}
-)
+TPPR_TIME_CATEGORIES = frozenset({"specification", "review", "repair", "integration"})
 
 # Overhead snapshots use a non-TPPR category so compute_tppr lists them in
 # exclusions rather than silently inflating the denominator.
@@ -193,9 +191,7 @@ class PilotWarehouse:
         expert-hours denominator (listed in ``exclusions``).
         """
         # Store instrumented wall delta as minutes for audit; TPPR ignores category.
-        delta_minutes = max(
-            0.0, report.instrumented_minutes - report.baseline_minutes
-        )
+        delta_minutes = max(0.0, report.instrumented_minutes - report.baseline_minutes)
         event = UtilityEvent(
             event_id=new_id("evt"),
             event_type=EventType.EXPERT_TIME_RECORDED,

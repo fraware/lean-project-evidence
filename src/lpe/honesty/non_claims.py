@@ -6,7 +6,8 @@ Software metrics from dry-runs / warehouse summaries are **not** causal TPPR,
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 # Stable ids — tests and doctors assert these remain present.
 NON_CLAIMS_ITEMS: tuple[dict[str, str], ...] = (
@@ -31,11 +32,13 @@ NON_CLAIMS_ITEMS: tuple[dict[str, str], ...] = (
     },
     {
         "id": "r3_r4_accept",
-        "claim": "R3/R4 production ACCEPT (ADR 0003)",
+        "claim": "R3/R4 auto-ACCEPT or single-reviewer production ACCEPT (ADR 0003)",
         "status": "refused",
         "detail": (
-            "`lpe review record` refuses ACCEPT for R3/R4. High-risk acceptance "
-            "remains an authorized human decision outside auto-accept paths."
+            "`lpe review record` refuses ACCEPT for R3/R4. Auto-accept remains "
+            "impossible. Qualified human acceptance requires distinct dimension "
+            "attestations via `lpe review attest` + `lpe review accept-quorum` "
+            "(still not a §21 / causal claim)."
         ),
     },
     {
@@ -113,8 +116,7 @@ def format_non_claims_block(*, as_markdown: bool = True) -> str:
         )
         for item in NON_CLAIMS_ITEMS:
             lines.append(
-                f"- **{item['id']}**: {item['claim']} — **{item['status']}**. "
-                f"{item['detail']}"
+                f"- **{item['id']}**: {item['claim']} — **{item['status']}**. {item['detail']}"
             )
         lines.append("")
     else:
@@ -149,7 +151,7 @@ def refuse_oversell_flags(
     /,
     **kwargs: Any,
 ) -> None:
-    """Fail closed if any flag implies §21 / causal / Mathlib / R3–R4 clearance.
+    """Fail closed if any flag implies §21 / causal / Mathlib / R3-R4 clearance.
 
     Call from pilot summary, dry-run, and research entrypoints before emitting
     metrics. Accepts a mapping and/or keyword arguments.
@@ -169,7 +171,7 @@ def refuse_oversell_flags(
                 offenders.append(norm)
     if offenders:
         raise OversellClaimError(
-            "Refusing oversell flags that imply §21 / causal / Mathlib / R3–R4 "
+            "Refusing oversell flags that imply §21 / causal / Mathlib / R3-R4 "
             f"clearance: {sorted(set(offenders))}. "
             f"See {NON_CLAIMS_DOC_PATH}."
         )
@@ -182,7 +184,7 @@ Canonical list: `docs/28_NON_CLAIMS.md` (repository root).
 
 1. **ENGINEERING_SPEC §21 is not passed.** Instrumentation and dry-runs only.
 2. **No causal utility / causal TPPR** from warehouse or dry-run software metrics.
-3. **No R3/R4 production ACCEPT** (ADR 0003). `lpe review record` refuses them.
+3. **No R3/R4 auto-ACCEPT / single-reviewer ACCEPT** (ADR 0003). Quorum path only.
 4. **No Mathlib-scale elaborator-complete kernel truth.** Regex-stub is incomplete;
    fixture toolchain is not Mathlib-scale.
 5. **M6/M7 training (EPIC-039/040) blocked until §21.** No training entrypoints.

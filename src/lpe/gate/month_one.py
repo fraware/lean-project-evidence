@@ -5,6 +5,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 
 @dataclass
@@ -28,7 +29,7 @@ class MonthOneGateReport:
     def all_passed(self) -> bool:
         return all(c.passed for c in self.criteria)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "all_passed": self.all_passed,
             "disclaimer": self.disclaimer,
@@ -83,10 +84,10 @@ def _validate_example_contract(repo_root: Path) -> tuple[bool, str]:
     if not example.is_dir():
         return False, f"missing example project: {example}"
     try:
-        from lpe.contract.loader import ContractError, load_contract
+        from lpe.contract.loader import load_contract
 
         contract = load_contract(example)
-    except Exception as exc:  # noqa: BLE001 — gate surfaces any validation failure
+    except Exception as exc:
         return False, f"contract validate failed: {exc}"
     return True, (
         f"validated project_id={contract.project.project_id} "

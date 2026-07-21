@@ -1,0 +1,11 @@
+name = "LpeExtract"
+version = "0.1.0"
+defaultTargets = ["lpe_extract"]
+
+[[lean_lib]]
+name = "LpeExtract"
+
+[[lean_exe]]
+name = "lpe_extract"
+root = "LpeExtract.Main"
+supportInterpreter = true

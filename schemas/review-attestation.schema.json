@@ -1,0 +1,120 @@
+{
+  "$defs": {
+    "ReviewDecisionValue": {
+      "enum": [
+        "ACCEPT",
+        "REJECT",
+        "REQUEST_REPAIR",
+        "INDETERMINATE"
+      ],
+      "title": "ReviewDecisionValue",
+      "type": "string"
+    },
+    "ReviewDimension": {
+      "enum": [
+        "SEMANTIC_FIDELITY",
+        "REPOSITORY_FIT",
+        "IMPLEMENTATION_QUALITY",
+        "DOWNSTREAM_VALUE",
+        "ADJUDICATION"
+      ],
+      "title": "ReviewDimension",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Single-dimension attestation (§12.2). One record = one dimension only.",
+  "properties": {
+    "schema_version": {
+      "const": "0.2.0",
+      "default": "0.2.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "attestation_id": {
+      "title": "Attestation Id",
+      "type": "string"
+    },
+    "packet_id": {
+      "title": "Packet Id",
+      "type": "string"
+    },
+    "evidence_fingerprint": {
+      "title": "Evidence Fingerprint",
+      "type": "string"
+    },
+    "reviewer_id": {
+      "title": "Reviewer Id",
+      "type": "string"
+    },
+    "reviewer_role": {
+      "title": "Reviewer Role",
+      "type": "string"
+    },
+    "dimension": {
+      "$ref": "#/$defs/ReviewDimension"
+    },
+    "decision": {
+      "$ref": "#/$defs/ReviewDecisionValue"
+    },
+    "confidence": {
+      "maximum": 100,
+      "minimum": 0,
+      "title": "Confidence",
+      "type": "integer"
+    },
+    "rationale": {
+      "title": "Rationale",
+      "type": "string"
+    },
+    "finding_refs": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Finding Refs",
+      "type": "array"
+    },
+    "conflict_declaration_hash": {
+      "title": "Conflict Declaration Hash",
+      "type": "string"
+    },
+    "blinded_condition": {
+      "default": "UNBLINDED",
+      "title": "Blinded Condition",
+      "type": "string"
+    },
+    "review_started_at": {
+      "format": "date-time",
+      "title": "Review Started At",
+      "type": "string"
+    },
+    "review_submitted_at": {
+      "format": "date-time",
+      "title": "Review Submitted At",
+      "type": "string"
+    },
+    "review_minutes": {
+      "exclusiveMinimum": 0,
+      "title": "Review Minutes",
+      "type": "number"
+    }
+  },
+  "required": [
+    "attestation_id",
+    "packet_id",
+    "evidence_fingerprint",
+    "reviewer_id",
+    "reviewer_role",
+    "dimension",
+    "decision",
+    "confidence",
+    "rationale",
+    "conflict_declaration_hash",
+    "review_started_at",
+    "review_minutes"
+  ],
+  "title": "ReviewAttestationV2",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.org/lpe/0.2.0/review-attestation.schema.json"
+}

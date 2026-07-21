@@ -1,0 +1,10 @@
+schema_version: 0.2.0
+suite_id: downstream-demo-v1
+obligation_ids: [O-01]
+successors:
+  - successor_id: lake-version-smoke
+    module: null
+    declarations: []
+    command: ["lake", "--version"]
+    required: true
+    timeout_seconds: 60

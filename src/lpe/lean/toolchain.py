@@ -29,13 +29,13 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from lpe.hashing import sha256_text
 from lpe.lean.extractor import (
     TOOLCHAIN_EXTRACTOR,
-    LeanExtractionResult,
     TOOLCHAIN_RESULT_CANDIDATES,
+    LeanExtractionResult,
     load_toolchain_json,
 )
 
@@ -73,9 +73,7 @@ def project_declares_lpe_extract(repository: Path) -> bool:
     """Cheap text check for an ``lpe_extract`` Lake exe / script target."""
     for name in ("lakefile.toml", "lakefile.lean"):
         path = repository / name
-        if path.is_file() and "lpe_extract" in path.read_text(
-            encoding="utf-8", errors="replace"
-        ):
+        if path.is_file() and "lpe_extract" in path.read_text(encoding="utf-8", errors="replace"):
             return True
     return False
 
@@ -87,7 +85,7 @@ def extraction_artifact_path(repository: Path) -> Path:
     return repository / TOOLCHAIN_RESULT_CANDIDATES[0]
 
 
-def _fill_signature_hashes(data: dict) -> dict:
+def _fill_signature_hashes(data: dict[str, Any]) -> dict[str, Any]:
     """Ensure each declaration has a content-addressed signature_hash."""
     decls = data.get("declarations") or []
     for item in decls:

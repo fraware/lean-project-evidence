@@ -117,9 +117,7 @@ def load_contract(project_path: Path) -> ProjectContract:
 
 
 def _validate_review_authorities(review: ReviewFile, policies: PoliciesFile) -> None:
-    configured_roles = {
-        role for authority in review.authorities for role in authority.roles
-    }
+    configured_roles = {role for authority in review.authorities for role in authority.roles}
     missing_by_risk: list[str] = []
     for risk_class, rule in policies.risk_rules.items():
         if not rule.require_human_acceptance:
@@ -139,8 +137,7 @@ def validate_candidate_obligations(
 ) -> None:
     if project_id != contract.project.project_id:
         raise ContractError(
-            f"candidate project_id {project_id!r} does not match "
-            f"{contract.project.project_id!r}"
+            f"candidate project_id {project_id!r} does not match {contract.project.project_id!r}"
         )
     known = {o.obligation_id for o in contract.obligations.obligations}
     unknown = set(obligation_ids) - known

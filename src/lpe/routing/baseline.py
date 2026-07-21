@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import ClassVar
 
 from lpe.honesty.research_gates import ResearchGateBlocked, refuse_research_entrypoint
 
@@ -37,7 +38,7 @@ class DeterministicRoutingBaseline:
     """
 
     BASELINE_ID = DETERMINISTIC_BASELINE_ID
-    PRIORITY = [
+    PRIORITY: ClassVar[list[str]] = [
         "semantic",
         "repository",
         "downstream",
