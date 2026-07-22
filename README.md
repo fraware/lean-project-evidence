@@ -1,12 +1,12 @@
 ```text
-                              _     ____  _____
-                             | |   |  _ \| ____|
-                             | |   | |_) |  _|
-                             | |___|  __/| |___
-                             |_____|_|   |_____|
+                               _     ____  _____
+                              | |   |  _ \| ____|
+                              | |   | |_) |  _|
+                              | |___|  __/| |___
+                              |_____|_|   |_____|
 
-                            LEAN PROJECT EVIDENCE
-                Project-grounded evidence for Lean development
+                             LEAN PROJECT EVIDENCE
+                 Project-grounded evidence for Lean development
 ```
 
 <p align="center">
@@ -41,12 +41,9 @@ The North Star is **TPPR**: sustained critical-path progress per expert hour.
 
 In plain language: of the obligations that actually move the project forward, how many are accepted and stay accepted — relative to the expert time spent specifying, reviewing, repairing, and integrating?
 
-\[
-\text{TPPR}
-=
-\frac{\text{weighted critical-path obligations accepted and sustained}}
-{\text{expert specification, review, repair, and integration hours}}
-\]
+$$
+\text{TPPR} = \frac{\text{weighted critical-path obligations accepted and sustained}}{\text{expert specification, review, repair, and integration hours}}
+$$
 
 Compilation rates, generated declarations, and synthetic-data volume are diagnostics. They are not the goal.
 
@@ -130,10 +127,10 @@ Every feature should answer: *does this increase critical-path, semantically fai
 | --- | --- |
 | `lpe contract validate` | Load and validate a project contract |
 | `lpe evidence compile` | Build an evidence packet for a candidate |
-| `lpe review …` | Record decisions; high-risk paths require human attestation |
+| `lpe review ...` | Record decisions; high-risk paths require human attestation |
 | `lpe ledger verify` / `archive` / `seal` | Integrity checks and export for the utility ledger |
 | `lpe doctor` | Local toolchain and honesty-surface checks |
-| `lpe pilot …` | Partner instrumentation (not scientific clearance) |
+| `lpe pilot ...` | Partner instrumentation (not scientific clearance) |
 
 Human-readable output by default; `--json` for machines. Nonzero exit on invalid input or hard execution failure.
 
