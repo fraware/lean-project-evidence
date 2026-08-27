@@ -33,7 +33,7 @@ jobs:
     steps:
       # Pin full commit SHAs (AUDIT-024); version comments aid Dependabot.
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1.5.0
+      - uses: leanprover/lean-action@50fcf42d2e460296f1a34b402e990d1b24f8b596 # v1.6.0
         with:
           build: false
           test: false
