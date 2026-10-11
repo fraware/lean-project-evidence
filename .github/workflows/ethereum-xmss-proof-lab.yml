@@ -28,10 +28,13 @@ jobs:
       - uses: leanprover/lean-action@v1
         with:
           lake-package-directory: experiments/ethereum-xmss
+          auto-config: 'false'
           build: 'false'
           test: 'false'
           lint: 'false'
           use-mathlib-cache: 'false'
+      - name: Resolve pinned dependencies
+        run: lake update
       - name: Download Mathlib cache
         run: lake exe cache get
       - name: Build pinned proof
