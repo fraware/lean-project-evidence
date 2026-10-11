@@ -1,15 +1,15 @@
-import Mathlib
+import Lean
 
 /-!
-# Isolated Ethereum XMSS proof lab
+# Ethereum XMSS proof lab — toolchain bootstrap
 
-This lab pins the exact Lean 4.31.0 version of the in-flight leanVM #533
-verification project. It is not an upstream proof or a production artifact.
-No sorry, admitted axioms, or synthetic theorem shortcuts are permitted.
+A small unconditional theorem first demonstrates that GitHub Actions is
+actually invoking the pinned Lean kernel. The separate XMSS obligations are
+not yet discharged. This experiment is not a production artifact.
 -/
 
 namespace XmssProofLab
 
-theorem sanity_arithmetic (n : Nat) : n / 1 = n := by omega
+theorem sanity_arithmetic (n : Nat) : n + 0 = n := by simp
 
 end XmssProofLab
