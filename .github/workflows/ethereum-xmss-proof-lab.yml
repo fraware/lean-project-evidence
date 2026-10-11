@@ -16,6 +16,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ethereum-xmss-proof-lab-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lean-proof:
     name: Lean 4.31.0 kernel check
@@ -31,8 +35,6 @@ jobs:
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - name: Resolve pinned dependencies
         run: lake update
-      - name: Download Mathlib cache
-        run: lake exe cache get
       - name: Build pinned proof
         run: lake build
       - name: Reject admitted proof holes
