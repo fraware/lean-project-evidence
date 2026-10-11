@@ -1,0 +1,44 @@
+name: Ethereum XMSS proof lab (isolated)
+
+on:
+  push:
+    branches:
+      - research/ethereum-xmss-proof-lab-20261011
+    paths:
+      - 'experiments/ethereum-xmss/**'
+      - '.github/workflows/ethereum-xmss-proof-lab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lean-proof:
+    name: Lean 4.31.0 kernel check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experiments/ethereum-xmss
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: experiments/ethereum-xmss
+          build: 'false'
+          test: 'false'
+          lint: 'false'
+          use-mathlib-cache: 'false'
+      - name: Download Mathlib cache
+        run: lake exe cache get
+      - name: Build pinned proof
+        run: lake build
+      - name: Reject admitted proof holes
+        run: |
+          if grep -R -nE '\b(sorry|admit)\b' XmssProofLab.lean; then
+            echo 'Unresolved proof or admission in proof lab'
+            exit 1
+          fi
+      - name: Report theorem axioms
+        run: |
+          printf 'import XmssProofLab\n#print axioms XmssProofLab.sanity_arithmetic\n' > Axioms.lean
+          lake env lean Axioms.lean
