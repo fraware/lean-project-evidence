@@ -25,14 +25,10 @@ jobs:
         working-directory: experiments/ethereum-xmss
     steps:
       - uses: actions/checkout@v4
-      - uses: leanprover/lean-action@v1
-        with:
-          lake-package-directory: experiments/ethereum-xmss
-          auto-config: 'false'
-          build: 'false'
-          test: 'false'
-          lint: 'false'
-          use-mathlib-cache: 'false'
+      - name: Install pinned Lean with elan
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain leanprover/lean4:v4.31.0
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - name: Resolve pinned dependencies
         run: lake update
       - name: Download Mathlib cache
