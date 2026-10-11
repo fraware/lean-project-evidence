@@ -8,6 +8,13 @@ name: Lean integration template
 #   pytest -q -m docker tests/integration/test_evidence_docker_build.py
 
 on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/lean-integration-template.yml"
+      - "tests/fixtures/lean/**"
+      - "tests/fixtures/lean_project/**"
+      - "tests/integration/test_evidence_lean_repo.py"
   workflow_dispatch:
   schedule:
     - cron: "0 6 * * 1"  # weekly Monday 06:00 UTC
@@ -35,14 +42,14 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1.5.0
         with:
-          build: false
+          lake-package-directory: tests/fixtures/lean_project
+          build: true
           test: false
-          use-mathlib-cache: auto
-      - name: Document fixture path
+          use-mathlib-cache: "false"
+      - name: Check pinned Lean fixture builds
         run: |
-          echo "No Mathlib-lite lakefile is committed yet."
-          echo "Use tests/fixtures/lean/toolchain_project for compiler toolchain ingest."
-          echo "When a pinned Lean fixture lands under tests/fixtures/lean/repos/, wire lpe evidence compile here."
+          echo "Built tests/fixtures/lean_project with its pinned Lean toolchain."
+          echo "The JSON protocol fixture is tested separately by lean-toolchain-fixture."
 
   # Optional: sandboxed Lean via pre-built lpe-lean:4.14.
   # Does NOT build the image in CI (multi-minute). Provide the image via a

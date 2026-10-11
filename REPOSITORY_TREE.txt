@@ -282,6 +282,7 @@ tests/fixtures/lean/impact_cone/Impact/Core.lean
 tests/fixtures/lean/impact_cone/Impact/GrandConsumer.lean
 tests/fixtures/lean/impact_cone/Impact/Unrelated.lean
 tests/fixtures/lean/impact_cone/expectations.json
+tests/fixtures/lean/toolchain_project/.lpe/lean-extraction.json
 tests/fixtures/lean/toolchain_project/Example/Public/Comparison.lean
 tests/fixtures/lean/toolchain_project/README.md
 tests/fixtures/lean_project/.gitignore
@@ -304,6 +305,7 @@ tests/fixtures/lean_project/LpeFixture/LibC.lean
 tests/fixtures/lean_project/LpeFixture/OpaqueLimits.lean
 tests/fixtures/lean_project/README.md
 tests/fixtures/lean_project/expectations_multi_module.json
+tests/fixtures/lean_project/lake-manifest.json
 tests/fixtures/lean_project/lakefile.toml
 tests/fixtures/lean_project/lean-toolchain
 tests/fixtures/section21/README.md

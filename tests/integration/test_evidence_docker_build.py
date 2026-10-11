@@ -48,6 +48,7 @@ def test_isolation_pass_requires_sandboxed_build_ran() -> None:
         build_ran=True,
         skip_build=False,
         network_isolated=True,
+        image_digest_resolved=True,
     )
     assert status == "PASS"
     assert name == "docker-sandbox"

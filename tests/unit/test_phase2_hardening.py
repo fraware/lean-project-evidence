@@ -113,8 +113,21 @@ def test_isolation_pass_only_when_sandboxed_build_ran() -> None:
         build_ran=True,
         skip_build=False,
         network_isolated=True,
+        image_digest_resolved=True,
     )
     assert status == "PASS"
+
+
+def test_isolation_unknown_when_image_digest_is_unresolved() -> None:
+    status, name = isolation_status_for_executor(
+        DockerSandboxExecutor(),
+        build_ran=True,
+        skip_build=False,
+        network_isolated=True,
+        image_digest_resolved=False,
+    )
+    assert status == "UNKNOWN"
+    assert name == "docker-sandbox"
 
 
 def test_isolation_unknown_for_subprocess_even_if_build_ran() -> None:
