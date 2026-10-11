@@ -180,7 +180,7 @@ def _host_uid_gid() -> tuple[int, int]:
     if uid is not None and gid is not None:
         return int(uid), int(gid)
     try:
-        return os.getuid(), os.getgid()  # type: ignore[attr-defined]
+        return os.getuid(), os.getgid()
     except AttributeError:
         # Windows / non-POSIX Docker Desktop: images currently ship elan under
         # /root. Default to root until the published digest image is unprivileged.
