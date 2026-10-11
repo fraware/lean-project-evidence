@@ -44,6 +44,11 @@ jobs:
         run: python scripts/check_version_sync.py
       - name: Repository tree + MANIFEST drift check (CLOSURE-032)
         run: python scripts/sync_repository_inventory.py --check
+      - name: Emit expected inventory on drift (temporary diagnostic)
+        if: ${{ failure() }}
+        run: |
+          python scripts/sync_repository_inventory.py --write
+          python -c "import base64, pathlib; print('LPE_EXPECTED_MANIFEST_B64=' + base64.b64encode(pathlib.Path('MANIFEST.sha256').read_bytes()).decode('ascii'))"
       - name: Compatibility matrix validate
         run: python scripts/validate_compatibility_matrix.py
       - name: Relative doc-link check

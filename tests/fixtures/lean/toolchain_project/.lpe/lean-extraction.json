@@ -1,0 +1,46 @@
+{
+  "extraction_schema_version": "1.1",
+  "declarations": [
+    {
+      "name": "Example.Public.Comparison.comparisonFunctor",
+      "kind": "def",
+      "path": "Example/Public/Comparison.lean",
+      "line": 6,
+      "signature": "def comparisonFunctor : Nat",
+      "is_axiom": false,
+      "public": true
+    },
+    {
+      "name": "Example.Public.Comparison.helper",
+      "kind": "def",
+      "path": "Example/Public/Comparison.lean",
+      "line": 8,
+      "signature": "def helper : Nat",
+      "is_axiom": false,
+      "public": true
+    }
+  ],
+  "axioms_used": [],
+  "imports": [],
+  "declaration_dependency_edges": [
+    [
+      "Example.Public.Comparison.comparisonFunctor",
+      "Example.Public.Comparison.helper"
+    ]
+  ],
+  "dependency_edges": [
+    [
+      "Example.Public.Comparison.comparisonFunctor",
+      "Example.Public.Comparison.helper"
+    ]
+  ],
+  "import_edges": [],
+  "placeholders": [],
+  "errors": [],
+  "extractor": "lean.toolchain",
+  "complete": true,
+  "toolchain_available": true,
+  "notes": [
+    "Synthetic protocol fixture: not emitted by Lean; complete=true is simulated to test ingestion and decision behavior."
+  ]
+}
