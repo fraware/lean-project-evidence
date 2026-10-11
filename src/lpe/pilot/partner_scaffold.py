@@ -120,7 +120,7 @@ Paths are relative to the **repository root** (not this working directory).
 | Document | Path | Role |
 | --- | --- | --- |
 | Pilot protocol + readiness | `docs/PILOT.md` | Instrumentation and study design |
-| Operator runbook | `docs/closure/PILOT_OPERATOR_RUNBOOK.md` | Live partner freeze / lock / analyze |
+| Operator runbook | `docs/closure/PILOT_OPERATOR_RUNBOOK.md` | Live partner freeze and analysis |
 | Human authority | `docs/adr/0003-human-authority.md` | No R3/R4 auto-accept |
 | Explicit non-claims | `docs/NON_CLAIMS.md` | Canonical anti-oversell list |
 | Ledger durability | `docs/adr/0004-append-only-ledger.md` | Append-only events |

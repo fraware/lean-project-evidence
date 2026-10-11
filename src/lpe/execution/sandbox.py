@@ -249,7 +249,7 @@ class DockerSandboxExecutor:
         host_uid, host_gid = _host_uid_gid()
         self.uid = uid if uid is not None else host_uid
         self.gid = gid if gid is not None else host_gid
-        self._resolved_digest: str | None | object = _DIGEST_UNRESOLVED
+        self._resolved_digest: str | object | None = _DIGEST_UNRESOLVED
 
     @staticmethod
     def is_available() -> bool:
