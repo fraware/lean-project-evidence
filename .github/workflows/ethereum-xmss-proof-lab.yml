@@ -7,6 +7,10 @@ on:
     paths:
       - 'experiments/ethereum-xmss/**'
       - '.github/workflows/ethereum-xmss-proof-lab.yml'
+  pull_request:
+    paths:
+      - 'experiments/ethereum-xmss/**'
+      - '.github/workflows/ethereum-xmss-proof-lab.yml'
   workflow_dispatch:
 
 permissions:
