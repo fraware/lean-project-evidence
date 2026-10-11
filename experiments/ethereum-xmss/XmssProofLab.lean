@@ -84,13 +84,13 @@ theorem fold12 (e0 e1 e2 e3 e4 e5 : Nat) (h0 : e0 ≤ 56) (h1 : e1 ≤ 56)
        (by omega) (by omega) (by omega) (by omega)
   rw [show (4095 : Nat) = 2 ^ 12 - 1 by decide,
       Nat.and_two_pow_sub_one_eq_mod]
-  rw [hs3, hshift3]
+  rw [hshift3, hs3]
   have hlow : e0 + e1 + e2 + e3 + e4 + e5 < 4096 := by omega
   have heq :
     val 4096 [e0+e1+e2+e3,e1+e2+e3+e4,e2+e3+e4+e5,e3+e4+e5,e4+e5,e5] +
         val 4096 [e4+e5,e5] =
     (e0+e1+e2+e3+e4+e5) +
-        4096 * (e1+e2+e3+e4+e5+e2+e3+e4+e5+4096*(e2+e3+e4+e5+4096*(e3+e4+e5+4096*(e4+e5+4096*e5)))) := by
+        4096 * (e1+e2+e3+e4+e5+4096*(e2+e3+e4+e5+4096*(e3+e4+e5+4096*(e4+e5+4096*e5)))) := by
     simp [val]
     omega
   rw [heq]
