@@ -1,0 +1,36 @@
+name: leanSpec XMSS exact patch application witness
+
+on:
+  push:
+    branches:
+      - research/leanspec-xmss-handoff-20261012
+
+permissions:
+  contents: read
+
+jobs:
+  exact-patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout isolated handoff
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Clone pinned leanSpec upstream
+        run: |
+          git clone --filter=blob:none https://github.com/leanEthereum/leanSpec.git leanSpec
+          git -C leanSpec checkout --detach 0b7d33ecbc9ee2435759c92de4da4d08d7faf1c8
+          test "$(git -C leanSpec rev-parse HEAD)" = 0b7d33ecbc9ee2435759c92de4da4d08d7faf1c8
+      - name: Confirm exact unmodified upstream Git blobs
+        run: |
+          test "$(git -C leanSpec hash-object src/lean_spec/node/validator/service.py)" = 3b85c005d49c786f23f49360e2e1117d93b9fa91
+          test "$(git -C leanSpec hash-object tests/node/validator/test_service.py)" = 3bbdd2070fcb7188ca1068e87db5a250752653ba
+      - name: Apply portable patch without conflict
+        run: |
+          git -C leanSpec apply --check ../handoff/leanSpec-xmss-preconditions.patch
+          git -C leanSpec apply ../handoff/leanSpec-xmss-preconditions.patch
+          git -C leanSpec diff --check
+      - name: Verify exact CI-tested output Git blobs
+        run: |
+          test "$(git -C leanSpec hash-object src/lean_spec/node/validator/service.py)" = b5b2869c51740baf78de5a829ea36597dc480fec
+          test "$(git -C leanSpec hash-object tests/node/validator/test_service.py)" = a055b66048f20d15c6c58c9ddc5954537e76c0b2
+          python3 -m compileall -q leanSpec/src/lean_spec/node/validator/service.py leanSpec/tests/node/validator/test_service.py
