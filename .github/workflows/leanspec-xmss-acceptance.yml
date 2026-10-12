@@ -1,4 +1,4 @@
-name: leanSpec XMSS independent acceptance baseline
+name: leanSpec XMSS independent acceptance candidate
 
 on:
   push:
@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
+      - name: Checkout isolated candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Install uv
         run: python3 -m pip install 'uv>=0.7,<1'
       - name: Clone exactly pinned leanSpec revision
@@ -24,12 +26,16 @@ jobs:
         run: |
           cd leanSpec
           uv sync --frozen --group lint --group test
-      - name: Upstream baseline validator lint and format
+      - name: Overlay the source-pinned candidate under test
+        run: |
+          cp candidate/validator_service.py leanSpec/src/lean_spec/node/validator/service.py
+          python3 -m compileall -q leanSpec/src/lean_spec/node/validator/service.py
+      - name: Candidate validator lint and format
         run: |
           cd leanSpec
           uv run --no-sync --group lint ruff check --no-fix src/lean_spec/node/validator/service.py tests/node/validator/test_service.py
           uv run --no-sync --group lint ruff format --check src/lean_spec/node/validator/service.py tests/node/validator/test_service.py
-      - name: Upstream baseline validator tests
+      - name: Candidate validator tests
         run: |
           cd leanSpec
           uv run --no-sync --group test pytest tests/node/validator/test_service.py -q --no-cov
