@@ -31,11 +31,6 @@ jobs:
           cp candidate/validator_service.py leanSpec/src/lean_spec/node/validator/service.py
           cp candidate/validator_tests.py leanSpec/tests/node/validator/test_service.py
           python3 -m compileall -q leanSpec/src/lean_spec/node/validator/service.py
-      - name: Diagnose exact Ruff formatting delta
-        run: |
-          cd leanSpec
-          uv run --no-sync --group lint ruff format --diff tests/node/validator/test_service.py || true
-          uv run --no-sync --group lint ruff format tests/node/validator/test_service.py
       - name: Candidate validator lint and format
         run: |
           cd leanSpec

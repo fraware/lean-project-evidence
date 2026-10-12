@@ -357,13 +357,12 @@ class TestSignWithKey:
         self, sync_service: SyncService, key_manager: XmssKeyManager
     ) -> None:
         """Do not enter the preparation loop beyond the activation interval."""
-        service, _, entry, key, _ = self._setup(sync_service, key_manager)
-        slot = Slot(int(key.activation_slot) + int(key.num_active_slots))
+        service, _, entry, _, _ = self._setup(sync_service, key_manager)
+        secret = entry.attestation_secret_key
+        slot = Slot(int(secret.activation_slot) + int(secret.num_active_slots))
         with patch(_SCHEME) as scheme:
             with pytest.raises(ValueError, match="inactive"):
-                service._sign_with_key(
-                    entry, slot, Bytes32.zero(), "attestation_secret_key"
-                )
+                service._sign_with_key(entry, slot, Bytes32.zero(), "attestation_secret_key")
             scheme.advance_preparation.assert_not_called()
             scheme.sign.assert_not_called()
 
