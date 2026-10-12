@@ -182,7 +182,6 @@ class TestSignBlock:
             scheme.sign.assert_not_called()
 
 
-
 class TestSignWithKey:
     """
     Unit tests for the XMSS key advancement and signing logic.
@@ -367,7 +366,6 @@ class TestSignWithKey:
                 )
             scheme.advance_preparation.assert_not_called()
             scheme.sign.assert_not_called()
-
 
 
 class TestValidatorServiceBasic:
@@ -668,7 +666,6 @@ class TestProduceAttestationsAdvanced:
         await service._produce_attestations(Slot(1))
         assert [a.validator_index for a in received] == [ValidatorIndex(1)]
         assert service.attestations_produced == 1
-
 
 
 class TestValidatorServiceRun:
