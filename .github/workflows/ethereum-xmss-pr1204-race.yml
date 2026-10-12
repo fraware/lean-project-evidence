@@ -31,7 +31,8 @@ jobs:
         run: |
           cd leanSpec
           uv sync --frozen --group test
-      - name: Run actual SigningProtection.reserve race tests
+      - name: Run actual SigningProtection.reserve race tests via upstream pytest
         run: |
+          cp experiments/ethereum-xmss/pr1204_race.py leanSpec/tests/node/validator/test_pr1204_race.py
           cd leanSpec
-          uv run --no-sync --group test python ../experiments/ethereum-xmss/pr1204_race.py
+          uv run --no-sync --group test pytest tests/node/validator/test_pr1204_race.py -q --no-cov
