@@ -1,0 +1,33 @@
+name: leanSpec XMSS candidate independent interoperability
+on:
+  push:
+    branches:
+      - research/leanspec-xmss-interop-20261012
+permissions:
+  contents: read
+jobs:
+  interop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - name: Checkout isolated candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install uv
+        run: python3 -m pip install 'uv>=0.7,<1'
+      - name: Clone pinned upstream leanSpec
+        run: |
+          git clone --filter=blob:none https://github.com/leanEthereum/leanSpec.git leanSpec
+          git -C leanSpec checkout --detach 0b7d33ecbc9ee2435759c92de4da4d08d7faf1c8
+          test "$(git -C leanSpec rev-parse HEAD)" = 0b7d33ecbc9ee2435759c92de4da4d08d7faf1c8
+      - name: Install upstream dependencies
+        run: |
+          cd leanSpec
+          uv sync --frozen --group test --group lint
+      - name: Overlay previously validated candidate and regressions
+        run: |
+          cp candidate/validator_service.py leanSpec/src/lean_spec/node/validator/service.py
+          cp candidate/validator_tests.py leanSpec/tests/node/validator/test_service.py
+      - name: Run real multi-node interoperability tests
+        run: |
+          cd leanSpec
+          uv run --no-sync --group test pytest tests/interop/ -v --no-cov --timeout=120 -x --tb=short --log-cli-level=INFO
