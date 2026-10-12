@@ -98,6 +98,24 @@ theorem success_is_strictly_newer (l next : Ledger) (key slot previous : Nat)
   | false => simp [reserve, ha] at hsuccess
   | true => simpa [admissible, hprev] using ha
 
+/-- An initially empty ledger has no committed reservations. -/
+def empty : Ledger := fun _ => none
+
+/-!
+Two distinct *logical* key IDs can both reserve the same slot. If those IDs
+are accidentally backed by one XMSS master secret, role-scoped or
+validator-scoped tracking does not enforce one-time use for that secret.
+This is a counterexample to a wrongly chosen identity domain, not a claim
+that the default leanSpec key generator aliases secrets.
+-/
+theorem distinct_ids_can_each_reserve_same_slot (slot : Nat) :
+    ∃ first second : Ledger,
+      reserve empty 0 slot = some first ∧
+      reserve first 1 slot = some second := by
+  refine ⟨record empty 0 slot, record (record empty 0 slot) 1 slot, ?_, ?_⟩
+  · simp [reserve, admissible, empty]
+  · simp [reserve, admissible, record, empty]
+
 end XmssReservation
 
 #print axioms XmssReservation.success_prevents_replay
