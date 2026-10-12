@@ -425,36 +425,14 @@ class SQLiteDatabase:
             return None
         return Slot(row["last_signed_slot"])
 
-    def put_last_signed_slot(
-        self,
-        validator_index: ValidatorIndex,
-        key_role: str,
-        slot: Slot,
-    ) -> None:
-        """Record the highest slot one of a validator's keys has signed."""
-        try:
-            cursor = self._connection.cursor()
-            cursor.execute(
-                f"""
-                INSERT OR REPLACE INTO {SIGNING_RECORDS_TABLE_NAME}
-                (validator_index, key_role, last_signed_slot)
-                VALUES (?, ?, ?)
-                """,
-                (int(validator_index), key_role, int(slot)),
-            )
-        except sqlite3.Error as exception:
-            raise StorageWriteError(
-                f"Failed to write signing record for validator {validator_index} "
-                f"{key_role} key at slot {slot}: {exception}"
-            ) from exception
-
     def try_reserve_signing_slot(
         self,
         validator_index: ValidatorIndex,
         key_role: str,
         slot: Slot,
     ) -> bool:
-        """Atomically record a strictly increasing signing slot for one key role.
+        """
+        Atomically record a strictly increasing signing slot for one key role.
 
         Caller must commit this transaction before invoking the XMSS signer.
         The conditional statement is the admission decision: no earlier SELECT

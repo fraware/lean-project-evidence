@@ -122,15 +122,6 @@ class Database(Protocol):
         """
         ...
 
-    def put_last_signed_slot(
-        self,
-        validator_index: ValidatorIndex,
-        key_role: str,
-        slot: Slot,
-    ) -> None:
-        """Record the highest slot one of a validator's keys has signed."""
-        ...
-
     def try_reserve_signing_slot(
         self,
         validator_index: ValidatorIndex,

@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import logging
-from concurrent.futures import ThreadPoolExecutor
-from threading import Barrier
 import tempfile
 from collections.abc import Generator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier
 
 import pytest
 
@@ -26,6 +26,7 @@ from lean_spec.node.validator import (
 )
 from lean_spec.node.validator.registry import ValidatorEntry
 from lean_spec.node.validator.service import AttestationPublisher
+from lean_spec.node.validator.signing_protection import SigningRole
 from lean_spec.spec.forks import Slot, ValidatorIndex
 from lean_spec.spec.forks.lstar import State, Store
 from lean_spec.spec.forks.lstar.containers import Block, SignedAttestation
@@ -226,14 +227,15 @@ class TestDatabaseBackedReserve:
         """Attestation and proposal reservations use distinct keys in this scheme."""
         barrier = Barrier(2)
 
-        def reserve_role(role: str) -> bool:
+        def reserve_role(role: SigningRole) -> bool:
             with _open_database(database_path) as db:
                 barrier.wait(timeout=10)
                 SigningProtection(database=db).reserve(_VALIDATOR, role, Slot(6))
                 return True
 
+        roles: tuple[SigningRole, SigningRole] = ("attestation", "proposal")
         with ThreadPoolExecutor(max_workers=2) as pool:
-            outcomes = list(pool.map(reserve_role, ("attestation", "proposal")))
+            outcomes = list(pool.map(reserve_role, roles))
 
         assert outcomes == [True, True]
         with _open_database(database_path) as db:
