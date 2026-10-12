@@ -29,6 +29,8 @@ jobs:
         run: lake build
       - name: Kernel-check reservation lemmas
         run: lake env lean XmssReservation.lean
+      - name: Exercise SQLite two-connection reservation schedules
+        run: python3 -m unittest -v test_reservation_sqlite.py
       - name: Reject admitted proof placeholders
         run: |
           if grep -nE '\\b(sorry|admit)\\b' XmssReservation.lean; then
