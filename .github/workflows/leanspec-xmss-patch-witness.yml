@@ -29,6 +29,12 @@ jobs:
           git -C leanSpec apply --check ../handoff/leanSpec-xmss-preconditions.patch
           git -C leanSpec apply ../handoff/leanSpec-xmss-preconditions.patch
           git -C leanSpec diff --check
+      - name: Check publication helper is syntactically valid and fail-closed
+        run: |
+          bash -n handoff/publish_upstream.sh
+          grep -F 'gh repo fork "$UPSTREAM" --clone=false' handoff/publish_upstream.sh
+          ! grep -F -- '--remote=false' handoff/publish_upstream.sh
+          grep -F 'is not a fork of' handoff/publish_upstream.sh
       - name: Verify exact CI-tested output Git blobs
         run: |
           test "$(git -C leanSpec hash-object src/lean_spec/node/validator/service.py)" = b5b2869c51740baf78de5a829ea36597dc480fec
