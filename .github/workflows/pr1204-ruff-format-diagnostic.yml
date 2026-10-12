@@ -1,0 +1,31 @@
+name: PR1204 exact Ruff formatting diagnostic
+on:
+  push:
+    branches:
+      - research/ethereum-xmss-pr1204-format-20261012
+permissions:
+  contents: read
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Fetch upstream configuration at PR head
+        run: |
+          git clone --filter=blob:none https://github.com/leanEthereum/leanSpec.git leanSpec
+          git -C leanSpec fetch origin pull/1204/head
+          git -C leanSpec checkout --detach e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+          cp candidate_pr1204/signing_protection.py leanSpec/src/lean_spec/node/validator/signing_protection.py
+          cp candidate_pr1204/test_signing_protection.py leanSpec/tests/node/validator/test_signing_protection.py
+      - name: Install exact repository Ruff version
+        run: python3 -m pip install 'ruff==0.14.10'
+      - name: Print exact required formatting difference
+        run: |
+          cd leanSpec
+          ruff format --diff src/lean_spec/node/validator/signing_protection.py tests/node/validator/test_signing_protection.py
+      - name: Check candidate after temporary formatting
+        run: |
+          cd leanSpec
+          ruff format src/lean_spec/node/validator/signing_protection.py tests/node/validator/test_signing_protection.py
+          ruff format --check src/lean_spec/node/validator/signing_protection.py tests/node/validator/test_signing_protection.py
