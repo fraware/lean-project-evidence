@@ -42,9 +42,16 @@ For the stronger cross-role/cross-index key identity policy, design a unique `ke
 - [Exact-PR Python adapter tests](./pr1204_race.py) execute the actual `SigningProtection.reserve` method from the pinned PR head. Its adapter duplicates the PR table and SQL behavior and injects barriers to force adverse schedules; it is not a test using the node's complete `SQLiteDatabase`.
 - [Lean 4 reservation model](./XmssReservation.lean) proves replay exclusion, older-slot refusal, unrelated-key isolation, and recovery properties for an abstract per-key ledger. Its linearizable durable commit and stable key identity assumptions are **not established** by the proof.
 - [Proof and SQLite model CI](https://github.com/fraware/lean-project-evidence/actions/runs/38316932452).
-- [Exact-PR adapter CI](https://github.com/fraware/lean-project-evidence/actions/runs/38316932514).
+- [Exact-PR adapter CI, run #38317231036](https://github.com/fraware/lean-project-evidence/actions/runs/38317231036): **2 passed** against the actual `SigningProtection.reserve` implementation from pinned PR #1204, including same-slot concurrent double acceptance and high-water decrease. The first run (#38316932514) did not run assertions because standalone import encountered an initialization cycle; the corrected run uses upstream pytest/conftest.
+- [Updated Lean reservation and SQLite-model CI](https://github.com/fraware/lean-project-evidence/actions/runs/38317050285): kernel check passed, including a distinct-logical-identity countermodel, and all seven SQLite schedule tests passed.
 
 Beyond SQLite atomicity, storage rollback, independent replicas, database replacement, power-loss durability and corruption remain explicit deployment obligations. The tests do not claim an actual attack against a running node, and the PR remains open.
+
+## Current finding disposition
+
+The two schedules have now been reproduced in both an isolated SQL protocol and the pending PR's exact `SigningProtection.reserve` method (using the instrumented adapter). This is a **verified concurrency limitation**, not proof that an unsupported multi-writer deployment is currently in production. The PR's `SQLiteDatabase` documentation explicitly limits writes to a single writer on the node event-loop thread; its signing protection also says concurrent nodes sharing keys are unsupported. The model exposes what would need to change if those limitations were removed or if configuration errors must fail safely.
+
+The smallest atomicity improvement is a conditionally updating, committed claim statement with a success indicator, replacing the separate application-level check and unconditional replacement. True cross-host key-safety additionally needs a shared authoritative ledger or exclusive signing-key custody; a better SQLite statement cannot coordinate two unrelated database files. Key identity must be defined in cryptographic terms before sharing reservation records across logical roles.
 
 ## Reviewer acceptance questions
 
