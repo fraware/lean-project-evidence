@@ -11,7 +11,7 @@ permissions:
 jobs:
   upstream-baseline:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 90
     steps:
       - name: Checkout isolated candidate
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -44,3 +44,12 @@ jobs:
         run: |
           cd leanSpec
           uv run --no-sync --group test pytest tests/node/validator/test_service.py -q --no-cov
+      - name: Candidate complete upstream pytest suite
+        run: |
+          cd leanSpec
+          uv run --no-sync --group test pytest tests -n auto --maxprocesses=10 --durations=10 --dist=worksteal
+      - name: Candidate multi-node interoperability tests
+        if: ${{ always() }}
+        run: |
+          cd leanSpec
+          uv run --no-sync --group test pytest tests/interop/ -v --no-cov --timeout=120 -x --tb=short
