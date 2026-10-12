@@ -39,3 +39,20 @@ The change is a validator execution-preconditions patch: bounded XMSS preparatio
 It **does not implement durable, cross-restart XMSS one-time-key reservation** or prove cryptographic state correspondence. See [leanSpec issue #1203](https://github.com/leanEthereum/leanSpec/issues/1203) and [PR #1204](https://github.com/leanEthereum/leanSpec/pull/1204). Distinct storage safety, concurrency, and recovery obligations remain. This is a pinned historical baseline and needs rebasing if upstream main advances.
 
 No upstream leanSpec branch or PR was created. A fork with write access is needed to submit the patch for maintainer review. Independent hosted CI in another writable repository does not equal upstream CI or maintainer approval.
+
+
+## One-command publication using an authenticated GitHub account
+
+Upstream GitHub API writes from this connected integration return HTTP 403, including branch creation and PR review comments. The supported publication route is the authenticated GitHub CLI on your own machine. The publication helper verifies that the active account is `fraware`, creates the actual `leanEthereum/leanSpec` fork if missing, checks its parent relationship, downloads the immutable tested patch, confirms exact output Git blobs, pushes a separate branch, and opens the pull request against upstream `main`.
+
+Prerequisites: `gh`, `git` and `curl` installed, `gh auth login` completed as `fraware`, and Git commit author information configured.
+
+```bash
+curl -fsSLo publish_upstream.sh https://raw.githubusercontent.com/fraware/lean-project-evidence/0f9ac08259db34e2a5c2aa46d1e12ba039f1dc11/handoff/publish_upstream.sh
+bash -n publish_upstream.sh
+bash publish_upstream.sh
+```
+
+Inspect [the publication helper](./publish_upstream.sh) and [the proposed PR description](./PR_BODY.md) before executing. The helper performs public GitHub writes, creates a temporary standalone clone, and does not overwrite an existing upstream branch. It fails closed if the account, fork parent, pinned source, patch hash, or expected file identity is wrong. Local helper syntax and publication guards are exercised in the [patch witness workflow](../.github/workflows/leanspec-xmss-patch-witness.yml); the actual fork and PR operation must run under the account's authentication, which is not available to this integration.
+
+If using the web interface, [create the fork](https://github.com/leanEthereum/leanSpec/fork) under the `fraware` namespace first. The helper accepts an existing correctly related fork, so the remaining steps stay automatic.
