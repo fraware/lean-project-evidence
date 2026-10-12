@@ -1,0 +1,34 @@
+name: PR1204 atomic patch exact reproduction
+on:
+  push:
+    branches:
+      - research/ethereum-xmss-pr1204-atomic-handoff-20261012
+permissions:
+  contents: read
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout pinned PR1204 source
+        run: |
+          git clone --filter=blob:none https://github.com/leanEthereum/leanSpec.git leanSpec
+          git -C leanSpec fetch origin pull/1204/head
+          git -C leanSpec checkout --detach e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+          test "$(git -C leanSpec rev-parse HEAD)" = e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+      - name: Check upstream source blobs, apply patch, verify exact output
+        run: |
+          set -euo pipefail
+          test "$(git -C leanSpec hash-object src/lean_spec/node/storage/database.py)" = 3023a3aed674fba16e46bda5722a691081c0d20a
+          test "$(git -C leanSpec hash-object src/lean_spec/node/storage/sqlite.py)" = 0df19c168bc23751e235f1eef4d56f9b9242933a
+          test "$(git -C leanSpec hash-object src/lean_spec/node/validator/signing_protection.py)" = 218c66c035949a1b59f834245273acfa4e46d638
+          test "$(git -C leanSpec hash-object tests/node/validator/test_signing_protection.py)" = c31631acd1b9db5bf16dfc5bf15cf03c78eb62d2
+          git -C leanSpec apply --check ../handoff_pr1204/pr1204-atomic-reservation.patch
+          git -C leanSpec apply ../handoff_pr1204/pr1204-atomic-reservation.patch
+          git -C leanSpec diff --check
+          test "$(git -C leanSpec hash-object src/lean_spec/node/storage/database.py)" = 355dfbb5bd2bd50b1b9d24c67a417b04b4363af0
+          test "$(git -C leanSpec hash-object src/lean_spec/node/storage/sqlite.py)" = 660c3dfff3fbc7ad384929831dfd5761812cd773
+          test "$(git -C leanSpec hash-object src/lean_spec/node/validator/signing_protection.py)" = 5d7baef324dde273cc8b67ddfba6b6a0c6000236
+          test "$(git -C leanSpec hash-object tests/node/validator/test_signing_protection.py)" = 063c055588bdb2818ce73e4af1f0d766dd94d350
+          python3 -m compileall -q leanSpec/src/lean_spec/node/storage leanSpec/src/lean_spec/node/validator
