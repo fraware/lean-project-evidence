@@ -20,6 +20,7 @@ done
 gh auth status >/dev/null 2>&1 || fail "Please sign in locally first: gh auth login"
 LOGIN="$(gh api user --jq '.login')"
 [[ "$LOGIN" =~ ^[a-zA-Z0-9-]+$ ]] || fail "Unexpected GitHub login string"
+[[ "$LOGIN" == "fraware" ]] || fail "Authenticate as fraware (current account: ${LOGIN})"
 
 if gh repo view "${LOGIN}/leanSpec" --json nameWithOwner >/dev/null 2>&1; then
   printf 'Using existing repository %s/leanSpec\n' "$LOGIN"
