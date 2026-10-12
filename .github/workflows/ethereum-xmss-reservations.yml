@@ -1,0 +1,36 @@
+name: Ethereum XMSS durable-reservation model
+
+on:
+  push:
+    branches:
+      - research/ethereum-xmss-reservations-20261012
+    paths:
+      - 'experiments/ethereum-xmss/**'
+      - '.github/workflows/ethereum-xmss-reservations.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reservation-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: experiments/ethereum-xmss
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install pinned Lean with elan
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain leanprover/lean4:v4.31.0
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Check original proof lab
+        run: lake build
+      - name: Kernel-check reservation lemmas
+        run: lake env lean XmssReservation.lean
+      - name: Reject admitted proof placeholders
+        run: |
+          if grep -nE '\\b(sorry|admit)\\b' XmssReservation.lean; then
+            exit 1
+          fi
