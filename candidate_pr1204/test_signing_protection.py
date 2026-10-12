@@ -189,7 +189,6 @@ class TestDatabaseBackedReserve:
             with pytest.raises(SigningProtectionError):
                 SigningProtection(database=second).reserve(_VALIDATOR, "attestation", Slot(3))
 
-
     def test_concurrent_connections_claim_a_slot_only_once(self, database_path: Path) -> None:
         """Two SQLite connections agree on a single winner for one signing slot."""
         barrier = Barrier(2)
@@ -198,9 +197,7 @@ class TestDatabaseBackedReserve:
             with _open_database(database_path) as db:
                 barrier.wait(timeout=10)
                 try:
-                    SigningProtection(database=db).reserve(
-                        _VALIDATOR, "proposal", Slot(5)
-                    )
+                    SigningProtection(database=db).reserve(_VALIDATOR, "proposal", Slot(5))
                 except SigningProtectionError:
                     return False
                 return True

@@ -35,11 +35,6 @@ jobs:
           cp candidate_pr1204/signing_protection.py leanSpec/src/lean_spec/node/validator/signing_protection.py
           cp candidate_pr1204/test_signing_protection.py leanSpec/tests/node/validator/test_signing_protection.py
           python3 -m compileall -q leanSpec/src/lean_spec/node/storage leanSpec/src/lean_spec/node/validator
-      - name: Diagnose exact Ruff format changes in disposable checkout
-        run: |
-          cd leanSpec
-          uv run --no-sync --group lint ruff format --diff src/lean_spec/node/validator/signing_protection.py tests/node/validator/test_signing_protection.py || true
-          uv run --no-sync --group lint ruff format src/lean_spec/node/validator/signing_protection.py tests/node/validator/test_signing_protection.py
       - name: Ruff lint and formatting on changed files
         run: |
           cd leanSpec

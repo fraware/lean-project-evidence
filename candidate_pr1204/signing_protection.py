@@ -73,9 +73,7 @@ class SigningProtection:
             # Admission and update are one conditional SQLite statement.
             # Commit before signing so a crash forfeits the duty, not the key.
             with self.database.batch_write():
-                admitted = self.database.try_reserve_signing_slot(
-                    validator_index, role, slot
-                )
+                admitted = self.database.try_reserve_signing_slot(validator_index, role, slot)
             if admitted:
                 return
             last_signed = self.last_signed_slot(validator_index, role)
