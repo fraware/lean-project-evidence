@@ -37,5 +37,9 @@ jobs:
           lake build
           lake env lean EncodingPaddingBridge.lean | tee "$RUNNER_TEMP/encoding-padding-axioms.txt"
           for th in encoding_top_bit_or encoding_top_bit_reject; do
-            grep -F "'leanxmss.Proofs.Encoding.$th' depends on axioms:" "$RUNNER_TEMP/encoding-padding-axioms.txt" | grep -Fv sorryAx
+            grep -F "'leanxmss.Proofs.Encoding.$th' depends on axioms:" "$RUNNER_TEMP/encoding-padding-axioms.txt"
           done
+          if grep -Eq '(sorryAx|_native[.]|Lean[.]trustCompiler)' "$RUNNER_TEMP/encoding-padding-axioms.txt"; then
+            echo "Unexpected admitted or native-evaluation axiom in padding proof" >&2
+            exit 1
+          fi
