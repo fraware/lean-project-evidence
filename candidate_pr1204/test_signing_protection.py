@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import logging
+import shutil
 import tempfile
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-import shutil
 from threading import Barrier
 
 import pytest

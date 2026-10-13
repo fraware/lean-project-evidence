@@ -54,7 +54,8 @@ class SigningProtection:
 
     @property
     def is_durable(self) -> bool:
-        """Whether the SQLite configuration supports local restart persistence.
+        """
+        Report whether SQLite configuration supports local restart persistence.
 
         Returns False for in-memory and unknown storage implementations.
         This property does not certify power-loss survival or backup integrity.

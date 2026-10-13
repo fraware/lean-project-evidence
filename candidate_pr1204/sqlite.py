@@ -81,7 +81,8 @@ class SQLiteDatabase:
 
     @property
     def has_persistent_signing_storage(self) -> bool:
-        """Conservatively classify this SQLite connection for local signer recovery.
+        """
+        Conservatively classify this SQLite connection for local signer recovery.
 
         This checks a file-backed main database and full-sync persistent journaling.
         It does not establish hardware durability, resistance to backup rollback,
