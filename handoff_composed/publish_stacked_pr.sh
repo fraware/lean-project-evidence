@@ -10,7 +10,7 @@ PIN="e8f9c29da3c2b725b988ed85dac8dce3d89d0012"
 BRANCH="fix/atomic-xmss-preflight-on-pr1204-20261013"
 REF="0fbba82f9658f58a4515a2767cc7c1b98f946170"
 PATCH_URL="https://raw.githubusercontent.com/fraware/lean-project-evidence/${REF}/handoff_composed/xmss-composed.patch"
-BODY_URL="https://raw.githubusercontent.com/fraware/lean-project-evidence/${REF}/handoff_composed/PR_BODY_STACKED.md"
+BODY_URL="https://raw.githubusercontent.com/fraware/lean-project-evidence/64f51af64ad1704c6e96c88db12a26a1c2140a8c/handoff_composed/PR_BODY_STACKED.md"
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 for tool in gh git curl awk; do command -v "$tool" >/dev/null 2>&1 || fail "Missing $tool"; done
