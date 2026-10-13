@@ -1,0 +1,49 @@
+name: leanSpec XMSS independent manifest identity patch acceptance
+
+on:
+  push:
+    branches:
+      - research/ethereum-xmss-local-key-identity-handoff-20261013
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-registry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Clone pinned upstream PR source
+        run: |
+          git clone --filter=blob:none https://github.com/leanEthereum/leanSpec.git leanSpec
+          git -C leanSpec fetch origin pull/1204/head
+          git -C leanSpec checkout --detach e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+          test "$(git -C leanSpec rev-parse HEAD)" = e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+      - name: Validate original and candidate SHA for both patched files
+        run: |
+          cd leanSpec
+          test "$(git hash-object src/lean_spec/node/validator/registry.py)" = c3336437260d35a1c41c4589734e73625191b74f
+          test "$(git hash-object tests/node/validator/test_registry.py)" = 5ac8e77b2a6be6b2579ae51064f51bac9c8ec5de
+          git apply --check ../handoff_xmss_key_identity/local-public-key-uniqueness.patch
+          git apply ../handoff_xmss_key_identity/local-public-key-uniqueness.patch
+          test "$(git hash-object src/lean_spec/node/validator/registry.py)" = ba46ce42f0c5457a4862d331cc67948a30f10196
+          test "$(git hash-object tests/node/validator/test_registry.py)" = b3c53b66294ee8801f2871a6ed81c29ec7d112c6
+          git diff --check
+          git diff --stat
+      - name: Install frozen upstream dependencies
+        run: |
+          python3 -m pip install 'uv>=0.7,<1'
+          cd leanSpec
+          uv sync --frozen --group test --group lint
+      - name: Check Ruff, formatting, and whole-project typing
+        run: |
+          cd leanSpec
+          uv run --no-sync --group lint ruff check --no-fix src/lean_spec/node/validator/registry.py tests/node/validator/test_registry.py
+          uv run --no-sync --group lint ruff format --check src/lean_spec/node/validator/registry.py tests/node/validator/test_registry.py
+          uv run --no-sync --group lint ty check
+      - name: Execute upstream native registry tests
+        run: |
+          cd leanSpec
+          uv run --no-sync --group test pytest tests/node/validator/test_registry.py -q --no-cov
