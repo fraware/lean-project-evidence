@@ -170,7 +170,6 @@ class TestDatabaseBackedReserve:
         with _open_database(database_path) as database:
             assert SigningProtection(database=database).is_durable is True
 
-
     def test_in_memory_sqlite_is_not_durable_and_loses_reservations(self) -> None:
         """An in-memory database must not be advertised as restart-safe."""
         with SQLiteDatabase(":memory:", State, Block) as first:

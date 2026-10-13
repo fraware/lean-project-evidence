@@ -78,7 +78,6 @@ class SQLiteDatabase:
 
         self._init_schema()
 
-
     @property
     def has_persistent_signing_storage(self) -> bool:
         """
