@@ -20,3 +20,21 @@ The [atomic-only candidate](https://github.com/fraware/lean-project-evidence/act
 - `tests/node/validator/test_service.py` — `6eb3cd197275d390c4c0dc4e55e0429521604140` → `2d83eaa71529bafda6e914e9c8c66b81e98d3870`; +69/-0 lines, 3 hunks
 
 Do not submit this patch against unmodified upstream main. It is stacked on PR #1204.
+
+## Publish a stacked review PR
+
+PR #1204's contributor branch is `adust09/leanSpec:feat/durable-signing-protection` at the pinned SHA. The preferred next contribution is a **stacked PR to that exact feature branch**, then a link from the upstream PR #1204 conversation. It avoids duplicating the entire unmerged feature against upstream main.
+
+The connected GitHub integration cannot create forks or write upstream PR comments. An account-authenticated local helper is available. It checks the `fraware` login, the live author-branch commit, the fork parent, the exact patch and all six output Git blobs, then pushes a separate branch and requests review.
+
+```bash
+curl -fsSLo publish_stacked_pr.sh \
+  https://raw.githubusercontent.com/fraware/lean-project-evidence/4290f283374f4fdd7d20ebaa9b0951cebd41a299/handoff_composed/publish_stacked_pr.sh
+bash -n publish_stacked_pr.sh
+bash publish_stacked_pr.sh
+```
+
+The script needs `gh`, `git`, `curl`, GitHub authentication as `fraware`, and locally configured Git commit identity. Inspect [publish_stacked_pr.sh](./publish_stacked_pr.sh) and [PR_BODY_STACKED.md](./PR_BODY_STACKED.md) before execution. It makes public GitHub changes, refuses stale revisions or overwrite of the target fork branch, and retains its working directory. It does not automatically merge or alter the upstream contributor's branch.
+
+[Composed native CI, 72 focused and 2,967 standard tests](https://github.com/fraware/lean-project-evidence/actions/runs/38340641997) · [Patch and publication-helper witness](https://github.com/fraware/lean-project-evidence/actions/runs/38377803843).
+
