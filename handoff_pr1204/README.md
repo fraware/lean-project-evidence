@@ -6,6 +6,8 @@ The correction replaces separate read/check/unconditional replacement with one c
 
 The candidate includes three native regression tests: two SQLite handles claiming the same slot concurrently, refusal of a delayed lower-slot claim, and independence of two role-specific keys.
 
+For review, see the [claim–evidence register](./CLAIMS.md) and [threat/recovery model](./THREAT_MODEL.md). They separate directly reproduced traces, bounded tests, Lean theorems, and unestablished deployment assumptions.
+
 ## Scope and limitations
 
 - Safety relies on the committed shared SQLite file and a single agreed logical validator/role key identity. Two independent database files, backups rolled back to prior states, and accidental reuse of the same XMSS secret across logical identities are **outside** this patch.
