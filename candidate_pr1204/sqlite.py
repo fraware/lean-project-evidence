@@ -78,6 +78,37 @@ class SQLiteDatabase:
 
         self._init_schema()
 
+
+    @property
+    def has_persistent_signing_storage(self) -> bool:
+        """Conservatively classify this SQLite connection for local signer recovery.
+
+        This checks a file-backed main database and full-sync persistent journaling.
+        It does not establish hardware durability, resistance to backup rollback,
+        or exclusive custody of the associated cryptographic signing secret.
+        """
+        try:
+            file_path = next(
+                (
+                    str(row["file"])
+                    for row in self._connection.execute("PRAGMA database_list")
+                    if row["name"] == "main"
+                ),
+                "",
+            )
+            journal = self._connection.execute("PRAGMA main.journal_mode").fetchone()
+            synchronous = self._connection.execute("PRAGMA main.synchronous").fetchone()
+        except sqlite3.Error:
+            return False
+
+        return (
+            bool(file_path)
+            and journal is not None
+            and synchronous is not None
+            and str(journal[0]).lower() in {"delete", "truncate", "persist", "wal"}
+            and int(synchronous[0]) >= 2
+        )
+
     def _init_schema(self) -> None:
         """Create tables if they don't exist."""
         cursor = self._connection.cursor()

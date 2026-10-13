@@ -124,9 +124,9 @@ class ValidatorService:
 
         if not self.signing_protection.is_durable:
             logger.warning(
-                "Signing protection is not durable: no database is configured. "
-                "A restart or a backward clock step within a slot can sign it twice "
-                "and expose one-time key material."
+                "Signing protection lacks supported persistent SQLite storage. "
+                "An in-memory or unsafe storage configuration can lose reservations "
+                "on restart; restored backups and independent signers are unsupported."
             )
 
         while self._running:

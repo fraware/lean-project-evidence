@@ -7,6 +7,7 @@ import tempfile
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+import shutil
 from threading import Barrier
 
 import pytest
@@ -168,6 +169,49 @@ class TestDatabaseBackedReserve:
         """A configured database makes the records survive a restart."""
         with _open_database(database_path) as database:
             assert SigningProtection(database=database).is_durable is True
+
+
+    def test_in_memory_sqlite_is_not_durable_and_loses_reservations(self) -> None:
+        """An in-memory database must not be advertised as restart-safe."""
+        with SQLiteDatabase(":memory:", State, Block) as first:
+            protection = SigningProtection(database=first)
+            assert protection.is_durable is False
+            protection.reserve(_VALIDATOR, "proposal", Slot(5))
+            assert protection.last_signed_slot(_VALIDATOR, "proposal") == Slot(5)
+
+        with SQLiteDatabase(":memory:", State, Block) as reopened:
+            assert reopened.get_last_signed_slot(_VALIDATOR, "proposal") is None
+            assert SigningProtection(database=reopened).is_durable is False
+
+    def test_unsafe_sqlite_pragmas_are_not_classified_durable(
+        self, database_path: Path
+    ) -> None:
+        """File-backed storage still needs appropriate SQLite commit settings."""
+        with _open_database(database_path) as database:
+            assert SigningProtection(database=database).is_durable is True
+            database._connection.execute("PRAGMA synchronous = NORMAL")
+            assert SigningProtection(database=database).is_durable is False
+            database._connection.execute("PRAGMA synchronous = FULL")
+            assert SigningProtection(database=database).is_durable is True
+            database._connection.execute("PRAGMA journal_mode = MEMORY")
+            assert SigningProtection(database=database).is_durable is False
+
+    def test_restoring_old_database_snapshot_does_not_preserve_high_water(
+        self, database_path: Path
+    ) -> None:
+        """Document the unsupported rollback case without signing real keys."""
+        snapshot = database_path.with_suffix(".snapshot")
+        with _open_database(database_path) as database:
+            SigningProtection(database=database).reserve(_VALIDATOR, "proposal", Slot(3))
+        shutil.copyfile(database_path, snapshot)
+        with _open_database(database_path) as database:
+            SigningProtection(database=database).reserve(_VALIDATOR, "proposal", Slot(4))
+
+        shutil.copyfile(snapshot, database_path)
+        with _open_database(database_path) as restored:
+            assert restored.get_last_signed_slot(_VALIDATOR, "proposal") == Slot(3)
+            # A restored snapshot cannot prove that slot 4 was already consumed.
+            SigningProtection(database=restored).reserve(_VALIDATOR, "proposal", Slot(4))
 
     def test_should_commit_the_claim_before_returning(self, database_path: Path) -> None:
         """The record is committed on its own, not left for a later batch."""

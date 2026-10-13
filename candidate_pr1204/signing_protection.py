@@ -14,7 +14,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Literal
 
-from lean_spec.node.storage import Database
+from lean_spec.node.storage import Database, SQLiteDatabase
 from lean_spec.spec.forks import Slot, ValidatorIndex
 
 logger = logging.getLogger(__name__)
@@ -36,13 +36,14 @@ class SigningProtection:
     """
     Enforces at most one signature per validator key per slot.
 
-    Records live in the node database when one is configured, so they survive a
-    restart, a clock that steps backwards, and a restore from backup. Without a
-    database they are process-local, which leaves a crash inside a slot
-    unprotected — `is_durable` reports which of the two is in force.
+    A file-backed SQLite database with supported full-sync journaling retains
+    committed records across ordinary process restarts. In-memory SQLite and
+    process-local records have no such persistence. The `is_durable` flag is a
+    conservative configuration indicator, not a filesystem power-loss proof.
 
-    Two instances must never share a key. Concurrent nodes holding the same key
-    keep separate records and can each sign the same slot.
+    Restoring an older database snapshot can reopen a spent slot. Independent
+    databases and signers sharing one secret also defeat local reservations.
+    Key custody and backup-rollback prevention are operational obligations.
     """
 
     database: Database | None = None
@@ -53,8 +54,15 @@ class SigningProtection:
 
     @property
     def is_durable(self) -> bool:
-        """Whether the records survive a restart of this process."""
-        return self.database is not None
+        """Whether the SQLite configuration supports local restart persistence.
+
+        Returns False for in-memory and unknown storage implementations.
+        This property does not certify power-loss survival or backup integrity.
+        """
+        return (
+            isinstance(self.database, SQLiteDatabase)
+            and self.database.has_persistent_signing_storage
+        )
 
     def reserve(self, validator_index: ValidatorIndex, role: SigningRole, slot: Slot) -> None:
         """
