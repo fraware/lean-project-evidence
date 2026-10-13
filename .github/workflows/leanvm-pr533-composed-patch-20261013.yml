@@ -14,6 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate review script syntax and idempotency marker
+        run: |
+          bash -n handoff_leanvm_533/publish_review.sh
+          grep -Fq 'leanvm-pr533-two-folds-reviewed-20261013-v1' handoff_leanvm_533/REVIEW_NOTE.md
       - name: Clone pinned upstream PR #533
         run: |
           git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
