@@ -47,6 +47,8 @@ class PublishReviewContract(unittest.TestCase):
                         sys.exit(2)
                     sys.exit(0)
                 if argv[0] == "api" and "issues/1204/comments" in argv[1]:
+                    if os.environ.get("MOCK_COMMENTS_FAIL") == "1":
+                        sys.exit(8)
                     print(os.environ.get("MOCK_OLD_REVIEW", ""))
                     sys.exit(0)
                 if argv[:2] == ["pr", "comment"]:
@@ -140,6 +142,13 @@ class PublishReviewContract(unittest.TestCase):
         result = self.run_script()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("No duplicate", result.stdout)
+        self.assertFalse(self.log.exists())
+
+    def test_comment_history_read_failure_blocks_publication(self):
+        self.env["MOCK_COMMENTS_FAIL"] = "1"
+        result = self.run_script()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Unable to verify existing PR comments", result.stderr)
         self.assertFalse(self.log.exists())
 
     def test_tampered_review_rejected(self):
