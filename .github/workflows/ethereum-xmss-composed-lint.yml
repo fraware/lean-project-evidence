@@ -1,0 +1,28 @@
+name: Composed XMSS Ruff diagnostic
+on:
+  push:
+    branches:
+      - research/ethereum-xmss-composed-lint-20261013
+permissions:
+  contents: read
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Clone pinned PR #1204
+        run: |
+          git clone --filter=blob:none https://github.com/leanEthereum/leanSpec.git leanSpec
+          git -C leanSpec fetch origin pull/1204/head
+          git -C leanSpec checkout --detach e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+          cp candidate_composed/service.py leanSpec/src/lean_spec/node/validator/service.py
+          cp candidate_composed/test_service.py leanSpec/tests/node/validator/test_service.py
+      - name: Install pinned formatter
+        run: python3 -m pip install ruff==0.14.10
+      - name: Check lint and exact formatting
+        run: |
+          cd leanSpec
+          ruff check --no-fix src/lean_spec/node/validator/service.py tests/node/validator/test_service.py
+          ruff format --diff src/lean_spec/node/validator/service.py tests/node/validator/test_service.py || true
+          ruff format --check src/lean_spec/node/validator/service.py tests/node/validator/test_service.py
