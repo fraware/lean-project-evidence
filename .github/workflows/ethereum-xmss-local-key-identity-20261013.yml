@@ -38,6 +38,10 @@ jobs:
           python3 -m pip install 'uv>=0.7,<1'
           cd leanSpec
           uv sync --frozen --group test --group lint
+      - name: Report formatter changes for independent review
+        run: |
+          cd leanSpec
+          uv run --no-sync --group lint ruff format --diff tests/node/validator/test_registry.py || true
       - name: Check Ruff, exact formatting, and whole-project types
         run: |
           cd leanSpec
