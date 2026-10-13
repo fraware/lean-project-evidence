@@ -1,0 +1,54 @@
+name: XMSS locally duplicated manifest signing identities
+
+on:
+  push:
+    branches:
+      - research/ethereum-xmss-local-key-identity-20261013
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  local-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Clone pinned leanSpec XMSS signing PR
+        run: |
+          git clone --filter=blob:none https://github.com/leanEthereum/leanSpec.git leanSpec
+          git -C leanSpec fetch origin pull/1204/head
+          git -C leanSpec checkout --detach e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+          test "$(git -C leanSpec rev-parse HEAD)" = e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+      - name: Overlay full previously accepted signer and narrow key-loader correction
+        run: |
+          cp candidate_pr1204/database.py leanSpec/src/lean_spec/node/storage/database.py
+          cp candidate_pr1204/sqlite.py leanSpec/src/lean_spec/node/storage/sqlite.py
+          cp candidate_pr1204/signing_protection.py leanSpec/src/lean_spec/node/validator/signing_protection.py
+          cp candidate_pr1204/test_signing_protection.py leanSpec/tests/node/validator/test_signing_protection.py
+          cp candidate_composed/service.py leanSpec/src/lean_spec/node/validator/service.py
+          cp candidate_composed/test_service.py leanSpec/tests/node/validator/test_service.py
+          cp candidate_identity/registry.py leanSpec/src/lean_spec/node/validator/registry.py
+          cp candidate_identity/test_registry.py leanSpec/tests/node/validator/test_registry.py
+          git -C leanSpec diff --check
+          git -C leanSpec diff --stat
+      - name: Install frozen test and lint dependencies
+        run: |
+          python3 -m pip install 'uv>=0.7,<1'
+          cd leanSpec
+          uv sync --frozen --group test --group lint
+      - name: Check Ruff, exact formatting, and whole-project types
+        run: |
+          cd leanSpec
+          uv run --no-sync --group lint ruff check --no-fix src/lean_spec/node/validator/registry.py tests/node/validator/test_registry.py
+          uv run --no-sync --group lint ruff format --check src/lean_spec/node/validator/registry.py tests/node/validator/test_registry.py
+          uv run --no-sync --group lint ty check
+      - name: Run focus tests for registry, signing, and service
+        run: |
+          cd leanSpec
+          uv run --no-sync --group test pytest tests/node/validator/test_registry.py tests/node/validator/test_signing_protection.py tests/node/validator/test_service.py -q --no-cov
+      - name: Full standard upstream suite
+        run: |
+          cd leanSpec
+          uv run --no-sync --group test pytest tests -n auto --maxprocesses=10 --durations=10 --dist=worksteal
