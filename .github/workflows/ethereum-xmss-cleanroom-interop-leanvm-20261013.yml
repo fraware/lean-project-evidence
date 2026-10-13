@@ -1,0 +1,102 @@
+name: Ethereum XMSS independent handoff, interop, and leanVM proof audit
+
+on:
+  push:
+    branches:
+      - research/ethereum-xmss-cleanroom-interop-leanvm-audit-20261013
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cleanroom-interop:
+    name: Exact blob reconstruction and excluded multi-node interop
+    runs-on: macos-latest
+    timeout-minutes: 50
+    env:
+      LEAN_ENV: test
+      PYTHONHASHSEED: "1"
+    steps:
+      - name: Checkout source-pinned evidence and review script
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify review script syntax and expected source identity
+        run: |
+          bash -n handoff_xmss_durability/review_candidate.sh
+          grep -Fq 'EVIDENCE="79b27bba5154298de32681dcadcc8ec8628de54b"' handoff_xmss_durability/review_candidate.sh
+          grep -Fq 'PIN="e8f9c29da3c2b725b988ed85dac8dce3d89d0012"' handoff_xmss_durability/review_candidate.sh
+      - name: Reconstruct in fresh checkout and hash-verify all six files
+        run: |
+          bash handoff_xmss_durability/review_candidate.sh
+          checkout_dir="$(find "$RUNNER_TEMP" -maxdepth 2 -type d -path '*/lean-xmss-review.*/leanSpec' -print -quit)"
+          test -n "$checkout_dir"
+          test "$(git -C "$checkout_dir" rev-parse HEAD)" = e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+          printf 'CANDIDATE_DIR=%s\n' "$checkout_dir" >> "$GITHUB_ENV"
+          git -C "$checkout_dir" diff --check
+          git -C "$checkout_dir" diff --numstat
+      - name: Set up upstream-tested Python 3.14
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.14"
+      - name: Install uv and frozen dependencies
+        run: |
+          python3 -m pip install 'uv>=0.7,<1'
+          cd "$CANDIDATE_DIR"
+          uv sync --frozen --group test --group lint
+      - name: Check exact candidate lint, formatting, and types
+        run: |
+          cd "$CANDIDATE_DIR"
+          uv run --no-sync --group lint ruff check --no-fix src/lean_spec/node/storage/database.py src/lean_spec/node/storage/sqlite.py src/lean_spec/node/validator/signing_protection.py tests/node/validator/test_signing_protection.py src/lean_spec/node/validator/service.py tests/node/validator/test_service.py
+          uv run --no-sync --group lint ruff format --check src/lean_spec/node/storage/database.py src/lean_spec/node/storage/sqlite.py src/lean_spec/node/validator/signing_protection.py tests/node/validator/test_signing_protection.py src/lean_spec/node/validator/service.py tests/node/validator/test_service.py
+          uv run --no-sync --group lint ty check
+      - name: Run upstream multi-node interoperability test excluded from standard pytest
+        run: |
+          cd "$CANDIDATE_DIR"
+          uv run --no-sync --group test pytest tests/interop/ -v --no-cov --timeout=120 -x --tb=short --log-cli-level=INFO
+  leanvm-proof-baseline:
+    name: Exact leanVM PR #533 sorry and axioms baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Check out pinned leanVM PR source
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
+          git -C leanVM fetch --depth=1 origin pull/533/head
+          git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          test "$(git -C leanVM rev-parse HEAD)" = 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          grep -Fxq 'leanprover/lean4:v4.31.0' leanVM/verification/leanxmss/lean-toolchain
+      - name: Inspect exact admitted implementation obligations
+        run: |
+          cd leanVM/verification/leanxmss
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path("LeanxmssProofs/Encoding.lean").read_text()
+          expected={"fold6","fold12","encode_spec"}
+          found={}
+          for name in expected:
+              m=re.search(r"(?m)^theorem "+name+r"\b",s)
+              assert m is not None, name
+              end=re.search(r"(?m)^(?:theorem|end)\s",s[m.end():])
+              fragment=s[m.start():m.end()+end.start() if end else len(s)]
+              assert re.search(r"(?m)^\s+sorry\s*$",fragment),name
+              found[name]=s[:m.start()].count("\n")+1
+          all_sorry=[i for i,line in enumerate(s.splitlines(),1) if re.fullmatch(r"\s*sorry\s*",line)]
+          assert len(all_sorry)==3, f"Unexpected admitted proof inventory: {all_sorry}"
+          print("Exact pinned admitted obligations:", found)
+          print("Admitted proof-line positions:", all_sorry)
+          PY
+      - name: Install official Lean toolchain through elan
+        run: |
+          curl --fail --silent --show-error --location https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
+          sh /tmp/elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Reproduce Lean proof build and inspect actual axiom closure
+        run: |
+          export PATH="$HOME/.elan/bin:$PATH"
+          cd leanVM/verification/leanxmss
+          lake exe cache get
+          lake build
+          lake env lean scripts/Axioms.lean | tee "$RUNNER_TEMP/leanvm-pr533-axioms.txt"
+          grep -Fq 'sorryAx' "$RUNNER_TEMP/leanvm-pr533-axioms.txt"
+          echo 'BASELINE ONLY: sorryAx is present. No implementation equivalence completeness claim.'
