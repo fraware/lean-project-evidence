@@ -23,7 +23,20 @@ theorem encoding_top_bit_or (low high : BitVec 64) :
       simpa using h
   rw [eq_zero, eq_zero, eq_zero]
   rw [BitVec.toNat_or]
-  exact Nat.or_eq_zero_iff
+  have hor_small (a b : Nat) (ha : a < 2) (hb : b < 2) :
+      (a ||| b = 0 ↔ a = 0 ∧ b = 0) := by
+    rcases (show a = 0 ∨ a = 1 by omega) with h | h <;>
+      rcases (show b = 0 ∨ b = 1 by omega) with h' | h' <;>
+      simp [h, h']
+  have hl : (low >>> 63).toNat < 2 := by
+    have h := BitVec.toNat_ushiftRight_lt low 63 (by decide)
+    norm_num at h
+    exact h
+  have hh : (high >>> 63).toNat < 2 := by
+    have h := BitVec.toNat_ushiftRight_lt high 63 (by decide)
+    norm_num at h
+    exact h
+  exact hor_small _ _ hl hh
 
 /-- Equivalently, failure of the shared guard means a half has a high bit. -/
 theorem encoding_top_bit_reject (low high : BitVec 64) :
