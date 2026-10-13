@@ -22,6 +22,12 @@ jobs:
           bash -n handoff_composed/publish_review_comment.sh
           grep -F 'ACTUAL="$(gh api' handoff_composed/publish_review_comment.sh
           grep -F 'gh pr comment "$PR"' handoff_composed/publish_review_comment.sh
+          bash -n handoff_composed/publish_stacked_pr.sh
+          grep -F 'gh pr create --repo "$BASE_REPO"' handoff_composed/publish_stacked_pr.sh
+          grep -F 'git -C "$REPO" apply --check' handoff_composed/publish_stacked_pr.sh
+          grep -F '64f51af64ad1704c6e96c88db12a26a1c2140a8c/handoff_composed/PR_BODY_STACKED.md' handoff_composed/publish_stacked_pr.sh
+          curl -fsSL https://raw.githubusercontent.com/fraware/lean-project-evidence/64f51af64ad1704c6e96c88db12a26a1c2140a8c/handoff_composed/PR_BODY_STACKED.md -o /tmp/PR_BODY_STACKED.md
+          test -s /tmp/PR_BODY_STACKED.md
       - name: Verify Git file identities and reproduce combined candidate
         run: |
           set -euo pipefail
