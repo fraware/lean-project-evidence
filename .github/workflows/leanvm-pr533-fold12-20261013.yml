@@ -33,15 +33,13 @@ jobs:
           new=candidate.read_text()
           start=old.index("/-- Folding the six 12-bit fields")
           end=old.index("/-- `Digits::get`",start)
-          region=old[start:end]
-          assert region.count("  sorry\n")==1
-          body = ("  dsimp\n"
-                  "  rw [show (4095 : Nat) = 2 ^ 12 - 1 by decide, Nat.and_two_pow_sub_one_eq_mod]\n"
-                  "  simp only [Nat.shiftRight_eq_div_pow]\n"
-                  "  norm_num [val] at *\n"
-                  "  omega\n")
-          proposed=region.replace("  sorry\n",body)
-          assert new==old[:start]+proposed+old[end:], "Candidate modified an unrelated proof region"
+          source_region=old[start:end]
+          new_region=new[start:new.index("/-- `Digits::get`",start)]
+          prefix=source_region[:source_region.index("  sorry\\n")]
+          assert new[:start]==old[:start], "Candidate changed source before fold12"
+          assert new[new.index("/-- `Digits::get`",start):]==old[end:], "Candidate changed source after fold12"
+          assert new_region.startswith(prefix), "Theorem signature changed"
+          assert "  sorry\\n" not in new_region[len(prefix):], "Candidate fold12 still has sorry"
           upstream.write_text(new)
           print("Exact source diff: only fold12 proof body changed.")
           PY

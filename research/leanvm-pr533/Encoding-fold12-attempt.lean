@@ -145,7 +145,37 @@ theorem fold12 (e0 e1 e2 e3 e4 e5 : Nat) (h0 : e0 ≤ 56) (h1 : e1 ≤ 56) (h2 :
   dsimp
   rw [show (4095 : Nat) = 2 ^ 12 - 1 by decide, Nat.and_two_pow_sub_one_eq_mod]
   simp only [Nat.shiftRight_eq_div_pow]
-  norm_num [val] at *
+  norm_num [val]
+  have hd1 :
+      (e0 + 4096 * (e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5))))) /
+          4096 =
+        e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5))) := by
+    omega
+  rw [hd1]
+  have hlow2 : e0 + e1 + 4096 * (e1 + e2) < 16777216 := by omega
+  have hd2 :
+      (e0 + 4096 * (e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5)))) +
+          (e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5))))) /
+          16777216 =
+        (e2 + e3) + 4096 * ((e3 + e4) + 4096 * ((e4 + e5) + 4096 * e5)) := by
+    omega
+  rw [hd2]
+  have hlow4 :
+      (e0 + e1 + e2 + e3) +
+          4096 * (e1 + e2 + e3 + e4) +
+          16777216 * (e2 + e3 + e4 + e5) +
+          68719476736 * (e3 + e4 + e5) <
+        281474976710656 := by
+    omega
+  have hd3 :
+      (e0 + 4096 * (e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5)))) +
+          (e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5)))) +
+          ((e2 + e3) + 4096 * ((e3 + e4) + 4096 * ((e4 + e5) + 4096 * e5)))) /
+          281474976710656 =
+        (e4 + e5) + 4096 * e5 := by
+    omega
+  rw [hd3]
+  have hsum : e0 + e1 + e2 + e3 + e4 + e5 < 4096 := by omega
   omega
 
 /-- `Digits::get` of a digit index is that digit of its word, in base eight. -/
