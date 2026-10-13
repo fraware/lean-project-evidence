@@ -135,7 +135,7 @@ theorem fold6 (c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 : Nat) (h0 : c0 < 64) (h1 : c1 
     val 4096 [c0 + c1, c2 + c3, c4 + c5, c6 + c7, c8 + c9, c10] := by
   have hc : ∀ a ∈ [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10], a < 2 ^ 6 := by
     intro a ha
-    simp only [List.mem_cons, List.mem_singleton] at ha
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
     rcases ha with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> omega
   have hm : ∀ m ∈ [63, 0, 63, 0, 63, 0, 63, 0, 63, 0, 15], m < 2 ^ 6 := by
     simp
@@ -156,7 +156,7 @@ theorem fold6 (c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 : Nat) (h0 : c0 < 64) (h1 : c1 
       (val_cons_div 6 c0 [c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] (by omega))
   have hc' : ∀ a ∈ [c1, c2, c3, c4, c5, c6, c7, c8, c9, c10], a < 2 ^ 6 := by
     intro a ha
-    simp only [List.mem_cons, List.mem_singleton] at ha
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
     rcases ha with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> omega
   have hodd :
       (val 64 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] >>> 6 &&&
@@ -170,7 +170,7 @@ theorem fold6 (c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 : Nat) (h0 : c0 < 64) (h1 : c1 
       land_63 h1, land_63 h3, land_63 h5, land_63 h7, land_63 h9] using h
   rw [heven, hodd]
   simp only [val_cons, val_nil]
-  omega
+  ring
 
 /-- Folding the six 12-bit fields into the lowest (`Digits::sum`'s last steps). UNFINISHED. -/
 theorem fold12 (e0 e1 e2 e3 e4 e5 : Nat) (h0 : e0 ≤ 56) (h1 : e1 ≤ 56) (h2 : e2 ≤ 56) (h3 : e3 ≤ 56)
