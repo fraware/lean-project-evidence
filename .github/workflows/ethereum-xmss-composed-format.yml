@@ -1,0 +1,25 @@
+name: leanSpec combined candidate exact Ruff formatting diff
+on:
+  push:
+    branches:
+      - research/ethereum-xmss-composed-format-20261012
+permissions:
+  contents: read
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Clone exact upstream PR head for Ruff config
+        run: |
+          git clone --filter=blob:none https://github.com/leanEthereum/leanSpec.git leanSpec
+          git -C leanSpec fetch origin pull/1204/head
+          git -C leanSpec checkout --detach e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+          cp candidate_composed/test_service.py leanSpec/tests/node/validator/test_service.py
+      - name: Install pinned Ruff
+        run: python3 -m pip install 'ruff==0.14.10'
+      - name: Emit exact source formatter diff without modifying files
+        run: |
+          cd leanSpec
+          ruff format --diff tests/node/validator/test_service.py || true
