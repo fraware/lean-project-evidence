@@ -1,0 +1,51 @@
+name: XMSS local key identity independent consensus interop
+
+on:
+  push:
+    branches:
+      - research/ethereum-xmss-key-identity-interop-20261013
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  three-node-interop:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    env:
+      LEAN_ENV: test
+      PYTHONHASHSEED: "1"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Pin exact upstream signing PR revision
+        run: |
+          git clone --filter=blob:none https://github.com/leanEthereum/leanSpec.git leanSpec
+          git -C leanSpec fetch origin pull/1204/head
+          git -C leanSpec checkout --detach e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+          test "$(git -C leanSpec rev-parse HEAD)" = e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+      - name: Overlay CI-green eight-file signing, service, and local key-identity candidate
+        run: |
+          cp candidate_pr1204/database.py leanSpec/src/lean_spec/node/storage/database.py
+          cp candidate_pr1204/sqlite.py leanSpec/src/lean_spec/node/storage/sqlite.py
+          cp candidate_pr1204/signing_protection.py leanSpec/src/lean_spec/node/validator/signing_protection.py
+          cp candidate_pr1204/test_signing_protection.py leanSpec/tests/node/validator/test_signing_protection.py
+          cp candidate_composed/service.py leanSpec/src/lean_spec/node/validator/service.py
+          cp candidate_composed/test_service.py leanSpec/tests/node/validator/test_service.py
+          cp candidate_identity/registry.py leanSpec/src/lean_spec/node/validator/registry.py
+          cp candidate_identity/test_registry.py leanSpec/tests/node/validator/test_registry.py
+          git -C leanSpec diff --check
+          git -C leanSpec diff --stat
+      - name: Use upstream CI Python 3.14
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.14"
+      - name: Install pinned dependencies
+        run: |
+          python3 -m pip install 'uv>=0.7,<1'
+          cd leanSpec
+          uv sync --frozen --group test --group lint
+      - name: Execute excluded three-node consensus lifecycle
+        run: |
+          cd leanSpec
+          uv run --no-sync --group test pytest tests/interop/ -v --no-cov --timeout=120 -x --tb=short --log-cli-level=INFO
