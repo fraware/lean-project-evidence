@@ -17,6 +17,11 @@ jobs:
           git -C leanSpec fetch origin pull/1204/head
           git -C leanSpec checkout --detach e8f9c29da3c2b725b988ed85dac8dce3d89d0012
           test "$(git -C leanSpec rev-parse HEAD)" = e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+      - name: Validate authenticated publication helper without writing upstream
+        run: |
+          bash -n handoff_composed/publish_review_comment.sh
+          grep -F 'ACTUAL="$(gh api' handoff_composed/publish_review_comment.sh
+          grep -F 'gh pr comment "$PR"' handoff_composed/publish_review_comment.sh
       - name: Verify Git file identities and reproduce combined candidate
         run: |
           set -euo pipefail
