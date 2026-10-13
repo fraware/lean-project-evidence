@@ -17,6 +17,6 @@ The [atomic-only candidate](https://github.com/fraware/lean-project-evidence/act
 - `src/lean_spec/node/validator/signing_protection.py` — `218c66c035949a1b59f834245273acfa4e46d638` → `5d7baef324dde273cc8b67ddfba6b6a0c6000236`; +16/-12 lines, 1 hunks
 - `tests/node/validator/test_signing_protection.py` — `c31631acd1b9db5bf16dfc5bf15cf03c78eb62d2` → `063c055588bdb2818ce73e4af1f0d766dd94d350`; +53/-0 lines, 3 hunks
 - `src/lean_spec/node/validator/service.py` — `3cbaaa6c66b4a2a7461931a76939d24344e7aa46` → `9851994dc3bde0b4fb48c6d68d3a7b075b40960e`; +122/-58 lines, 9 hunks
-- `tests/node/validator/test_service.py` — `6eb3cd197275d390c4c0dc4e55e0429521604140` → `31e4d0b9fa3d66d792307315e0c449100e134c49`; +69/-0 lines, 3 hunks
+- `tests/node/validator/test_service.py` — `6eb3cd197275d390c4c0dc4e55e0429521604140` → `2d83eaa71529bafda6e914e9c8c66b81e98d3870`; +69/-0 lines, 3 hunks
 
 Do not submit this patch against unmodified upstream main. It is stacked on PR #1204.

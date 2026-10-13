@@ -39,5 +39,5 @@ jobs:
           test "$(git -C leanSpec hash-object src/lean_spec/node/validator/signing_protection.py)" = 5d7baef324dde273cc8b67ddfba6b6a0c6000236
           test "$(git -C leanSpec hash-object tests/node/validator/test_signing_protection.py)" = 063c055588bdb2818ce73e4af1f0d766dd94d350
           test "$(git -C leanSpec hash-object src/lean_spec/node/validator/service.py)" = 9851994dc3bde0b4fb48c6d68d3a7b075b40960e
-          test "$(git -C leanSpec hash-object tests/node/validator/test_service.py)" = 31e4d0b9fa3d66d792307315e0c449100e134c49
+          test "$(git -C leanSpec hash-object tests/node/validator/test_service.py)" = 2d83eaa71529bafda6e914e9c8c66b81e98d3870
           python3 -m compileall -q leanSpec/src/lean_spec/node/storage leanSpec/src/lean_spec/node/validator

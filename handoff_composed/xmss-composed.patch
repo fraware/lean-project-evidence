@@ -449,9 +449,9 @@ diff --git a/src/lean_spec/node/validator/service.py b/src/lean_spec/node/valida
 diff --git a/tests/node/validator/test_service.py b/tests/node/validator/test_service.py
 --- a/tests/node/validator/test_service.py
 +++ b/tests/node/validator/test_service.py
-@@ -162,6 +162,27 @@
+@@ -161,7 +161,27 @@
+             service._sign_block(block, ValidatorIndex(42), [])
          assert str(exception_info.value) == "No secret key for validator 42"
- 
  
 +    def test_ci_mismatched_proposal_key_rejected_without_signing(
 +        self, sync_service: SyncService, key_manager: XmssKeyManager
@@ -472,14 +472,14 @@ diff --git a/tests/node/validator/test_service.py b/tests/node/validator/test_se
 +            with pytest.raises(ValueError, match="does not match"):
 +                service._sign_block(block, ValidatorIndex(0), [])
 +            scheme.sign.assert_not_called()
-+
+ 
 +
  class TestSignWithKey:
      """
      Unit tests for the XMSS key advancement and signing logic.
-@@ -334,6 +355,23 @@
-         assert returned_signature is mock_signature
+@@ -333,7 +353,21 @@
  
+         assert returned_signature is mock_signature
  
 +    def test_ci_inactive_key_refused_before_preparation(
 +        self, sync_service: SyncService, key_manager: XmssKeyManager
@@ -493,17 +493,15 @@ diff --git a/tests/node/validator/test_service.py b/tests/node/validator/test_se
 +                service._sign_with_key(entry, slot, Bytes32.zero(), "attestation_secret_key")
 +            scheme.advance_preparation.assert_not_called()
 +            scheme.sign.assert_not_called()
-+        assert service.signing_protection.last_signed_slot(
-+            entry.index, "attestation"
-+        ) is None
-+
++        assert service.signing_protection.last_signed_slot(entry.index, "attestation") is None
+ 
 +
  class TestValidatorServiceBasic:
      """Basic tests for lifecycle properties."""
  
-@@ -768,6 +806,37 @@
+@@ -767,7 +801,37 @@
+             assert Slot(old_slot) not in service._attested_slots
          assert Slot(10) in service._attested_slots
- 
  
 +    async def test_ci_attestation_key_mismatch_skips_only_affected_validator(
 +        self, sync_service: SyncService, key_manager: XmssKeyManager
@@ -521,7 +519,7 @@ diff --git a/tests/node/validator/test_service.py b/tests/node/validator/test_se
 +            )
 +        )
 +        received: list[SignedAttestation] = []
-+
+ 
 +        async def capture(item: SignedAttestation) -> None:
 +            received.append(item)
 +
