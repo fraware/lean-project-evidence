@@ -35,12 +35,12 @@ jobs:
           end=old.index("/-- `Digits::get`",start)
           region=old[start:end]
           assert region.count("  sorry\n")==1
-          proposed=region.replace("  sorry\n",'''  dsimp
-            rw [show (4095 : Nat) = 2 ^ 12 - 1 by decide, Nat.and_two_pow_sub_one_eq_mod]
-            simp only [Nat.shiftRight_eq_div_pow]
-            norm_num [val] at *
-            omega
-          '''.replace("            ",""))
+          body = ("  dsimp\n"
+                  "  rw [show (4095 : Nat) = 2 ^ 12 - 1 by decide, Nat.and_two_pow_sub_one_eq_mod]\n"
+                  "  simp only [Nat.shiftRight_eq_div_pow]\n"
+                  "  norm_num [val] at *\n"
+                  "  omega\n")
+          proposed=region.replace("  sorry\n",body)
           assert new==old[:start]+proposed+old[end:], "Candidate modified an unrelated proof region"
           upstream.write_text(new)
           print("Exact source diff: only fold12 proof body changed.")
