@@ -1,0 +1,46 @@
+name: XMSS reservation high-water conformance
+
+on:
+  push:
+    branches:
+      - research/ethereum-xmss-pr1204-conformance-20261013
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout isolated candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install uv
+        run: python3 -m pip install 'uv>=0.7,<1'
+      - name: Clone pinned PR1204 head
+        run: |
+          git clone --filter=blob:none https://github.com/leanEthereum/leanSpec.git leanSpec
+          git -C leanSpec fetch origin pull/1204/head
+          git -C leanSpec checkout --detach e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+          test "$(git -C leanSpec rev-parse HEAD)" = e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+      - name: Install pinned upstream dependencies
+        run: |
+          cd leanSpec
+          uv sync --frozen --group test --group lint
+      - name: Overlay source-pinned atomic reservation and conformance tests
+        run: |
+          cp candidate_pr1204/database.py leanSpec/src/lean_spec/node/storage/database.py
+          cp candidate_pr1204/sqlite.py leanSpec/src/lean_spec/node/storage/sqlite.py
+          cp candidate_pr1204/signing_protection.py leanSpec/src/lean_spec/node/validator/signing_protection.py
+          cp candidate_pr1204/test_signing_protection.py leanSpec/tests/node/validator/test_signing_protection.py
+      - name: Ruff and whole-project ty
+        run: |
+          cd leanSpec
+          uv run --no-sync --group lint ruff check --no-fix src/lean_spec/node/storage/database.py src/lean_spec/node/storage/sqlite.py src/lean_spec/node/validator/signing_protection.py tests/node/validator/test_signing_protection.py
+          uv run --no-sync --group lint ruff format --check src/lean_spec/node/storage/database.py src/lean_spec/node/storage/sqlite.py src/lean_spec/node/validator/signing_protection.py tests/node/validator/test_signing_protection.py
+          uv run --no-sync --group lint ty check
+      - name: Execute deterministic persisted-state conformance plus existing tests
+        run: |
+          cd leanSpec
+          uv run --no-sync --group test pytest tests/node/validator/test_signing_protection.py -q --no-cov

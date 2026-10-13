@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import random
 import tempfile
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
@@ -238,6 +239,44 @@ class TestDatabaseBackedReserve:
         with _open_database(database_path) as db:
             assert db.get_last_signed_slot(_VALIDATOR, "attestation") == Slot(6)
             assert db.get_last_signed_slot(_VALIDATOR, "proposal") == Slot(6)
+
+
+    @pytest.mark.parametrize("seed", (0, 1, 2, 3, 5, 8, 13, 21))
+    def test_committed_reservation_traces_refine_high_water_model(
+        self, database_path: Path, seed: int
+    ) -> None:
+        """Check seeded sequences against the abstract per-key monotone ledger.
+
+        Each step reopens the database, so the reference state is compared
+        with the independently persisted record. This is a bounded test of
+        the implementation, not a proof that SQLite implements the Lean model.
+        """
+        rng = random.Random(seed)
+        reference: dict[tuple[int, SigningRole], int] = {}
+        roles: tuple[SigningRole, SigningRole] = ("attestation", "proposal")
+
+        for _ in range(64):
+            validator = ValidatorIndex(rng.randrange(4))
+            role = roles[rng.randrange(len(roles))]
+            slot = Slot(rng.randrange(24))
+            key = (int(validator), role)
+            previous = reference.get(key)
+            expected = previous is None or int(slot) > previous
+
+            with _open_database(database_path) as db:
+                guard = SigningProtection(database=db)
+                if expected:
+                    guard.reserve(validator, role, slot)
+                    reference[key] = int(slot)
+                else:
+                    with pytest.raises(SigningProtectionError):
+                        guard.reserve(validator, role, slot)
+
+            with _open_database(database_path) as recovered:
+                for (index, recorded_role), high_water in reference.items():
+                    assert recovered.get_last_signed_slot(
+                        ValidatorIndex(index), recorded_role
+                    ) == Slot(high_water)
 
 
 class TestServiceSigning:
