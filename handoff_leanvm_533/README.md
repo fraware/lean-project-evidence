@@ -32,3 +32,19 @@ full verifier and VM assumptions remain separate obligations.
 
 No upstream comment, PR, or merge is represented by this handoff. The
 connected GitHub integration cannot write to leanEthereum.
+
+### Pinning and independent reconstruction
+
+```bash
+git clone https://github.com/leanEthereum/leanVM.git
+cd leanVM
+git fetch origin pull/533/head
+git checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+test "$(git hash-object verification/leanxmss/LeanxmssProofs/Encoding.lean)" = 4853d8a398a1ff2762a71473c17c17e175f80b73
+```
+
+Retrieve `swar21-and-folds.patch` from this branch and apply it from the
+root of the detached checkout. Then run `lake exe cache get && lake build`
+in `verification/leanxmss` and examine the axiom report.
+
+The patch identity job is separate from the completed Lean kernel build.
