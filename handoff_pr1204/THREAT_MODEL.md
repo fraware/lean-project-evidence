@@ -29,7 +29,7 @@ The PR documents single-writer, exclusive-key assumptions. The corrected impleme
 
 The accompanying Lean proofs characterize an abstract transition system and rely on an atomic persisted ledger. They do not prove that the Python/SQLite code implements the transition, that a cryptographic secret has a unique persistent identity, or that the XMSS signer itself meets the cryptographic specification.
 
-The [bounded conformance exercise](https://github.com/fraware/lean-project-evidence/tree/research/ethereum-xmss-pr1204-conformance-20261013) is an implementation-level test, not a machine-checked refinement. Record its CI result only once observed.
+The [bounded conformance exercise](https://github.com/fraware/lean-project-evidence/actions/runs/38449298042) **passed** in hosted CI: 512 deterministic claims across eight traces with database reopen checks, within 28 native tests and passing Ruff/ty. This is still implementation-level evidence, not a machine-checked refinement.
 
 ## Maintainer decision
 
