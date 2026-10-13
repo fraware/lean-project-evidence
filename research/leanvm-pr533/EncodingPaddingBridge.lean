@@ -19,8 +19,7 @@ theorem encoding_top_bit_or (low high : BitVec 64) :
 theorem encoding_top_bit_reject (low high : BitVec 64) :
     ((low ||| high) >>> 63 ≠ 0#64) ↔
       ((low >>> 63 ≠ 0#64) ∨ (high >>> 63 ≠ 0#64)) := by
-  rw [not_iff_not]
-  exact encoding_top_bit_or low high
+  simpa only [not_and_or] using not_congr (encoding_top_bit_or low high)
 
 end leanxmss.Proofs.Encoding
 
