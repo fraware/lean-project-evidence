@@ -1,0 +1,61 @@
+name: leanVM PR 533 isolated fold6 proof attempt
+
+on:
+  push:
+    branches:
+      - research/leanvm-pr533-fold6-attempt-20261013
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile-fold6:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact experimental evidence
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Pin upstream PR source
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
+          git -C leanVM fetch --depth=1 origin pull/533/head
+          git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          test "$(git -C leanVM rev-parse HEAD)" = 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+      - name: Assert only fold6 proof body changed
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          original=Path("leanVM/verification/leanxmss/LeanxmssProofs/Encoding.lean")
+          new=Path("research/leanvm-pr533/Encoding-fold6-attempt.lean")
+          a=original.read_text()
+          b=new.read_text()
+          i=a.index("/-- Adding neighbouring 6-bit fields")
+          j=a.index("/-- Folding the six 12-bit fields",i)
+          s=a[i:j]
+          prefix=s[:s.index("  sorry\n")]
+          assert b[:i]==a[:i]
+          assert b[b.index("/-- Folding the six 12-bit fields",i):]==a[j:]
+          candidate=b[i:b.index("/-- Folding the six 12-bit fields",i)]
+          assert candidate.startswith(prefix)
+          assert "  sorry\n" not in candidate[len(prefix):]
+          original.write_text(b)
+          print("Exact change: fold6 proof body only.")
+          PY
+          git -C leanVM diff --check
+          git -C leanVM diff --stat
+      - name: Install pinned Lean toolchain
+        run: |
+          grep -Fxq 'leanprover/lean4:v4.31.0' leanVM/verification/leanxmss/lean-toolchain
+          curl --fail --silent --show-error --location https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
+          sh /tmp/elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Kernel-check complete project and proof dependency
+        run: |
+          cd leanVM/verification/leanxmss
+          lake exe cache get
+          lake build
+          printf 'import LeanxmssProofs\n#print axioms leanxmss.Proofs.Encoding.fold6\n#print axioms leanxmss.Proofs.verify_spec\n' > Fold6Axioms.lean
+          lake env lean Fold6Axioms.lean | tee "$RUNNER_TEMP/fold6-axioms.txt"
+          grep -F "'leanxmss.Proofs.Encoding.fold6' depends on axioms:" "$RUNNER_TEMP/fold6-axioms.txt" | grep -Fv 'sorryAx'
+          grep -F "'leanxmss.Proofs.verify_spec' depends on axioms:" "$RUNNER_TEMP/fold6-axioms.txt" | grep -Fq 'sorryAx'
