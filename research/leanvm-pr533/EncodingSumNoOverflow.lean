@@ -35,7 +35,7 @@ theorem encoding_initial_sum_below_u64
     (h6 : c6 ≤ 28) (h7 : c7 ≤ 28) (h8 : c8 ≤ 28)
     (h9 : c9 ≤ 28) (h10 : c10 < 16) :
     val 64 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] < 2 ^ 64 := by
-  norm_num [val]
+  simp only [val_cons, val_nil]
   omega
 
 end leanxmss.Proofs.Encoding
