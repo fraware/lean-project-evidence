@@ -25,6 +25,7 @@ theorem encoding_payload_words
       toBA (ofWords (msg.val ++ rnd.val ++ [0#u64])) := by
   unfold encodingPayload
   rw [packBytes_eq, packBytes_eq]
+  simp only [Statement.message, Statement.randomness]
   rw [Statement.bytes_toList msg MESSAGE_LEN rfl, Statement.bytes_toList rnd RANDOMNESS_LEN rfl]
   simp only [ofWords_append, toBA_append]
   rw [zero_payload_word]
