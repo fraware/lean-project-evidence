@@ -14,9 +14,9 @@ Independently proven against the exact parent:
 - [`fold12` axiom-clean build](https://github.com/fraware/lean-project-evidence/actions/runs/38477725808)
 
 Combined same-build acceptance:
-[Actions run #38479742934](https://github.com/fraware/lean-project-evidence/actions/runs/38479742934).
-**Consult its final verdict**. A separately checked lemma does not substitute
-for the combined build.
+[Actions run #38479742934](https://github.com/fraware/lean-project-evidence/actions/runs/38479742934),
+**successful** (1,713 Lean build jobs). Both `fold6` and `fold12` have
+no `sorryAx` in their axiom closures; `encode_spec` still has `sorryAx`.
 
 Apply from a checkout at the parent commit:
 
@@ -32,3 +32,15 @@ The resulting hash must be `41b62c33554ff74b96c129e21cc7fd11d225179c`.
 correspondence theorems retain `sorryAx`. SDK/VM models and translation
 correctness are separate premises. This patch has **not** been accepted or
 merged by upstream maintainers.
+
+### Contributor-side upstream review
+
+The connected GitHub integration receives HTTP 403 on PR #533 comments.
+The [review note](./REVIEW_NOTE.md) and
+[`publish_review.sh`](./publish_review.sh) support explicit publication through
+a contributor-authenticated GitHub CLI session. Running
+`bash handoff_leanvm_533/publish_review.sh` validates identity, PR source head,
+and previous comments without posting. Appending `--publish` submits the
+source-pinned review intentionally, if all checks pass.
+
+**No upstream review or PR was posted by preparing this handoff.**
