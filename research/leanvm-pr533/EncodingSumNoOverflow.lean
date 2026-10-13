@@ -27,6 +27,7 @@ theorem encoding_sum_stages_below_u64 (e0 e1 e2 e3 e4 e5 : Nat)
 /-- A digit-sum accumulator of ten complete six-bit fields and one
 partial high field cannot wrap a 64-bit machine word, provided its lower
 fields are sums of at most four three-bit digits (0..28 each). -/
+set_option maxHeartbeats 2000000 in
 theorem encoding_initial_sum_below_u64
     (c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 : Nat)
     (h0 : c0 ≤ 28) (h1 : c1 ≤ 28) (h2 : c2 ≤ 28)
