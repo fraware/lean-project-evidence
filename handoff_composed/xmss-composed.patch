@@ -1,0 +1,541 @@
+diff --git a/src/lean_spec/node/storage/database.py b/src/lean_spec/node/storage/database.py
+--- a/src/lean_spec/node/storage/database.py
++++ b/src/lean_spec/node/storage/database.py
+@@ -122,13 +122,13 @@
+         """
+         ...
+ 
+-    def put_last_signed_slot(
++    def try_reserve_signing_slot(
+         self,
+         validator_index: ValidatorIndex,
+         key_role: str,
+         slot: Slot,
+-    ) -> None:
+-        """Record the highest slot one of a validator's keys has signed."""
++    ) -> bool:
++        """Atomically claim a strictly newer signing slot; return False if already spent."""
+         ...
+ 
+     # Transaction Control
+diff --git a/src/lean_spec/node/storage/sqlite.py b/src/lean_spec/node/storage/sqlite.py
+--- a/src/lean_spec/node/storage/sqlite.py
++++ b/src/lean_spec/node/storage/sqlite.py
+@@ -425,26 +425,37 @@
+             return None
+         return Slot(row["last_signed_slot"])
+ 
+-    def put_last_signed_slot(
++    def try_reserve_signing_slot(
+         self,
+         validator_index: ValidatorIndex,
+         key_role: str,
+         slot: Slot,
+-    ) -> None:
+-        """Record the highest slot one of a validator's keys has signed."""
++    ) -> bool:
++        """
++        Atomically record a strictly increasing signing slot for one key role.
++
++        Caller must commit this transaction before invoking the XMSS signer.
++        The conditional statement is the admission decision: no earlier SELECT
++        is relied upon, even if two processes access the same SQLite file.
++        """
+         try:
+             cursor = self._connection.cursor()
+             cursor.execute(
+                 f"""
+-                INSERT OR REPLACE INTO {SIGNING_RECORDS_TABLE_NAME}
+-                (validator_index, key_role, last_signed_slot)
++                INSERT INTO {SIGNING_RECORDS_TABLE_NAME}
++                    (validator_index, key_role, last_signed_slot)
+                 VALUES (?, ?, ?)
++                ON CONFLICT(validator_index, key_role) DO UPDATE
++                SET last_signed_slot = excluded.last_signed_slot
++                WHERE {SIGNING_RECORDS_TABLE_NAME}.last_signed_slot
++                      < excluded.last_signed_slot
+                 """,
+                 (int(validator_index), key_role, int(slot)),
+             )
++            return cursor.rowcount == 1
+         except sqlite3.Error as exception:
+             raise StorageWriteError(
+-                f"Failed to write signing record for validator {validator_index} "
++                f"Failed to reserve signing slot for validator {validator_index} "
+                 f"{key_role} key at slot {slot}: {exception}"
+             ) from exception
+ 
+diff --git a/src/lean_spec/node/validator/signing_protection.py b/src/lean_spec/node/validator/signing_protection.py
+--- a/src/lean_spec/node/validator/signing_protection.py
++++ b/src/lean_spec/node/validator/signing_protection.py
+@@ -64,20 +64,24 @@
+         a later one. The claim is stored before the caller signs, so an
+         interruption in between forfeits the duty rather than the key.
+         """
+-        last_signed = self.last_signed_slot(validator_index, role)
+-        if last_signed is not None and slot <= last_signed:
+-            raise SigningProtectionError(
+-                f"validator {validator_index} {role} key last signed slot {last_signed}; "
+-                f"signing slot {slot} would reuse a one-time key"
+-            )
+-
+         if self.database is None:
+-            self._slots_in_memory[(validator_index, role)] = slot
+-            return
++            last_signed = self._slots_in_memory.get((validator_index, role))
++            if last_signed is None or slot > last_signed:
++                self._slots_in_memory[(validator_index, role)] = slot
++                return
++        else:
++            # Admission and update are one conditional SQLite statement.
++            # Commit before signing so a crash forfeits the duty, not the key.
++            with self.database.batch_write():
++                admitted = self.database.try_reserve_signing_slot(validator_index, role, slot)
++            if admitted:
++                return
++            last_signed = self.last_signed_slot(validator_index, role)
+ 
+-        # Commit on its own so the record outlives the signature it guards.
+-        with self.database.batch_write():
+-            self.database.put_last_signed_slot(validator_index, role, slot)
++        raise SigningProtectionError(
++            f"validator {validator_index} {role} key last signed slot {last_signed}; "
++            f"signing slot {slot} would reuse a one-time key"
++        )
+ 
+     def last_signed_slot(self, validator_index: ValidatorIndex, role: SigningRole) -> Slot | None:
+         """Return the highest slot this key has signed, or None if it never signed."""
+diff --git a/tests/node/validator/test_signing_protection.py b/tests/node/validator/test_signing_protection.py
+--- a/tests/node/validator/test_signing_protection.py
++++ b/tests/node/validator/test_signing_protection.py
+@@ -5,7 +5,9 @@
+ import logging
+ import tempfile
+ from collections.abc import Generator
++from concurrent.futures import ThreadPoolExecutor
+ from pathlib import Path
++from threading import Barrier
+ 
+ import pytest
+ 
+@@ -24,6 +26,7 @@
+ )
+ from lean_spec.node.validator.registry import ValidatorEntry
+ from lean_spec.node.validator.service import AttestationPublisher
++from lean_spec.node.validator.signing_protection import SigningRole
+ from lean_spec.spec.forks import Slot, ValidatorIndex
+ from lean_spec.spec.forks.lstar import State, Store
+ from lean_spec.spec.forks.lstar.containers import Block, SignedAttestation
+@@ -186,7 +189,57 @@
+             with pytest.raises(SigningProtectionError):
+                 SigningProtection(database=second).reserve(_VALIDATOR, "attestation", Slot(3))
+ 
++    def test_concurrent_connections_claim_a_slot_only_once(self, database_path: Path) -> None:
++        """Two SQLite connections agree on a single winner for one signing slot."""
++        barrier = Barrier(2)
+ 
++        def attempt_claim(_: int) -> bool:
++            with _open_database(database_path) as db:
++                barrier.wait(timeout=10)
++                try:
++                    SigningProtection(database=db).reserve(_VALIDATOR, "proposal", Slot(5))
++                except SigningProtectionError:
++                    return False
++                return True
++
++        with ThreadPoolExecutor(max_workers=2) as pool:
++            results = list(pool.map(attempt_claim, range(2)))
++
++        assert sorted(results) == [False, True]
++        with _open_database(database_path) as db:
++            assert db.get_last_signed_slot(_VALIDATOR, "proposal") == Slot(5)
++
++    def test_delayed_older_slot_cannot_lower_high_water(self, database_path: Path) -> None:
++        """The high-water record never regresses across independent connections."""
++        with _open_database(database_path) as high, _open_database(database_path) as low:
++            SigningProtection(database=high).reserve(_VALIDATOR, "proposal", Slot(8))
++
++            with pytest.raises(SigningProtectionError, match="would reuse a one-time key"):
++                SigningProtection(database=low).reserve(_VALIDATOR, "proposal", Slot(5))
++
++        with _open_database(database_path) as db:
++            assert db.get_last_signed_slot(_VALIDATOR, "proposal") == Slot(8)
++
++    def test_concurrent_distinct_roles_remain_independent(self, database_path: Path) -> None:
++        """Attestation and proposal reservations use distinct keys in this scheme."""
++        barrier = Barrier(2)
++
++        def reserve_role(role: SigningRole) -> bool:
++            with _open_database(database_path) as db:
++                barrier.wait(timeout=10)
++                SigningProtection(database=db).reserve(_VALIDATOR, role, Slot(6))
++                return True
++
++        roles: tuple[SigningRole, SigningRole] = ("attestation", "proposal")
++        with ThreadPoolExecutor(max_workers=2) as pool:
++            outcomes = list(pool.map(reserve_role, roles))
++
++        assert outcomes == [True, True]
++        with _open_database(database_path) as db:
++            assert db.get_last_signed_slot(_VALIDATOR, "attestation") == Slot(6)
++            assert db.get_last_signed_slot(_VALIDATOR, "proposal") == Slot(6)
++
++
+ class TestServiceSigning:
+     """The guard as it applies at the service's signing boundary."""
+ 
+diff --git a/src/lean_spec/node/validator/service.py b/src/lean_spec/node/validator/service.py
+--- a/src/lean_spec/node/validator/service.py
++++ b/src/lean_spec/node/validator/service.py
+@@ -54,6 +54,14 @@
+ """Maps a registry key field to the role name signing records are stored under."""
+ 
+ 
++class SigningPreparationError(ValueError):
++    """The XMSS key cannot prepare a signature for the requested slot."""
++
++
++class BlockSigningPreflightError(ValueError):
++    """Block signing prerequisites failed before any proposal signature."""
++
++
+ @dataclass(slots=True)
+ class ValidatorService:
+     """
+@@ -228,8 +236,13 @@
+ 
+             self.sync_service.store = new_store
+ 
+-            # Sign the block root, then merge that signature with the attestation proofs.
+-            signed_block = self._sign_block(block, validator_index, signatures)
++            # Restore the previous store only on a known pre-signature refusal.
++            # Other exceptions might follow key consumption and must propagate.
++            try:
++                signed_block = self._sign_block(block, validator_index, signatures)
++            except (SigningPreparationError, BlockSigningPreflightError, SigningProtectionError):
++                self.sync_service.store = store
++                raise
+ 
+             self._blocks_produced += 1
+ 
+@@ -245,10 +258,14 @@
+                 slot,
+                 exception,
+             )
+-        except SigningProtectionError as exception:
+-            # The proposal key already spent this slot; signing again would expose it.
++
++        except (
++            SigningPreparationError,
++            BlockSigningPreflightError,
++            SigningProtectionError,
++        ) as exception:
+             logger.warning(
+-                "Block production skipped for validator %d at slot %d: %s",
++                "Block signing skipped for validator %d at slot %d: %s",
+                 validator_index,
+                 slot,
+                 exception,
+@@ -283,18 +300,39 @@
+             if validator_entry is None:
+                 raise ValueError(f"No secret key for validator {validator_index}")
+ 
++            # Establish local/on-chain XMSS key identity before signing.
++            try:
++                if not validator_index.is_within_registry(Uint64(len(head_state.validators))):
++                    raise ValueError("Validator index outside the active state")
++                expected_public_key = PublicKey.decode_bytes(
++                    head_state.validators[validator_index].attestation_public_key
++                )
++                secret_key = validator_entry.attestation_secret_key
++                local_public_key = PublicKey(
++                    root=secret_key.top_tree.root(),
++                    parameter=secret_key.parameter,
++                )
++                if local_public_key != expected_public_key:
++                    raise ValueError("Local attestation key does not match on-chain public key")
++            except Exception:
++                logger.warning(
++                    "Attestation key preflight refused validator %d at slot %d",
++                    validator_index,
++                    slot,
++                )
++                continue
++
+             attestation_data = self.spec.produce_attestation_data(store, slot)
+             try:
+-                attestation_signature = self._sign_with_key(
++                signature = self._sign_with_key(
+                     validator_entry,
+                     attestation_data.slot,
+                     hash_tree_root(attestation_data),
+                     "attestation_secret_key",
+                 )
+-            except SigningProtectionError as exception:
+-                # One validator's spent key must not silence the others.
++            except (SigningPreparationError, SigningProtectionError) as exception:
+                 logger.warning(
+-                    "Attestation skipped for validator %d at slot %d: %s",
++                    "Attestation signing skipped for validator %d at slot %d: %s",
+                     validator_index,
+                     slot,
+                     exception,
+@@ -304,7 +342,7 @@
+             signed_attestation = SignedAttestation(
+                 validator_index=validator_index,
+                 data=attestation_data,
+-                signature=attestation_signature,
++                signature=signature,
+             )
+ 
+             self._attestations_produced += 1
+@@ -350,8 +388,54 @@
+         if validator_entry is None:
+             raise ValueError(f"No secret key for validator {validator_index}")
+ 
+-        # Sign the block root with the proposal key.
+-        block_root = hash_tree_root(block)
++        try:
++            block_root = hash_tree_root(block)
++            # Resolve validator public_keys from state using validator indices.
++            key_state = self.sync_service.store.states.get(block_root)
++            if key_state is None:
++                key_state = self.sync_service.store.states.get(self.sync_service.store.head)
++            if key_state is None:
++                raise ValueError(
++                    "No state available to resolve validator public keys for block signing"
++                )
++
++            validators = key_state.validators
++            if not validator_index.is_within_registry(Uint64(len(validators))):
++                raise ValueError(f"Validator {validator_index} not found in state validators")
++            proposer_public_key = PublicKey.decode_bytes(
++                validators[validator_index].proposal_public_key
++            )
++            # Refuse an accidental mismatch before using a one-time signing key.
++            secret_key = validator_entry.proposal_secret_key
++            local_public_key = PublicKey(
++                root=secret_key.top_tree.root(),
++                parameter=secret_key.parameter,
++            )
++            if local_public_key != proposer_public_key:
++                raise ValueError("Local XMSS proposal key does not match on-chain public key")
++
++            # Collect the public keys for each proof, in the same order as the proofs.
++            num_validators = Uint64(len(validators))
++            public_keys_per_aggregate: list[list[PublicKey]] = []
++            for attestation_proof in attestation_proofs:
++                participant_public_keys: list[PublicKey] = []
++                for participant_index in attestation_proof.participants.to_validator_indices():
++                    # Every participant must index the active validator set.
++                    # A stale entry would otherwise fail deep inside the aggregator.
++                    if not participant_index.is_within_registry(num_validators):
++                        raise ValueError(
++                            f"Attestation proof references validator {participant_index}; "
++                            f"active set has {num_validators} validators"
++                        )
++                    participant_public_keys.append(
++                        PublicKey.decode_bytes(validators[participant_index].attestation_public_key)
++                    )
++                public_keys_per_aggregate.append(participant_public_keys)
++
++        except Exception as exception:
++            raise BlockSigningPreflightError(str(exception)) from exception
++
++        # Preflight is complete: consume the proposal key only now.
+         proposer_signature = self._sign_with_key(
+             validator_entry,
+             block.slot,
+@@ -359,22 +443,6 @@
+             "proposal_secret_key",
+         )
+ 
+-        # Resolve validator public_keys from state using validator indices.
+-        key_state = self.sync_service.store.states.get(block_root)
+-        if key_state is None:
+-            key_state = self.sync_service.store.states.get(self.sync_service.store.head)
+-        if key_state is None:
+-            raise ValueError(
+-                "No state available to resolve validator public keys for block signing"
+-            )
+-
+-        validators = key_state.validators
+-        if not validator_index.is_within_registry(Uint64(len(validators))):
+-            raise ValueError(f"Validator {validator_index} not found in state validators")
+-        proposer_public_key = PublicKey.decode_bytes(
+-            validators[validator_index].proposal_public_key
+-        )
+-
+         # Wrap the proposer's raw XMSS signature into a singleton single-message aggregate.
+         # The single fresh entry carries the proposer index alongside its key and signature.
+         proposer_single_message_aggregate = SingleMessageAggregate.aggregate(
+@@ -384,24 +452,6 @@
+             slot=block.slot,
+         )
+ 
+-        # Collect the public keys for each proof, in the same order as the proofs.
+-        num_validators = Uint64(len(validators))
+-        public_keys_per_aggregate: list[list[PublicKey]] = []
+-        for attestation_proof in attestation_proofs:
+-            participant_public_keys: list[PublicKey] = []
+-            for validator_index in attestation_proof.participants.to_validator_indices():
+-                # Every participant must index the active validator set.
+-                # A stale entry would otherwise fail deep inside the aggregator.
+-                if not validator_index.is_within_registry(num_validators):
+-                    raise ValueError(
+-                        f"Attestation proof references validator {validator_index}; "
+-                        f"active set has {num_validators} validators"
+-                    )
+-                participant_public_keys.append(
+-                    PublicKey.decode_bytes(validators[validator_index].attestation_public_key)
+-                )
+-            public_keys_per_aggregate.append(participant_public_keys)
+-
+         # The proposer goes last, parallel to the proposer aggregate appended below.
+         public_keys_per_aggregate.append([proposer_public_key])
+ 
+@@ -427,25 +477,39 @@
+ 
+         XMSS keys are stateful one-time signatures, so each signature consumes key state.
+         The advanced key is written back so the next slot does not reuse it.
+-
+-        Raises SigningProtectionError when this key already signed the slot, which
+-        keeps a restart or a backward clock step from opening the one-time key.
+         """
+-        # Claim the slot first: a record without a signature costs a duty,
+-        # a signature without a record costs the key.
++        scheme = TARGET_SIGNATURE_SCHEME
++        secret_key = getattr(validator_entry, key_field)
++
++        slot_int = int(slot)
++        activation_start = int(secret_key.activation_slot)
++        activation_end = activation_start + int(secret_key.num_active_slots)
++        if not activation_start <= slot_int < activation_end:
++            raise SigningPreparationError("XMSS key inactive at signing slot")
++
++        prepared_interval = scheme.get_prepared_interval(secret_key)
++        while slot_int not in prepared_interval:
++            advanced_key = scheme.advance_preparation(secret_key)
++            if advanced_key is secret_key:
++                raise SigningPreparationError("XMSS preparation cannot advance to signing slot")
++            next_interval = scheme.get_prepared_interval(advanced_key)
++            if (
++                isinstance(prepared_interval, range)
++                and isinstance(next_interval, range)
++                and next_interval.start <= prepared_interval.start
++            ):
++                raise SigningPreparationError("XMSS preparation interval did not advance")
++            secret_key = advanced_key
++            prepared_interval = next_interval
++
++        # Persist the one-time slot claim only after preparation succeeds.
++        # The claim must commit before requesting any XMSS signature.
+         self.signing_protection.reserve(
+             validator_entry.index,
+             SIGNING_ROLE_BY_KEY_FIELD[key_field],
+             slot,
+         )
+ 
+-        scheme = TARGET_SIGNATURE_SCHEME
+-        secret_key = getattr(validator_entry, key_field)
+-
+-        slot_int = int(slot)
+-        while slot_int not in scheme.get_prepared_interval(secret_key):
+-            secret_key = scheme.advance_preparation(secret_key)
+-
+         signature = scheme.sign(secret_key, slot, message)
+ 
+         # Carry over both secret keys, replacing only the one that was advanced.
+diff --git a/tests/node/validator/test_service.py b/tests/node/validator/test_service.py
+--- a/tests/node/validator/test_service.py
++++ b/tests/node/validator/test_service.py
+@@ -162,6 +162,27 @@
+         assert str(exception_info.value) == "No secret key for validator 42"
+ 
+ 
++    def test_ci_mismatched_proposal_key_rejected_without_signing(
++        self, sync_service: SyncService, key_manager: XmssKeyManager
++    ) -> None:
++        """Refuse a local proposal key bound to another on-chain validator."""
++        service, block = self._setup(sync_service, key_manager)
++        own = service.registry.get(ValidatorIndex(0))
++        assert own is not None
++        other = _make_entry(key_manager, 1)
++        service.registry.add(
++            ValidatorEntry(
++                index=ValidatorIndex(0),
++                attestation_secret_key=own.attestation_secret_key,
++                proposal_secret_key=other.proposal_secret_key,
++            )
++        )
++        with patch(_SCHEME) as scheme:
++            with pytest.raises(ValueError, match="does not match"):
++                service._sign_block(block, ValidatorIndex(0), [])
++            scheme.sign.assert_not_called()
++
++
+ class TestSignWithKey:
+     """
+     Unit tests for the XMSS key advancement and signing logic.
+@@ -334,6 +355,23 @@
+         assert returned_signature is mock_signature
+ 
+ 
++    def test_ci_inactive_key_refused_before_preparation(
++        self, sync_service: SyncService, key_manager: XmssKeyManager
++    ) -> None:
++        """Do not enter the preparation loop beyond the activation interval."""
++        service, _, entry, _, _ = self._setup(sync_service, key_manager)
++        secret = entry.attestation_secret_key
++        slot = Slot(int(secret.activation_slot) + int(secret.num_active_slots))
++        with patch(_SCHEME) as scheme:
++            with pytest.raises(ValueError, match="inactive"):
++                service._sign_with_key(entry, slot, Bytes32.zero(), "attestation_secret_key")
++            scheme.advance_preparation.assert_not_called()
++            scheme.sign.assert_not_called()
++        assert service.signing_protection.last_signed_slot(
++            entry.index, "attestation"
++        ) is None
++
++
+ class TestValidatorServiceBasic:
+     """Basic tests for lifecycle properties."""
+ 
+@@ -768,6 +806,37 @@
+         assert Slot(10) in service._attested_slots
+ 
+ 
++    async def test_ci_attestation_key_mismatch_skips_only_affected_validator(
++        self, sync_service: SyncService, key_manager: XmssKeyManager
++    ) -> None:
++        """Keep signing for valid validators if one local attestation key is swapped."""
++        registry = _make_registry(key_manager, 0, 1)
++        own = registry.get(ValidatorIndex(0))
++        assert own is not None
++        other = _make_entry(key_manager, 1)
++        registry.add(
++            ValidatorEntry(
++                index=ValidatorIndex(0),
++                attestation_secret_key=other.attestation_secret_key,
++                proposal_secret_key=own.proposal_secret_key,
++            )
++        )
++        received: list[SignedAttestation] = []
++
++        async def capture(item: SignedAttestation) -> None:
++            received.append(item)
++
++        service = ValidatorService(
++            sync_service=sync_service,
++            clock=SlotClock(genesis_time=Uint64(0)),
++            registry=registry,
++            on_attestation=capture,
++        )
++        await service._produce_attestations(Slot(1))
++        assert [a.validator_index for a in received] == [ValidatorIndex(1)]
++        assert service.attestations_produced == 1
++
++
+ class TestProposerGossipAttestation:
+     """Tests verifying that all validators (including proposers) produce gossip attestations."""
+ 
