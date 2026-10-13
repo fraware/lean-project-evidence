@@ -1,0 +1,46 @@
+name: leanVM XMSS encoding hash payload bridge
+
+on:
+  push:
+    branches:
+      - research/leanvm-pr533-encode-payload-bridge-20261013
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  encode-payload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Checkout checked research artifact
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Pin exact leanVM PR #533 and both checked arithmetic folds
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
+          git -C leanVM fetch --depth=1 origin pull/533/head
+          git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          test "$(git -C leanVM rev-parse HEAD)" = 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          git -C leanVM apply --check ../handoff_leanvm_533/both-folds.patch
+          git -C leanVM apply ../handoff_leanvm_533/both-folds.patch
+          test "$(git -C leanVM hash-object verification/leanxmss/LeanxmssProofs/Encoding.lean)" = 41b62c33554ff74b96c129e21cc7fd11d225179c
+          cp research/leanvm-pr533/EncodingPayloadBridge.lean leanVM/verification/leanxmss/EncodingPayloadBridge.lean
+          git -C leanVM diff --check
+      - name: Install Lean toolchain
+        run: |
+          grep -Fxq 'leanprover/lean4:v4.31.0' leanVM/verification/leanxmss/lean-toolchain
+          curl --fail --silent --show-error --location https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
+          sh /tmp/elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Kernel-check new bridge and axiom closures
+        run: |
+          cd leanVM/verification/leanxmss
+          lake exe cache get
+          lake build
+          lake env lean EncodingPayloadBridge.lean | tee "$RUNNER_TEMP/encode-payload-axioms.txt"
+          for theorem in encoding_payload_words encoding_tweak_digest; do
+            grep -F "'leanxmss.Proofs.$theorem' depends on axioms:" "$RUNNER_TEMP/encode-payload-axioms.txt" | grep -Fv 'sorryAx'
+          done
+          printf 'import LeanxmssProofs\n#print axioms leanxmss.Proofs.Encoding.fold6\n#print axioms leanxmss.Proofs.Encoding.fold12\n#print axioms leanxmss.Proofs.encode_spec\n' > ExistingAxioms.lean
+          lake env lean ExistingAxioms.lean
