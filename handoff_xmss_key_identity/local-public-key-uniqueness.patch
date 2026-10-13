@@ -1,0 +1,146 @@
+diff --git a/src/lean_spec/node/validator/registry.py b/src/lean_spec/node/validator/registry.py
+--- a/src/lean_spec/node/validator/registry.py
++++ b/src/lean_spec/node/validator/registry.py
+@@ -197,34 +197,52 @@
+             manifest_validator.index: manifest_validator
+             for manifest_validator in manifest.validators
+         }
+ 
+-        # Load keys for assigned validators.
+-        registry = cls()
+-        manifest_directory = manifest_path.parent
+-
+-        for validator_index in assigned_indices:
+-            manifest_entry = manifest_by_index.get(ValidatorIndex(validator_index))
+-            if manifest_entry is None:
+-                # Validator index in validators.yaml but missing from manifest.
+-                # This can happen if the manifest was regenerated with fewer validators.
+-                logger.warning(
+-                    "Validator index %d assigned to node %s but not found in manifest",
+-                    validator_index,
+-                    node_id,
+-                )
+-                continue
+-
+-            # The attestation and proposal keys must be distinct.
+-            # A validator signs a proposal and an attestation in the same slot.
+-            # The signature scheme is a stateful one-time signature.
+-            # Sharing one key across both roles reuses one-time state and breaks it.
+-            # Compare the public keys so the secret bytes stay untouched.
+-            if manifest_entry.attestation_public_key_hex == manifest_entry.proposal_public_key_hex:
+-                raise ValueError(
+-                    "Attestation and proposal keys must differ for validator "
+-                    f"{validator_index}, but the manifest assigns the same key to both"
+-                )
++        # Reject repeated declared key identities before loading any secrets.
++        # Records are indexed by validator and role, so one public key assigned
++        # to two local signing identities would bypass their independent guards.
++        seen_public_keys: dict[Bytes52, tuple[ValidatorIndex, str]] = {}
++        for assigned_index in assigned_indices:
++            manifest_entry = manifest_by_index.get(ValidatorIndex(assigned_index))
++            if manifest_entry is None:
++                continue
++
++            if manifest_entry.attestation_public_key_hex == manifest_entry.proposal_public_key_hex:
++                raise ValueError(
++                    "Attestation and proposal keys must differ for validator "
++                    f"{assigned_index}, but the manifest assigns the same key to both"
++                )
++
++            for role, public_key in (
++                ("attestation", manifest_entry.attestation_public_key_hex),
++                ("proposal", manifest_entry.proposal_public_key_hex),
++            ):
++                previous = seen_public_keys.get(public_key)
++                if previous is not None:
++                    previous_index, previous_role = previous
++                    raise ValueError(
++                        "XMSS public key reused across locally controlled signing identities: "
++                        f"validator {previous_index} {previous_role} and "
++                        f"validator {assigned_index} {role}"
++                    )
++                seen_public_keys[public_key] = (ValidatorIndex(assigned_index), role)
++
++        # Load keys for assigned validators.
++        registry = cls()
++        manifest_directory = manifest_path.parent
++
++        for validator_index in assigned_indices:
++            manifest_entry = manifest_by_index.get(ValidatorIndex(validator_index))
++            if manifest_entry is None:
++                # Validator index in validators.yaml but missing from manifest.
++                # This can happen if the manifest was regenerated with fewer validators.
++                logger.warning(
++                    "Validator index %d assigned to node %s but not found in manifest",
++                    validator_index,
++                    node_id,
++                )
++                continue
+ 
+             # Decode the attestation key from its SSZ file.
+             attestation_key_path = manifest_directory / manifest_entry.attestation_private_key_file
+             try:
+diff --git a/tests/node/validator/test_registry.py b/tests/node/validator/test_registry.py
+--- a/tests/node/validator/test_registry.py
++++ b/tests/node/validator/test_registry.py
+@@ -536,8 +536,60 @@
+             "Attestation and proposal keys must differ for validator 0, "
+             "but the manifest assigns the same key to both"
+         )
+ 
++    @pytest.mark.parametrize(
++        ("first_role", "second_role"),
++        [
++            ("attestation", "attestation"),
++            ("attestation", "proposal"),
++            ("proposal", "attestation"),
++            ("proposal", "proposal"),
++        ],
++    )
++    def test_duplicate_public_key_among_assigned_validators_raises_before_key_load(
++        self, tmp_path: Path, first_role: str, second_role: str
++    ) -> None:
++        """All cross-validator declared-key collisions are rejected before secret loading."""
++        validators_file = tmp_path / "validators.yaml"
++        validators_file.write_text(yaml.dump({"node_0": [0, 1]}))
++
++        first = _manifest_entry_dict(0)
++        second = _manifest_entry_dict(1)
++        second[f"{second_role}_public_key_hex"] = first[f"{first_role}_public_key_hex"]
++
++        manifest_file = tmp_path / "manifest.yaml"
++        _write_manifest(manifest_file, [first, second])
++
++        # Deliberately omit all key files. Identity validation must precede decoding.
++        with pytest.raises(
++            ValueError, match="XMSS public key reused across locally controlled signing identities"
++        ):
++            ValidatorRegistry.from_yaml(
++                node_id="node_0",
++                validators_path=validators_file,
++                manifest_path=manifest_file,
++            )
++
++    def test_duplicate_key_on_other_node_is_outside_local_loader_scope(
++        self, tmp_path: Path, km: XmssKeyManager
++    ) -> None:
++        """A local registry validates its controlled set, not another node's key custody."""
++        validators_file = tmp_path / "validators.yaml"
++        validators_file.write_text(yaml.dump({"node_0": [0], "node_1": [1]}))
++
++        first = _manifest_entry_dict(0)
++        second = _manifest_entry_dict(1)
++        second["proposal_public_key_hex"] = first["attestation_public_key_hex"]
++        manifest_file = tmp_path / "manifest.yaml"
++        _write_manifest(manifest_file, [first, second])
++        self._write_real_key_files(km, tmp_path, [0])
++
++        registry = ValidatorRegistry.from_yaml(
++            node_id="node_0", validators_path=validators_file, manifest_path=manifest_file
++        )
++        assert set(registry.indices()) == {ValidatorIndex(0)}
++
+     def test_only_assigned_node_keys_are_loaded(self, tmp_path: Path, km: XmssKeyManager) -> None:
+         """Keys for validators belonging to other nodes are never touched."""
+         validators_file = tmp_path / "validators.yaml"
+         validators_file.write_text(yaml.dump({"node_0": [0], "node_1": [1, 2]}))
