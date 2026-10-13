@@ -32,6 +32,7 @@ jobs:
       - name: Kernel-check the Nat/U64 nonoverflow bound
         run: |
           cd leanVM/verification/leanxmss
+          set -o pipefail
           lake exe cache get
           lake build
           lake env lean EncodingSumNoOverflow.lean | tee "$RUNNER_TEMP/bounds-axioms.txt"
