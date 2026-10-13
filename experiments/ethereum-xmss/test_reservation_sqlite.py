@@ -3,6 +3,7 @@
 Uses the PR's two-step read-then-write shape and its (validator_index, role)
 schema; does not import leanSpec or execute its Python service.
 """
+import shutil
 import sqlite3
 import tempfile
 import threading
@@ -156,6 +157,26 @@ class ReservationTests(unittest.TestCase):
         with connect(self.db) as reopened:
             self.assertFalse(claim(reopened, 5))
             self.assertTrue(claim(reopened, 6))
+
+    def test_restoring_stale_backup_reopens_a_committed_slot(self):
+        # This is a counterexample to backup rollback safety, not an expected
+        # supported operation. A local SQLite file alone cannot prevent it.
+        backup = Path(self.tmp.name) / "pre_claim_backup.db"
+        shutil.copy2(self.db, backup)
+
+        first = connect(self.db)
+        try:
+            self.assertTrue(claim(first, 9))
+        finally:
+            first.close()
+
+        shutil.copy2(backup, self.db)
+
+        reopened = connect(self.db)
+        try:
+            self.assertTrue(claim(reopened, 9))
+        finally:
+            reopened.close()
 
 
 if __name__ == "__main__":
