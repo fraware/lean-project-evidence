@@ -37,8 +37,16 @@ tests passing**.
 [Two-file source-pinned handoff](https://github.com/fraware/lean-project-evidence/tree/research/ethereum-xmss-local-key-identity-handoff-20261013/handoff_xmss_key_identity).
 
 The [larger signing+registry candidate suite #38484185368](https://github.com/fraware/lean-project-evidence/actions/runs/38484185368)
-is **a separate run**, whose final conclusion must be observed independently.
-It is not implied by the standalone result.
+also completed **successfully** at the same candidate revision:
+**110 focused tests passed**, **2,976 full-suite tests passed**, and
+**91.80% measured coverage**, with Ruff and whole-project typing green.
+Its acceptance is separately established by the workflow record and does
+not rely on the 34-test standalone result.
+
+The standard upstream pytest tree excludes `tests/interop`; the new
+registry's three-node interoperability check is a separate gate, initiated
+on `research/ethereum-xmss-key-identity-interop-20261013`. Only the
+completed interop workflow establishes that additional result.
 
 ## Limits and external decisions
 
