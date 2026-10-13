@@ -14,7 +14,7 @@ It does not fork, push, create a pull request, or touch an existing checkout.
 
 ```bash
 curl -fsSLo review_candidate.sh \
-  https://raw.githubusercontent.com/fraware/lean-project-evidence/research/ethereum-xmss-durability-handoff-20261013/handoff_xmss_durability/review_candidate.sh
+  https://raw.githubusercontent.com/fraware/lean-project-evidence/61181cb6940d4c34e22b00a41e74d77a878e759c/handoff_xmss_durability/review_candidate.sh
 bash -n review_candidate.sh
 bash review_candidate.sh
 ```
