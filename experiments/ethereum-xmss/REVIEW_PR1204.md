@@ -38,14 +38,14 @@ For the stronger cross-role/cross-index key identity policy, design a unique `ke
 
 ## Evidence and limitation
 
-- [Seven stdlib SQLite adversarial tests](./test_reservation_sqlite.py), including deterministic two-connection same-slot acceptance, high-water regression, atomic UPSERT comparison, alias model, and restart. These reproduce the SQL/control-flow pattern without importing leanSpec.
+- [Eight stdlib SQLite adversarial tests](./test_reservation_sqlite.py), including deterministic two-connection same-slot acceptance, high-water regression, atomic UPSERT comparison, alias model, and restart. These reproduce the SQL/control-flow pattern without importing leanSpec.
 - [Exact-PR Python adapter tests](./pr1204_race.py) execute the actual `SigningProtection.reserve` method from the pinned PR head. Its adapter duplicates the PR table and SQL behavior and injects barriers to force adverse schedules; it is not a test using the node's complete `SQLiteDatabase`.
 - [Lean 4 reservation model](./XmssReservation.lean) proves replay exclusion, older-slot refusal, unrelated-key isolation, and recovery properties for an abstract per-key ledger. Its linearizable durable commit and stable key identity assumptions are **not established** by the proof.
 - [Proof and SQLite model CI](https://github.com/fraware/lean-project-evidence/actions/runs/38316932452).
 - [Exact-PR adapter CI, run #38317231036](https://github.com/fraware/lean-project-evidence/actions/runs/38317231036): **2 passed** against the actual `SigningProtection.reserve` implementation from pinned PR #1204, including same-slot concurrent double acceptance and high-water decrease. The first run (#38316932514) did not run assertions because standalone import encountered an initialization cycle; the corrected run uses upstream pytest/conftest.
-- [Updated Lean reservation and SQLite-model CI](https://github.com/fraware/lean-project-evidence/actions/runs/38317050285): kernel check passed, including a distinct-logical-identity countermodel, and all seven SQLite schedule tests passed.
+- [Updated Lean reservation and SQLite-model CI](https://github.com/fraware/lean-project-evidence/actions/runs/38317050285): kernel check passed, including a distinct-logical-identity countermodel, and all seven SQLite schedule tests passed (prior to the added stale-backup negative control).
 
-Beyond SQLite atomicity, storage rollback, independent replicas, database replacement, power-loss durability and corruption remain explicit deployment obligations. The tests do not claim an actual attack against a running node, and the PR remains open.
+Beyond SQLite atomicity, storage rollback, independent replicas, database replacement, power-loss durability and corruption remain explicit deployment obligations. A further negative control now copies a fresh database, commits a claim on the live file, restores the older copy, and successfully reclaims the same slot. This demonstrates that an old-file restore is **not** protected by SQLite's monotone conditional UPSERT. The source documentation phrase "restore from backup" must be qualified: only a backup containing the latest committed reservations is safe to restore without an external anti-rollback authority. The tests do not claim an actual attack against a running node, and the PR remains open.
 
 ## Current finding disposition
 
