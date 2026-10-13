@@ -27,8 +27,14 @@ jobs:
           grep -Fq 'PIN="e8f9c29da3c2b725b988ed85dac8dce3d89d0012"' handoff_xmss_durability/review_candidate.sh
       - name: Reconstruct in fresh checkout and hash-verify all six files
         run: |
-          bash handoff_xmss_durability/review_candidate.sh
-          checkout_dir="$(find "$RUNNER_TEMP" -maxdepth 2 -type d -path '*/lean-xmss-review.*/leanSpec' -print -quit)"
+          TMPDIR="$RUNNER_TEMP" bash handoff_xmss_durability/review_candidate.sh
+          checkout_dir=""
+          for candidate in "$RUNNER_TEMP"/lean-xmss-review.*/leanSpec; do
+            if test -d "$candidate"; then
+              test -z "$checkout_dir"
+              checkout_dir="$candidate"
+            fi
+          done
           test -n "$checkout_dir"
           test "$(git -C "$checkout_dir" rev-parse HEAD)" = e8f9c29da3c2b725b988ed85dac8dce3d89d0012
           printf 'CANDIDATE_DIR=%s\n' "$checkout_dir" >> "$GITHUB_ENV"
