@@ -78,7 +78,7 @@ class PublishReviewContract(unittest.TestCase):
                 shutil.copyfile(os.environ["MOCK_NOTE"], destination)
                 if os.environ.get("MOCK_TAMPER") == "1":
                     with open(destination, "a", encoding="utf-8") as f:
-                        f.write("tampered\n")
+                        f.write("tampered\\n")
                 """
             )
         )
