@@ -183,7 +183,6 @@ class TestSignBlock:
         assert service.signing_protection.last_signed_slot(ValidatorIndex(0), "proposal") is None
 
 
-
 class TestSignWithKey:
     """
     Unit tests for the XMSS key advancement and signing logic.
@@ -382,7 +381,6 @@ class TestSignWithKey:
                 service._sign_with_key(entry, slot, Bytes32.zero(), "attestation_secret_key")
             scheme.sign.assert_not_called()
         assert service.signing_protection.last_signed_slot(entry.index, "attestation") is None
-
 
 
 class TestValidatorServiceBasic:
@@ -683,7 +681,6 @@ class TestProduceAttestationsAdvanced:
         await service._produce_attestations(Slot(1))
         assert [a.validator_index for a in received] == [ValidatorIndex(1)]
         assert service.attestations_produced == 1
-
 
 
 class TestValidatorServiceRun:
