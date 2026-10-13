@@ -240,7 +240,6 @@ class TestDatabaseBackedReserve:
             assert db.get_last_signed_slot(_VALIDATOR, "attestation") == Slot(6)
             assert db.get_last_signed_slot(_VALIDATOR, "proposal") == Slot(6)
 
-
     @pytest.mark.parametrize("seed", (0, 1, 2, 3, 5, 8, 13, 21))
     def test_committed_reservation_traces_refine_high_water_model(
         self, database_path: Path, seed: int
