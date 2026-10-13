@@ -29,13 +29,11 @@ theorem encoding_top_bit_or (low high : BitVec 64) :
       rcases (show b = 0 ∨ b = 1 by omega) with h' | h' <;>
       simp [h, h']
   have hl : (low >>> 63).toNat < 2 := by
-    have h := BitVec.toNat_ushiftRight_lt low 63 (by decide)
-    norm_num at h
-    exact h
+    simpa only [show (64 - 63 : Nat) = 1 by decide, pow_one] using
+      (BitVec.toNat_ushiftRight_lt low 63 (by decide))
   have hh : (high >>> 63).toNat < 2 := by
-    have h := BitVec.toNat_ushiftRight_lt high 63 (by decide)
-    norm_num at h
-    exact h
+    simpa only [show (64 - 63 : Nat) = 1 by decide, pow_one] using
+      (BitVec.toNat_ushiftRight_lt high 63 (by decide))
   exact hor_small _ _ hl hh
 
 /-- Equivalently, failure of the shared guard means a half has a high bit. -/
