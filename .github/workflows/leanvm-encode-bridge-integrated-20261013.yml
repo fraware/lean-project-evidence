@@ -55,6 +55,7 @@ jobs:
         run: |
           set -o pipefail
           cd leanVM/verification/leanxmss
+          set -o pipefail
           lake exe cache get
           lake build
           cat > EncodingHelperAxioms.lean <<'EOF'
