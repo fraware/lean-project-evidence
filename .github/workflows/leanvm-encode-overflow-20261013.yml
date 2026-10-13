@@ -35,4 +35,10 @@ jobs:
           lake exe cache get
           lake build
           lake env lean EncodingSumNoOverflow.lean | tee "$RUNNER_TEMP/bounds-axioms.txt"
-          grep -F "'leanxmss.Proofs.Encoding.encoding_sum_stages_below_u64' depends on axioms:" "$RUNNER_TEMP/bounds-axioms.txt" | grep -Fv sorryAx
+          for th in encoding_sum_stages_below_u64 encoding_initial_sum_below_u64; do
+            grep -F "'leanxmss.Proofs.Encoding.$th' depends on axioms:" "$RUNNER_TEMP/bounds-axioms.txt"
+          done
+          if grep -Eq '(sorryAx|_native[.]|Lean[.]trustCompiler)' "$RUNNER_TEMP/bounds-axioms.txt"; then
+            echo 'Unexpected admitted or native axiom in overflow proof' >&2
+            exit 1
+          fi
