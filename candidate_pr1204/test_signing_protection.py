@@ -182,9 +182,7 @@ class TestDatabaseBackedReserve:
             assert reopened.get_last_signed_slot(_VALIDATOR, "proposal") is None
             assert SigningProtection(database=reopened).is_durable is False
 
-    def test_unsafe_sqlite_pragmas_are_not_classified_durable(
-        self, database_path: Path
-    ) -> None:
+    def test_unsafe_sqlite_pragmas_are_not_classified_durable(self, database_path: Path) -> None:
         """File-backed storage still needs appropriate SQLite commit settings."""
         with _open_database(database_path) as database:
             assert SigningProtection(database=database).is_durable is True
