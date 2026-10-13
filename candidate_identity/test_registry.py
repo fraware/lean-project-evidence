@@ -537,7 +537,6 @@ class TestValidatorRegistryFromYaml:
             "but the manifest assigns the same key to both"
         )
 
-
     @pytest.mark.parametrize(
         ("first_role", "second_role"),
         [
