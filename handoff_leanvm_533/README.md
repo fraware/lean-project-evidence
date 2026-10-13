@@ -50,3 +50,16 @@ review, PR, or merge was created.
 The patch is available for the PR author to incorporate, subject to the
 upstream architecture and review decision. It does not modify the upstream
 implementation.
+
+### Review publication
+
+The connected GitHub integration cannot post to PR #533 (HTTP 403).
+A reviewer-facing [REVIEW_NOTE.md](./REVIEW_NOTE.md) is provided with a
+deliberate contributor-side publication helper.
+
+In an authenticated GitHub CLI session as `fraware`, run
+`bash handoff_leanvm_533/publish_review.sh` to check the pinned PR
+head and detect a previously posted comment. To submit the prepared review,
+run `bash handoff_leanvm_533/publish_review.sh --publish`.
+The script aborts if the upstream PR head changed, and refuses to post under
+another account. **No comment is posted by installing or reading this repo.**
