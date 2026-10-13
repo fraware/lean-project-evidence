@@ -161,7 +161,6 @@ class TestSignBlock:
             service._sign_block(block, ValidatorIndex(42), [])
         assert str(exception_info.value) == "No secret key for validator 42"
 
-
     def test_ci_mismatched_proposal_key_rejected_without_signing(
         self, sync_service: SyncService, key_manager: XmssKeyManager
     ) -> None:
@@ -354,7 +353,6 @@ class TestSignWithKey:
 
         assert returned_signature is mock_signature
 
-
     def test_ci_inactive_key_refused_before_preparation(
         self, sync_service: SyncService, key_manager: XmssKeyManager
     ) -> None:
@@ -367,9 +365,7 @@ class TestSignWithKey:
                 service._sign_with_key(entry, slot, Bytes32.zero(), "attestation_secret_key")
             scheme.advance_preparation.assert_not_called()
             scheme.sign.assert_not_called()
-        assert service.signing_protection.last_signed_slot(
-            entry.index, "attestation"
-        ) is None
+        assert service.signing_protection.last_signed_slot(entry.index, "attestation") is None
 
 
 class TestValidatorServiceBasic:
@@ -804,7 +800,6 @@ class TestValidatorServiceRun:
         for old_slot in range(6):
             assert Slot(old_slot) not in service._attested_slots
         assert Slot(10) in service._attested_slots
-
 
     async def test_ci_attestation_key_mismatch_skips_only_affected_validator(
         self, sync_service: SyncService, key_manager: XmssKeyManager
