@@ -1,0 +1,29 @@
+name: PR1204 review publication contract
+
+on:
+  push:
+    branches:
+      - research/ethereum-xmss-pr1204-atomic-handoff-20261012
+    paths:
+      - 'handoff_pr1204/post_review.sh'
+      - 'handoff_pr1204/REVIEW_NOTE.md'
+      - 'handoff_pr1204/test_post_review.py'
+      - '.github/workflows/ethereum-xmss-pr1204-review-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-publication-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Checkout evidence without any GitHub write token
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check publication-helper syntax
+        run: bash -n handoff_pr1204/post_review.sh
+      - name: Run mocked GitHub publication contract (no external writes)
+        run: python3 -m unittest -v handoff_pr1204/test_post_review.py
