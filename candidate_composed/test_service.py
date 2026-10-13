@@ -367,6 +367,9 @@ class TestSignWithKey:
                 service._sign_with_key(entry, slot, Bytes32.zero(), "attestation_secret_key")
             scheme.advance_preparation.assert_not_called()
             scheme.sign.assert_not_called()
+        assert service.signing_protection.last_signed_slot(
+            entry.index, "attestation"
+        ) is None
 
 
 class TestValidatorServiceBasic:
