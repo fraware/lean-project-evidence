@@ -28,9 +28,10 @@ state="$(gh api "repos/${UPSTREAM}/pulls/${PR}" --jq '.state')"
 
 # Fail closed on a previous matching comment by this account. GitHub issues/comments
 # includes ordinary PR discussion comments. The review marker is unique to this note.
-if gh api "repos/${UPSTREAM}/issues/${PR}/comments?per_page=100" \
-    --paginate --jq '.[] | select(.user.login == "fraware") | .body' \
-    | grep -Fq "$REVIEW_MARKER"; then
+previous_reviews="$(gh api "repos/${UPSTREAM}/issues/${PR}/comments?per_page=100" \
+    --paginate --jq '.[] | select(.user.login == "fraware") | .body')" \
+    || fail "Unable to verify existing PR comments safely"
+if grep -Fq "$REVIEW_MARKER" <<< "$previous_reviews"; then
     printf 'Already posted an identical review marker. No duplicate comment created.\n'
     exit 0
 fi
