@@ -1,0 +1,82 @@
+name: leanVM XMSS encoding bridge integrated proof acceptance
+
+on:
+  push:
+    branches:
+      - research/leanvm-pr533-encoding-bridge-integration-20261013
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  encoding-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Pin exact PR #533 source
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
+          git -C leanVM fetch --depth=1 origin pull/533/head
+          git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          test "$(git -C leanVM rev-parse HEAD)" = 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+      - name: Require unchanged theorem statements and exactly one remaining admission
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("leanVM/verification/leanxmss/LeanxmssProofs/Encoding.lean")
+          old=p.read_text()
+          new=Path("research/leanvm-pr533/Encoding-integrated-candidate.lean").read_text()
+          for name in ("fold6","fold12","encode_spec"):
+              start="theorem "+name+" "
+              a=old.index(start)
+              b=new.index(start)
+              assert old[a:old.index(":= by",a)] == new[b:new.index(":= by",b)], f"{name}: declaration changed"
+          a=old.index("theorem encode_spec ")
+          b=new.index("theorem encode_spec ")
+          assert old[a:] == new[b:], "Existing encode_spec statement/body changed"
+          assert new.count("\n  sorry\n")==1, "Exactly encode_spec must remain admitted"
+          helpers=("encoding_payload_words","encoding_tweak_digest","encoding_top_bit_or",
+              "encoding_top_bit_reject","encoding_sum_stages_below_u64","encoding_initial_sum_below_u64")
+          assert all("theorem "+n in new for n in helpers)
+          p.write_text(new)
+          print("Statements unchanged; only encode_spec admitted.")
+          PY
+          git -C leanVM diff --check
+          git -C leanVM diff --stat
+      - name: Install Lean 4.31.0
+        run: |
+          grep -Fxq 'leanprover/lean4:v4.31.0' leanVM/verification/leanxmss/lean-toolchain
+          curl --fail --silent --show-error --location https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
+          sh /tmp/elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build all proofs and require no admitted/native helper axioms
+        run: |
+          set -o pipefail
+          cd leanVM/verification/leanxmss
+          lake exe cache get
+          lake build
+          cat > EncodingHelperAxioms.lean <<'EOF'
+          import LeanxmssProofs
+          #print axioms leanxmss.Proofs.Encoding.fold6
+          #print axioms leanxmss.Proofs.Encoding.fold12
+          #print axioms leanxmss.Proofs.Encoding.encoding_top_bit_or
+          #print axioms leanxmss.Proofs.Encoding.encoding_top_bit_reject
+          #print axioms leanxmss.Proofs.Encoding.encoding_sum_stages_below_u64
+          #print axioms leanxmss.Proofs.Encoding.encoding_initial_sum_below_u64
+          #print axioms leanxmss.Proofs.encoding_payload_words
+          #print axioms leanxmss.Proofs.encoding_tweak_digest
+          EOF
+          lake env lean EncodingHelperAxioms.lean | tee "$RUNNER_TEMP/all-helper-axioms.txt"
+          for theorem in             leanxmss.Proofs.Encoding.fold6 leanxmss.Proofs.Encoding.fold12             leanxmss.Proofs.Encoding.encoding_top_bit_or leanxmss.Proofs.Encoding.encoding_top_bit_reject             leanxmss.Proofs.Encoding.encoding_sum_stages_below_u64 leanxmss.Proofs.Encoding.encoding_initial_sum_below_u64             leanxmss.Proofs.encoding_payload_words leanxmss.Proofs.encoding_tweak_digest; do
+            grep -F "'$theorem' depends on axioms:" "$RUNNER_TEMP/all-helper-axioms.txt"
+          done
+          if grep -Eq '(sorryAx|_native[.]|Lean[.]trustCompiler)' "$RUNNER_TEMP/all-helper-axioms.txt"; then
+            echo 'Helper theorem depends on an admitted or native-evaluation axiom' >&2
+            exit 1
+          fi
+          printf 'import LeanxmssProofs\n#print axioms leanxmss.Proofs.encode_spec\n#print axioms leanxmss.Proofs.verify_spec\n' > StillAdmitted.lean
+          lake env lean StillAdmitted.lean | tee "$RUNNER_TEMP/still-admitted.txt"
+          grep -F "'leanxmss.Proofs.encode_spec' depends on axioms:" "$RUNNER_TEMP/still-admitted.txt" | grep -Fq sorryAx
+          echo 'INTEGRATED HELPER GATE COMPLETE. encode_spec still unresolved.'
