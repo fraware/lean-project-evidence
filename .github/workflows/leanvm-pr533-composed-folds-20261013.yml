@@ -1,0 +1,66 @@
+name: leanVM 533 both fold lemmas kernel acceptance
+
+on:
+  push:
+    branches:
+      - research/leanvm-pr533-composed-folds-20261013
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  composed-folds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Checkout proof evidence
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Pin exact upstream PR head
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
+          git -C leanVM fetch --depth=1 origin pull/533/head
+          git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          test "$(git -C leanVM rev-parse HEAD)" = 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+      - name: Confirm unchanged theorem signatures and only two proof replacements
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("leanVM/verification/leanxmss/LeanxmssProofs/Encoding.lean")
+          a=p.read_text()
+          b=Path("research/leanvm-pr533/Encoding-both-folds.lean").read_text()
+          k1=a.index("/-- Adding neighbouring 6-bit")
+          k2=a.index("/-- Folding the six 12-bit",k1)
+          k3=a.index("/-- `Digits::get`",k2)
+          n2=b.index("/-- Folding the six 12-bit",k1)
+          n3=b.index("/-- `Digits::get`",n2)
+          assert a[:k1]==b[:k1] and a[k3:]==b[n3:]
+          for old,new in [(a[k1:k2],b[k1:n2]),(a[k2:k3],b[n2:n3])]:
+              assert old.count("  sorry\n")==1
+              signature=old[:old.index("  sorry\n")]
+              assert new.startswith(signature) and "  sorry\n" not in new[len(signature):]
+          assert b.count("\n  sorry\n")==1
+          p.write_text(b)
+          print("Only the two admitted fold proof bodies changed.")
+          PY
+          test "$(git -C leanVM hash-object verification/leanxmss/LeanxmssProofs/Encoding.lean)" = 41b62c33554ff74b96c129e21cc7fd11d225179c
+          git -C leanVM diff --check
+          git -C leanVM diff --stat
+      - name: Install Lean 4.31.0 from pinned source
+        run: |
+          grep -Fxq 'leanprover/lean4:v4.31.0' leanVM/verification/leanxmss/lean-toolchain
+          curl --fail --silent --show-error --location https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
+          sh /tmp/elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build and independently inspect axiom closure of both folds
+        run: |
+          cd leanVM/verification/leanxmss
+          lake exe cache get
+          lake build
+          printf 'import LeanxmssProofs\n#print axioms leanxmss.Proofs.Encoding.fold6\n#print axioms leanxmss.Proofs.Encoding.fold12\n#print axioms leanxmss.Proofs.encode_spec\n#print axioms leanxmss.Proofs.verify_spec\n' > FoldAxioms.lean
+          lake env lean FoldAxioms.lean | tee "$RUNNER_TEMP/both-folds-axioms.txt"
+          for theorem in fold6 fold12; do
+            grep -F "'leanxmss.Proofs.Encoding.$theorem' depends on axioms:" "$RUNNER_TEMP/both-folds-axioms.txt" | grep -Fv 'sorryAx'
+          done
+          grep -F "'leanxmss.Proofs.verify_spec' depends on axioms:" "$RUNNER_TEMP/both-folds-axioms.txt" | grep -Fq 'sorryAx'
+          echo "Both local fold lemmas checked. encode_spec still admitted."
