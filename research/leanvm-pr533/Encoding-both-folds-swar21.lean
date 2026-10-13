@@ -247,7 +247,7 @@ theorem swar21_spec (x : Nat) (hx : x < 2 ^ 63) :
   have hc7 : c7 < 64 := by dsimp [c7]; have hA := d_lt x 14; have hB := d_lt x 15; omega
   have hc8 : c8 < 64 := by dsimp [c8]; have hA := d_lt x 16; have hB := d_lt x 17; omega
   have hc9 : c9 < 64 := by dsimp [c9]; have hA := d_lt x 18; have hB := d_lt x 19; omega
-  have hc10 : c10 < 16 := by dsimp [c10]; exact d_lt x 20
+  have hc10 : c10 < 16 := by dsimp [c10]; have h := d_lt x 20; omega
   have he0 : c0 + c1 ≤ 56 := by dsimp [c0, c1]; have h0 := d_lt x 0; have h1 := d_lt x 1; have h2 := d_lt x 2; have h3 := d_lt x 3; omega
   have he1 : c2 + c3 ≤ 56 := by dsimp [c2, c3]; have h0 := d_lt x 4; have h1 := d_lt x 5; have h2 := d_lt x 6; have h3 := d_lt x 7; omega
   have he2 : c4 + c5 ≤ 56 := by dsimp [c4, c5]; have h0 := d_lt x 8; have h1 := d_lt x 9; have h2 := d_lt x 10; have h3 := d_lt x 11; omega
@@ -264,9 +264,16 @@ theorem swar21_spec (x : Nat) (hx : x < 2 ^ 63) :
   have h6 := fold6 c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 hc0 hc1 hc2 hc3 hc4 hc5 hc6 hc7 hc8 hc9 hc10
   rw [h6]
   have h12 := fold12 (c0 + c1) (c2 + c3) (c4 + c5) (c6 + c7) (c8 + c9) c10 he0 he1 he2 he3 he4 he5
-  dsimp at h12
-  dsimp [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] at h12
-  simpa only [Nat.add_assoc] using h12
+  dsimp only at h12
+  calc
+    _ = (c0 + c1) + (c2 + c3) + (c4 + c5) + (c6 + c7) + (c8 + c9) + c10 := by
+      simpa only using h12
+    _ = d x 0 + d x 1 + d x 2 + d x 3 + d x 4 + d x 5 + d x 6 +
+          d x 7 + d x 8 + d x 9 + d x 10 + d x 11 + d x 12 +
+          d x 13 + d x 14 + d x 15 + d x 16 + d x 17 +
+          d x 18 + d x 19 + d x 20 := by
+      dsimp [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10]
+      omega
 
 /-- `Digits::get` of a digit index is that digit of its word, in base eight. -/
 theorem get_ok (lo hi : Std.U64) (i : Std.Usize) (hlt : i.val < 42) :
