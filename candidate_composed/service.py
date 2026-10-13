@@ -259,7 +259,11 @@ class ValidatorService:
                 exception,
             )
 
-        except (SigningPreparationError, BlockSigningPreflightError, SigningProtectionError) as exception:
+        except (
+            SigningPreparationError,
+            BlockSigningPreflightError,
+            SigningProtectionError,
+        ) as exception:
             logger.warning(
                 "Block signing skipped for validator %d at slot %d: %s",
                 validator_index,
