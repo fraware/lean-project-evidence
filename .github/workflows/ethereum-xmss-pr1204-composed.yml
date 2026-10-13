@@ -1,0 +1,56 @@
+name: leanSpec XMSS combined safety acceptance
+
+on:
+  push:
+    branches:
+      - research/ethereum-xmss-composed-20261012
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  atomic-reservation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout isolated candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install uv
+        run: python3 -m pip install 'uv>=0.7,<1'
+      - name: Clone exact PR1204 head
+        run: |
+          git clone --filter=blob:none https://github.com/leanEthereum/leanSpec.git leanSpec
+          git -C leanSpec fetch origin pull/1204/head
+          git -C leanSpec checkout --detach e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+          test "$(git -C leanSpec rev-parse HEAD)" = e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+      - name: Install locked dependencies
+        run: |
+          cd leanSpec
+          uv sync --frozen --group test --group lint
+      - name: Overlay isolated atomic-reservation candidate
+        run: |
+          cp candidate_pr1204/database.py leanSpec/src/lean_spec/node/storage/database.py
+          cp candidate_pr1204/sqlite.py leanSpec/src/lean_spec/node/storage/sqlite.py
+          cp candidate_pr1204/signing_protection.py leanSpec/src/lean_spec/node/validator/signing_protection.py
+          cp candidate_pr1204/test_signing_protection.py leanSpec/tests/node/validator/test_signing_protection.py
+          cp candidate_composed/service.py leanSpec/src/lean_spec/node/validator/service.py
+          cp candidate_composed/test_service.py leanSpec/tests/node/validator/test_service.py
+          python3 -m compileall -q leanSpec/src/lean_spec/node/storage leanSpec/src/lean_spec/node/validator
+      - name: Ruff lint and formatting on changed files
+        run: |
+          cd leanSpec
+          uv run --no-sync --group lint ruff check --no-fix src/lean_spec/node/storage/database.py src/lean_spec/node/storage/sqlite.py src/lean_spec/node/validator/signing_protection.py tests/node/validator/test_signing_protection.py src/lean_spec/node/validator/service.py tests/node/validator/test_service.py
+          uv run --no-sync --group lint ruff format --check src/lean_spec/node/storage/database.py src/lean_spec/node/storage/sqlite.py src/lean_spec/node/validator/signing_protection.py tests/node/validator/test_signing_protection.py src/lean_spec/node/validator/service.py tests/node/validator/test_service.py
+      - name: Full project type check
+        run: |
+          cd leanSpec
+          uv run --no-sync --group lint ty check
+      - name: Signing protection and validator tests
+        run: |
+          cd leanSpec
+          uv run --no-sync --group test pytest tests/node/validator/test_signing_protection.py tests/node/validator/test_service.py -q --no-cov
+      - name: Complete upstream standard test suite
+        run: |
+          cd leanSpec
+          uv run --no-sync --group test pytest tests -n auto --maxprocesses=10 --durations=10 --dist=worksteal
