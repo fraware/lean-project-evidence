@@ -1,0 +1,27 @@
+name: XMSS conformance exact Ruff formatting
+on:
+  push:
+    branches:
+      - research/ethereum-xmss-pr1204-conformance-ruff-20261013
+permissions:
+  contents: read
+jobs:
+  formatting:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Clone exact PR1204 Ruff configuration
+        run: |
+          git clone --filter=blob:none https://github.com/leanEthereum/leanSpec.git leanSpec
+          git -C leanSpec checkout --detach e8f9c29da3c2b725b988ed85dac8dce3d89d0012
+          cp candidate_pr1204/test_signing_protection.py leanSpec/tests/node/validator/test_signing_protection.py
+      - name: Install exact Ruff version
+        run: python3 -m pip install 'ruff==0.14.10'
+      - name: Print exact source diff
+        run: |
+          cd leanSpec
+          ruff format --diff tests/node/validator/test_signing_protection.py || true
+          ruff check --no-fix tests/node/validator/test_signing_protection.py
