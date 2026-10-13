@@ -1,0 +1,163 @@
+diff --git a/verification/leanxmss/LeanxmssProofs/Encoding.lean b/verification/leanxmss/LeanxmssProofs/Encoding.lean
+--- a/verification/leanxmss/LeanxmssProofs/Encoding.lean
++++ b/verification/leanxmss/LeanxmssProofs/Encoding.lean
+@@ -132,18 +132,149 @@
+     (h10 : c10 < 16) :
+     (val 64 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] &&& 17311559823019733055) +
+       (val 64 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] >>> 6 &&& 17311559823019733055) =
+     val 4096 [c0 + c1, c2 + c3, c4 + c5, c6 + c7, c8 + c9, c10] := by
+-  sorry
+-
+-/-- Folding the six 12-bit fields into the lowest (`Digits::sum`'s last steps). UNFINISHED. -/
+-theorem fold12 (e0 e1 e2 e3 e4 e5 : Nat) (h0 : e0 ≤ 56) (h1 : e1 ≤ 56) (h2 : e2 ≤ 56) (h3 : e3 ≤ 56)
+-    (h4 : e4 ≤ 56) (h5 : e5 ≤ 56) :
+-    let s1 := val 4096 [e0, e1, e2, e3, e4, e5]
+-    let s2 := s1 + s1 >>> 12
+-    let s3 := s2 + s2 >>> 24
+-    (s3 + s3 >>> 48) &&& 4095 = e0 + e1 + e2 + e3 + e4 + e5 := by
+-  sorry
++  have hc : ∀ a ∈ [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10], a < 2 ^ 6 := by
++    intro a ha
++    simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
++    rcases ha with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> omega
++  have hm : ∀ m ∈ [63, 0, 63, 0, 63, 0, 63, 0, 63, 0, 15], m < 2 ^ 6 := by
++    simp
++  have heven :
++      val 64 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] &&& 17311559823019733055 =
++        val 64 [c0, 0, c2, 0, c4, 0, c6, 0, c8, 0, c10] := by
++    rw [low6_val]
++    have h := val_land 6 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10]
++      [63, 0, 63, 0, 63, 0, 63, 0, 63, 0, 15] hc hm
++    simpa only [show (2 : Nat) ^ 6 = 64 by decide, List.zipWith_cons_cons,
++      List.zipWith_nil_left, List.zipWith_nil_right, Nat.and_zero,
++      land_63 h0, land_63 h2, land_63 h4, land_63 h6, land_63 h8, land_15 h10] using h
++  have hshift :
++      val 64 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] >>> 6 =
++        val 64 [c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] := by
++    rw [Nat.shiftRight_eq_div_pow]
++    simpa only [show (2 : Nat) ^ 6 = 64 by decide] using
++      (val_cons_div 6 c0 [c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] (by omega))
++  have hc' : ∀ a ∈ [c1, c2, c3, c4, c5, c6, c7, c8, c9, c10], a < 2 ^ 6 := by
++    intro a ha
++    simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
++    rcases ha with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> omega
++  have hodd :
++      (val 64 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] >>> 6 &&&
++          17311559823019733055) =
++        val 64 [c1, 0, c3, 0, c5, 0, c7, 0, c9, 0] := by
++    rw [hshift, low6_val]
++    have h := val_land 6 [c1, c2, c3, c4, c5, c6, c7, c8, c9, c10]
++      [63, 0, 63, 0, 63, 0, 63, 0, 63, 0, 15] hc' hm
++    simpa only [show (2 : Nat) ^ 6 = 64 by decide, List.zipWith_cons_cons,
++      List.zipWith_nil_left, List.zipWith_nil_right, Nat.and_zero,
++      land_63 h1, land_63 h3, land_63 h5, land_63 h7, land_63 h9] using h
++  rw [heven, hodd]
++  simp only [val_cons, val_nil]
++  ring
++
++/-- Folding the six 12-bit fields into the lowest (`Digits::sum`'s last steps). UNFINISHED. -/
++theorem fold12 (e0 e1 e2 e3 e4 e5 : Nat) (h0 : e0 ≤ 56) (h1 : e1 ≤ 56) (h2 : e2 ≤ 56) (h3 : e3 ≤ 56)
++    (h4 : e4 ≤ 56) (h5 : e5 ≤ 56) :
++    let s1 := val 4096 [e0, e1, e2, e3, e4, e5]
++    let s2 := s1 + s1 >>> 12
++    let s3 := s2 + s2 >>> 24
++    (s3 + s3 >>> 48) &&& 4095 = e0 + e1 + e2 + e3 + e4 + e5 := by
++  dsimp
++  rw [show (4095 : Nat) = 2 ^ 12 - 1 by decide, Nat.and_two_pow_sub_one_eq_mod]
++  simp only [Nat.shiftRight_eq_div_pow]
++  norm_num [val]
++  have hd1 :
++      (e0 + 4096 * (e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5))))) /
++          4096 =
++        e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5))) := by
++    omega
++  rw [hd1]
++  have hlow2 : e0 + e1 + 4096 * (e1 + e2) < 16777216 := by omega
++  have hd2 :
++      (e0 + 4096 * (e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5)))) +
++          (e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5))))) /
++          16777216 =
++        (e2 + e3) + 4096 * ((e3 + e4) + 4096 * ((e4 + e5) + 4096 * e5)) := by
++    omega
++  rw [hd2]
++  have hlow4 :
++      (e0 + e1 + e2 + e3) +
++          4096 * (e1 + e2 + e3 + e4) +
++          16777216 * (e2 + e3 + e4 + e5) +
++          68719476736 * (e3 + e4 + e5) <
++        281474976710656 := by
++    omega
++  have hd3 :
++      (e0 + 4096 * (e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5)))) +
++          (e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5)))) +
++          ((e2 + e3) + 4096 * ((e3 + e4) + 4096 * ((e4 + e5) + 4096 * e5)))) /
++          281474976710656 =
++        (e4 + e5) + 4096 * e5 := by
++    omega
++  rw [hd3]
++  have hsum : e0 + e1 + e2 + e3 + e4 + e5 < 4096 := by omega
++  omega
++
++
++/-- For a padded 64-bit XMSS digest word, the guest's two-mask SWAR
++    algorithm computes the sum of precisely its 21 base-eight chain digits.
++    This is one half of the arithmetic needed by `encode_spec`. -/
++theorem swar21_spec (x : Nat) (hx : x < 2 ^ 63) :
++    let s := (x &&& 8198552921648689607) + (x >>> 3 &&& 8198552921648689607)
++    let t := (s &&& 17311559823019733055) + (s >>> 6 &&& 17311559823019733055)
++    let u := t + t >>> 12
++    let v := u + u >>> 24
++    (v + v >>> 48) &&& 4095 = d x 0 + d x 1 + d x 2 + d x 3 + d x 4 + d x 5 + d x 6 + d x 7 + d x 8 + d x 9 + d x 10 + d x 11 + d x 12 + d x 13 + d x 14 + d x 15 + d x 16 + d x 17 + d x 18 + d x 19 + d x 20 := by
++  dsimp
++  let c0 := d x 0 + d x 1
++  let c1 := d x 2 + d x 3
++  let c2 := d x 4 + d x 5
++  let c3 := d x 6 + d x 7
++  let c4 := d x 8 + d x 9
++  let c5 := d x 10 + d x 11
++  let c6 := d x 12 + d x 13
++  let c7 := d x 14 + d x 15
++  let c8 := d x 16 + d x 17
++  let c9 := d x 18 + d x 19
++  let c10 := d x 20
++  have hc0 : c0 < 64 := by dsimp [c0]; have hA := d_lt x 0; have hB := d_lt x 1; omega
++  have hc1 : c1 < 64 := by dsimp [c1]; have hA := d_lt x 2; have hB := d_lt x 3; omega
++  have hc2 : c2 < 64 := by dsimp [c2]; have hA := d_lt x 4; have hB := d_lt x 5; omega
++  have hc3 : c3 < 64 := by dsimp [c3]; have hA := d_lt x 6; have hB := d_lt x 7; omega
++  have hc4 : c4 < 64 := by dsimp [c4]; have hA := d_lt x 8; have hB := d_lt x 9; omega
++  have hc5 : c5 < 64 := by dsimp [c5]; have hA := d_lt x 10; have hB := d_lt x 11; omega
++  have hc6 : c6 < 64 := by dsimp [c6]; have hA := d_lt x 12; have hB := d_lt x 13; omega
++  have hc7 : c7 < 64 := by dsimp [c7]; have hA := d_lt x 14; have hB := d_lt x 15; omega
++  have hc8 : c8 < 64 := by dsimp [c8]; have hA := d_lt x 16; have hB := d_lt x 17; omega
++  have hc9 : c9 < 64 := by dsimp [c9]; have hA := d_lt x 18; have hB := d_lt x 19; omega
++  have hc10 : c10 < 16 := by dsimp [c10]; have h := d_lt x 20; omega
++  have he0 : c0 + c1 ≤ 56 := by dsimp [c0, c1]; have h0 := d_lt x 0; have h1 := d_lt x 1; have h2 := d_lt x 2; have h3 := d_lt x 3; omega
++  have he1 : c2 + c3 ≤ 56 := by dsimp [c2, c3]; have h0 := d_lt x 4; have h1 := d_lt x 5; have h2 := d_lt x 6; have h3 := d_lt x 7; omega
++  have he2 : c4 + c5 ≤ 56 := by dsimp [c4, c5]; have h0 := d_lt x 8; have h1 := d_lt x 9; have h2 := d_lt x 10; have h3 := d_lt x 11; omega
++  have he3 : c6 + c7 ≤ 56 := by dsimp [c6, c7]; have h0 := d_lt x 12; have h1 := d_lt x 13; have h2 := d_lt x 14; have h3 := d_lt x 15; omega
++  have he4 : c8 + c9 ≤ 56 := by dsimp [c8, c9]; have h0 := d_lt x 16; have h1 := d_lt x 17; have h2 := d_lt x 18; have h3 := d_lt x 19; omega
++  have he5 : c10 ≤ 56 := by omega
++  have hp :
++      (x &&& 8198552921648689607) + (x >>> 3 &&& 8198552921648689607) =
++        val 64 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] := by
++    rw [land_even x hx, land_odd x hx]
++    dsimp [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, val]
++    ring
++  rw [hp]
++  have h6 := fold6 c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 hc0 hc1 hc2 hc3 hc4 hc5 hc6 hc7 hc8 hc9 hc10
++  rw [h6]
++  have h12 := fold12 (c0 + c1) (c2 + c3) (c4 + c5) (c6 + c7) (c8 + c9) c10 he0 he1 he2 he3 he4 he5
++  dsimp only at h12
++  calc
++    _ = (c0 + c1) + (c2 + c3) + (c4 + c5) + (c6 + c7) + (c8 + c9) + c10 := by
++      simpa only using h12
++    _ = d x 0 + d x 1 + d x 2 + d x 3 + d x 4 + d x 5 + d x 6 +
++          d x 7 + d x 8 + d x 9 + d x 10 + d x 11 + d x 12 +
++          d x 13 + d x 14 + d x 15 + d x 16 + d x 17 +
++          d x 18 + d x 19 + d x 20 := by
++      dsimp [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10]
++      omega
+ 
+ /-- `Digits::get` of a digit index is that digit of its word, in base eight. -/
+ theorem get_ok (lo hi : Std.U64) (i : Std.Usize) (hlt : i.val < 42) :
+     ∃ v, leanxmss.Digits.get (Std.Array.make 2#usize [lo, hi]) i = ok v ∧
