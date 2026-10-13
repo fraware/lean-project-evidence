@@ -1,0 +1,32 @@
+name: leanVM PR533 source-pinned SWAR21 handoff identity
+
+on:
+  push:
+    branches:
+      - research/leanvm-pr533-swar21-handoff-20261013
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Clone pinned PR source
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
+          git -C leanVM fetch --depth=1 origin pull/533/head
+          git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          test "$(git -C leanVM rev-parse HEAD)" = 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+      - name: Reapply patch and assert exact verified blob identity
+        run: |
+          cd leanVM
+          test "$(git hash-object verification/leanxmss/LeanxmssProofs/Encoding.lean)" = 4853d8a398a1ff2762a71473c17c17e175f80b73
+          git apply --check ../handoff_leanvm_533/swar21-and-folds.patch
+          git apply ../handoff_leanvm_533/swar21-and-folds.patch
+          test "$(git hash-object verification/leanxmss/LeanxmssProofs/Encoding.lean)" = 6c3adec7a90ce8883a8501e9e4a3acbcca3df2db
+          git diff --check
+          git diff --stat
+          echo 'SWAR21 and folded arithmetic source was independently reconstructed.'
