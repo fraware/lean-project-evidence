@@ -46,6 +46,23 @@ late bounds:
 [CI #38591839608](https://github.com/fraware/lean-project-evidence/actions/runs/38591839608).
 Only its final verdict establishes whether it succeeded.
 
+## Branch-specific scope of the padded-input assumption
+
+The exact translated guest `Leanxmss/Funs.lean` first computes
+`i := low ||| high`, then `i3 := i >>> (W * V / 2)` and returns
+`ok none` if `i3 != 0#u64`. Only the other branch executes
+`Digits.sum (Array.make 2#usize [low, high])`
+(source lines 564–594 at the pinned PR #533 head).
+Given `W = 3` and `V = 42`, that shift is 63. The exact
+high-bit OR equivalence is being separately checked as
+[`guest_padded_or_iff` CI #38592278322](https://github.com/fraware/lean-project-evidence/actions/runs/38592278322).
+
+This control-flow guard explains why a padded-input `Digits.sum`
+lemma is sufficient for the `encode` success branch, assuming the
+guard equivalence is established. It does **not** prove that
+`Digits.sum` always succeeds for arbitrary callers and inputs,
+nor that `encode_spec` is complete.
+
 ## Remaining boundary
 
 The natural arithmetic and checked-operation lemmas have not yet been
