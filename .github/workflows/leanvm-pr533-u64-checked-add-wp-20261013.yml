@@ -1,0 +1,40 @@
+name: leanVM #533 checked U64 guest addition WP
+on:
+  push:
+    branches:
+      - research/leanvm-pr533-u64-checked-add-wp-20261013
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  kernel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Exact upstream and unchanged proven arithmetic overlay
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
+          git -C leanVM fetch --depth=1 origin pull/533/head
+          git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          test "$(git -C leanVM rev-parse HEAD)" = 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          cp research/leanvm-pr533/Encoding-swar42-all-range-bounds.lean leanVM/verification/leanxmss/LeanxmssProofs/Encoding.lean
+          cp research/leanvm-pr533/GuestAddWP.lean leanVM/verification/leanxmss/GuestAddWP.lean
+          git -C leanVM diff --check
+      - name: Pinned Lean 4.31.0
+        run: |
+          grep -Fxq 'leanprover/lean4:v4.31.0' leanVM/verification/leanxmss/lean-toolchain
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
+          sh /tmp/elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build verified dependencies then direct checked-U64 WP proof
+        run: |
+          cd leanVM/verification/leanxmss
+          lake exe cache get
+          lake build
+          lake env lean -o GuestAddWP.olean GuestAddWP.lean
+          printf 'import LeanxmssProofs.Encoding\nimport GuestAddWP\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_first_add_spec\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_initial_prefixes\n' > WpAxioms.lean
+          lake env lean WpAxioms.lean | tee "$RUNNER_TEMP/axioms.txt"
+          for theorem in swar42_guest_first_add_spec swar42_guest_initial_prefixes; do
+            grep -F "'leanxmss.Proofs.Encoding.$theorem' depends on axioms:" "$RUNNER_TEMP/axioms.txt" | grep -Fv sorryAx
+          done
