@@ -36,12 +36,13 @@ jobs:
           lake env lean PaddingAxioms.lean | tee /tmp/padding-axioms.txt
           python3 - <<'PY'
           from pathlib import Path
-          import re
+          header = "'leanxmss.Proofs.Encoding.guest_padded_or_iff' depends on axioms: ["
           content = Path("PaddingAxioms.lean").read_text()
           assert "#print axioms leanxmss.Proofs.Encoding.guest_padded_or_iff" in content
           output = Path("/tmp/padding-axioms.txt").read_text()
-          m = re.search(r"'leanxmss\\.Proofs\\.Encoding\\.guest_padded_or_iff' depends on axioms: \\[(.*?)\\]", output, re.S)
-          assert m, "missing complete axiom closure"
+          assert header in output, "missing axiom closure"
+          axiom_list = output.split(header, 1)[1].split("]", 1)[0]
+          axioms = {a.strip() for a in axiom_list.split(",") if a.strip()}
           axioms = {a.strip() for a in m.group(1).split(",") if a.strip()}
           allowed = {"propext", "Classical.choice", "Quot.sound"}
           assert axioms <= allowed, f"unexpected axiom(s): {axioms - allowed}"
