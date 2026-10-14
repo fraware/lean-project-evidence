@@ -33,5 +33,17 @@ jobs:
           lake build LeanxmssProofs.Encoding
           lake env lean -o .lake/build/lib/lean/PaddingBitVec.olean PaddingBitVec.lean
           printf 'import PaddingBitVec\n#print axioms leanxmss.Proofs.Encoding.guest_padded_or_iff\n' > PaddingAxioms.lean
-          lake env lean PaddingAxioms.lean | tee "$RUNNER_TEMP/axioms.txt"
-          grep -F "'leanxmss.Proofs.Encoding.guest_padded_or_iff' depends on axioms:" "$RUNNER_TEMP/axioms.txt" | grep -Fv sorryAx
+          lake env lean PaddingAxioms.lean | tee /tmp/padding-axioms.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          content = Path("PaddingAxioms.lean").read_text()
+          assert "#print axioms leanxmss.Proofs.Encoding.guest_padded_or_iff" in content
+          output = Path("/tmp/padding-axioms.txt").read_text()
+          m = re.search(r"'leanxmss\\.Proofs\\.Encoding\\.guest_padded_or_iff' depends on axioms: \\[(.*?)\\]", output, re.S)
+          assert m, "missing complete axiom closure"
+          axioms = {a.strip() for a in m.group(1).split(",") if a.strip()}
+          allowed = {"propext", "Classical.choice", "Quot.sound"}
+          assert axioms <= allowed, f"unexpected axiom(s): {axioms - allowed}"
+          print("Kernel-style axiom whitelist satisfied:", sorted(axioms))
+          PY
