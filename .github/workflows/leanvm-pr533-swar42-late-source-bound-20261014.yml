@@ -1,0 +1,37 @@
+name: leanVM #533 two-half SWAR late source-specific bounds
+on:
+  push:
+    branches:
+      - research/leanvm-pr533-swar42-middle-bound-20261014
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  kernel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Pin original upstream translation
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
+          git -C leanVM fetch --depth=1 origin pull/533/head
+          git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          test "$(git -C leanVM rev-parse HEAD)" = 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          cp research/leanvm-pr533/Encoding-swar42-late-source-bound.lean leanVM/verification/leanxmss/LeanxmssProofs/Encoding.lean
+          git -C leanVM diff --check
+      - name: Install pinned toolchain
+        run: |
+          grep -Fxq 'leanprover/lean4:v4.31.0' leanVM/verification/leanxmss/lean-toolchain
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
+          sh /tmp/elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build whole project and audit new theorem
+        run: |
+          cd leanVM/verification/leanxmss
+          lake exe cache get
+          lake build
+          printf 'import LeanxmssProofs\n#print axioms leanxmss.Proofs.Encoding.swar42_all_late_sums_fit_u64\n#print axioms leanxmss.Proofs.Encoding.swar42_nat_spec\n#print axioms leanxmss.Proofs.encode_spec\n' > Audit.lean
+          lake env lean Audit.lean | tee "$RUNNER_TEMP/axioms.txt"
+          grep -F "'leanxmss.Proofs.Encoding.swar42_all_late_sums_fit_u64' depends on axioms:" "$RUNNER_TEMP/axioms.txt" | grep -Fv sorryAx
+          grep -F "'leanxmss.Proofs.encode_spec' depends on axioms:" "$RUNNER_TEMP/axioms.txt" | grep -Fq sorryAx
