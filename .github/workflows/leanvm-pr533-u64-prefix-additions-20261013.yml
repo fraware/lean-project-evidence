@@ -31,7 +31,7 @@ jobs:
           cd leanVM/verification/leanxmss
           lake exe cache get
           lake build
-          lake env lean -o GuestAddPrefixes.olean GuestAddPrefixes.lean
+          lake env lean -o .lake/build/lib/lean/GuestAddPrefixes.olean GuestAddPrefixes.lean
           printf 'import GuestAddPrefixes\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_first_add_spec\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_initial_prefixes\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_second_add_spec\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_third_add_spec\n' > Axioms.lean
           lake env lean Axioms.lean | tee "$RUNNER_TEMP/axioms.txt"
           for lemma in swar42_guest_first_add_spec swar42_guest_initial_prefixes swar42_guest_second_add_spec swar42_guest_third_add_spec; do
