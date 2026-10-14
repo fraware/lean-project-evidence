@@ -37,8 +37,7 @@ theorem digits_sum_impl_spec
     have hlate := swar42_all_late_sums_fit_u64 lo.val hi.val hlo hhi
     have hsum := swar42_nat_spec lo.val hi.val hlo hhi
     dsimp at hlate hsum
-    subst low
-    subst high
+    simp only [hlo_eq, hhi_eq] at *
     simp only [UScalar.val_and, UScalar.max_UScalarTy_U64_eq, U64.max_eq] at *
     try rw [i1_post] at *
     try rw [i6_post] at *
