@@ -1,0 +1,39 @@
+name: leanVM source-specific checked shift and mask semantics
+on:
+  push:
+    branches:
+      - research/leanvm-pr533-u64-shift-mask-wp-20261013
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Exact upstream source pin
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
+          git -C leanVM fetch --depth=1 origin pull/533/head
+          git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          test "$(git -C leanVM rev-parse HEAD)" = 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          cp research/leanvm-pr533/Encoding-swar42-all-range-bounds.lean leanVM/verification/leanxmss/LeanxmssProofs/Encoding.lean
+          cp research/leanvm-pr533/GuestShiftMaskWP.lean leanVM/verification/leanxmss/GuestShiftMaskWP.lean
+          git -C leanVM diff --check
+      - name: Install official pinned Lean 4.31
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
+          sh /tmp/elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Kernel-validate actual translated guest operations
+        run: |
+          cd leanVM/verification/leanxmss
+          lake exe cache get
+          lake build
+          lake env lean -o GuestShiftMaskWP.olean GuestShiftMaskWP.lean
+          printf 'import GuestShiftMaskWP\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_W_shift_spec\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_even_mask_val\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_low6_mask_val\n' > AxiomAudit.lean
+          lake env lean AxiomAudit.lean | tee "$RUNNER_TEMP/axioms.txt"
+          for theorem in swar42_guest_W_shift_spec swar42_guest_even_mask_val swar42_guest_low6_mask_val; do
+            grep -F "'leanxmss.Proofs.Encoding.$theorem' depends on axioms:" "$RUNNER_TEMP/axioms.txt" | grep -Fv sorryAx
+          done
