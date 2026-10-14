@@ -57,12 +57,21 @@ Two experiments now target their precise application:
 A separate [shift and mask specialization](https://github.com/fraware/lean-project-evidence/tree/research/leanvm-pr533-u64-shift-mask-wp-20261013)
 targets the guest's concrete constants and types.
 
-Only a successful Lean build **and an actual no-sorry axiom report**
-establish a completed helper. The first helper initially compiled but the
-workflow then failed to locate its standalone compiled module during
-the axiom audit. This workflow import-path problem was corrected on a
-subsequent isolated commit; success is not inferred until that run
-completes.
+**First source-specific checked addition completed.**
+[CI #38521832642](https://github.com/fraware/lean-project-evidence/actions/runs/38521832642)
+passed the full 1,713-job Lean build and printed:
+
+```text
+'leanxmss.Proofs.Encoding.swar42_guest_first_add_spec' depends on axioms: [propext, Classical.choice, Quot.sound]
+'leanxmss.Proofs.Encoding.swar42_guest_initial_prefixes' depends on axioms: [propext, Classical.choice, Quot.sound]
+```
+
+These establish, for the exact guest's first masked addition, successful
+Aeneas checked-add execution with the mathematical sum, together with
+source-specific bounds for all three initial prefix sums.
+
+The direct full-function `Digits.sum` theorem remains unproved.
+Other experimental helper branches have independent kernel and axiom gates.
 
 ## Next full-function proof step
 
