@@ -273,17 +273,17 @@ theorem swar42_nat_spec (x y : Nat) (hx : x < 2 ^ 63) (hy : y < 2 ^ 63) :
       omega
 
 
-/-- The top bit of a 64-bit digest half is clear exactly if its natural
-    representation fits into the 63-bit region used by XMSS digits. -/
-theorem top_bit_clear_iff_padded (x : BitVec 64) :
-    (x >>> 63 = 0#64) ↔ x.toNat < 2 ^ 63 := by
+/-- The guest's shift test is equivalent to comparing the unsigned
+    64-bit word with the boundary at bit 63. -/
+theorem top_bit_clear_iff_unsigned_small (x : BitVec 64) :
+    (x >>> 63 = 0#64) ↔ x < 9223372036854775808#64 := by
   bv_decide
 
-/-- The guest's combined OR / shift test rejects precisely those
-    inputs with a set padding bit in either digest half. -/
-theorem or_top_bit_clear_iff_both_padded (x y : BitVec 64) :
+/-- The OR/shift predicate checks both padding bits in one operation.
+    This statement uses only fixed-width bitvector operations. -/
+theorem or_top_bit_clear_iff_both_words (x y : BitVec 64) :
     ((x ||| y) >>> 63 = 0#64) ↔
-      x.toNat < 2 ^ 63 ∧ y.toNat < 2 ^ 63 := by
+      (x >>> 63 = 0#64 ∧ y >>> 63 = 0#64) := by
   bv_decide
 
 /-- `Digits::get` of a digit index is that digit of its word, in base eight. -/
