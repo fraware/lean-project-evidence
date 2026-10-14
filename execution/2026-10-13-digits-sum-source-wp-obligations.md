@@ -1,0 +1,79 @@
+# Source-derived weakest-precondition frontier for Digits.sum
+
+**Source:** leanEthereum/leanVM PR #533, exactly
+`4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d`,
+`verification/leanxmss/Leanxmss/Funs.lean`,
+Aeneas-generated `leanxmss.Digits.sum`.
+**Diagnostic CI:** [#38521214202](https://github.com/fraware/lean-project-evidence/actions/runs/38521214202),
+failure at a fully elaborated source-level proof term, not an admitted theorem.
+
+## What the pinned proof engine returned
+
+The original function was unfolded on two padded digest words.
+Aeneas's `step*` tactic recognized the exact source operations,
+established array indexing, translated both three-bit shifts and all
+six- and 12/24/48-bit shift postconditions, and created eight remaining
+goals:
+
+1. First checked addition: `(low & EVEN) + ((low >>> 3) & EVEN) ≤ U64.max`.
+2. Second addition: previous sum plus `(high & EVEN) ≤ U64.max`.
+3. Third addition: previous result plus `((high >>> 3) & EVEN) ≤ U64.max`.
+4. LOW6 pair fold: `(s & LOW6) + ((s >>> 6) & LOW6) ≤ U64.max`.
+5. `s1 + (s1 >>> 12) ≤ U64.max`.
+6. `s2 + (s2 >>> 24) ≤ U64.max`.
+7. `s3 + (s3 >>> 48) ≤ U64.max`.
+8. Exact result equality between `(i14 & 4095).val` and the sum of all
+   42 specification-style base-eight chain digits.
+
+These are proof obligations, **not proved facts**. Their number and
+form are directly observed in the Lean error output from that run.
+No `sorry` was inserted to suppress them.
+
+## Available checked mathematical lemmas
+
+The same exact-source Lean project previously checked:
+
+- `fold6`, `fold12`;
+- `swar42_nat_spec`, the two-half 42-digit SWAR arithmetic identity;
+- `swar42_packed_first_fits_u64`;
+- `swar42_first_sum_fits_u64`;
+- `swar42_late_folds_fit_u64`.
+
+All are axiom-clean in
+[combined CI #38519333671](https://github.com/fraware/lean-project-evidence/actions/runs/38519333671).
+
+## The reusable executable bridge
+
+The pinned Aeneas library exposes:
+
+- `UScalar.add_spec` with explicit no-overflow precondition;
+- `UScalar.ShiftRight_spec`, with shift count in range;
+- `UScalar.val_and`, relating machine and natural-bit operations.
+
+Two experiments now target their precise application:
+- [first checked guest addition](https://github.com/fraware/lean-project-evidence/tree/research/leanvm-pr533-u64-checked-add-wp-20261013);
+- [all three initial checked additions](https://github.com/fraware/lean-project-evidence/tree/research/leanvm-pr533-u64-prefix-additions-20261013).
+
+A separate [shift and mask specialization](https://github.com/fraware/lean-project-evidence/tree/research/leanvm-pr533-u64-shift-mask-wp-20261013)
+targets the guest's concrete constants and types.
+
+Only a successful Lean build **and an actual no-sorry axiom report**
+establish a completed helper. The first helper initially compiled but the
+workflow then failed to locate its standalone compiled module during
+the axiom audit. This workflow import-path problem was corrected on a
+subsequent isolated commit; success is not inferred until that run
+completes.
+
+## Next full-function proof step
+
+Propagate the padded input and actual `low`/`high` array-index facts into
+the seven addition preconditions; establish exact each-stage value
+equations, and use `swar42_nat_spec` for the final sum.
+
+The `U64` semantic refinement and `Digits.sum` function theorem
+are distinct from complete `encode_spec`, which still needs digest
+byte representation, spare-bit admissibility, and rejection/success
+branch correspondence.
+
+Upstream PR #533 is still draft, with no upstream review or merge
+of these research candidates at the time this evidence was recorded.
