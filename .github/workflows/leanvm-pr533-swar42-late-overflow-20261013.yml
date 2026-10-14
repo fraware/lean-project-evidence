@@ -1,0 +1,38 @@
+name: leanVM #533 no-overflow bounds for late SWAR folds
+on:
+  push:
+    branches:
+      - research/leanvm-pr533-swar42-fold-overflow-20261013
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Exact upstream PR revision and candidate overlay
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
+          git -C leanVM fetch --depth=1 origin pull/533/head
+          git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          test "$(git -C leanVM rev-parse HEAD)" = 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          cp research/leanvm-pr533/Encoding-swar42-late-no-overflow.lean leanVM/verification/leanxmss/LeanxmssProofs/Encoding.lean
+          git -C leanVM diff --check
+      - name: Install Lean 4.31.0
+        run: |
+          grep -Fxq 'leanprover/lean4:v4.31.0' leanVM/verification/leanxmss/lean-toolchain
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
+          sh /tmp/elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Verify full build and proof axiom closure
+        run: |
+          cd leanVM/verification/leanxmss
+          lake exe cache get
+          lake build
+          printf 'import LeanxmssProofs\n#print axioms leanxmss.Proofs.Encoding.swar42_late_folds_fit_u64\n#print axioms leanxmss.Proofs.Encoding.swar42_nat_spec\n' > Axioms.lean
+          lake env lean Axioms.lean | tee "$RUNNER_TEMP/axioms.txt"
+          for theorem in swar42_late_folds_fit_u64 swar42_nat_spec; do
+            grep -F "'leanxmss.Proofs.Encoding.$theorem' depends on axioms:" "$RUNNER_TEMP/axioms.txt" | grep -Fv sorryAx
+          done
