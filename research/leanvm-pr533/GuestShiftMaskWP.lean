@@ -15,7 +15,8 @@ theorem swar42_guest_W_shift_spec (lo : Std.U64) :
   have hw : leanxmss.W.val < UScalarTy.U64.numBits := by
     simp [leanxmss.W, UScalarTy.U64_numBits_eq]
   have hs := UScalar.ShiftRight_spec lo leanxmss.W hw
-  simpa only [show leanxmss.W.val = 3 by rfl] using hs
+  have hW : leanxmss.W.val = 3 := by simp [leanxmss.W]
+  simpa only [hW] using hs
 
 /-- The actual guest source's EVEN mask is interpreted as a bitwise
 AND of natural-number word values. -/
@@ -23,13 +24,13 @@ theorem swar42_guest_even_mask_val (lo : Std.U64) :
     (lo &&& leanxmss.Digits.sum.EVEN).val =
       lo.val &&& 8198552921648689607 := by
   rw [UScalar.val_and]
-  rfl
+  simp [leanxmss.Digits.sum.EVEN]
 
 /-- The LOW6 mask operation in the guest has exact natural AND semantics. -/
 theorem swar42_guest_low6_mask_val (lo : Std.U64) :
     (lo &&& leanxmss.Digits.sum.LOW6).val =
       lo.val &&& 17311559823019733055 := by
   rw [UScalar.val_and]
-  rfl
+  simp [leanxmss.Digits.sum.LOW6]
 
 end leanxmss.Proofs.Encoding
