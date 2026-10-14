@@ -282,10 +282,10 @@ theorem packed6_eleven_fits_u64 (c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 : Nat)
   simp only [val_cons, val_nil]
   omega
 
+set_option maxHeartbeats 1200000 in
 /-- The four masked contributions of the two padded XMSS digest words fit
     into one 64-bit unsigned value, so the guest's initial accumulations
     cannot lose a carry due to unsigned modular wraparound. -/
-set_option maxHeartbeats 1200000 in
 theorem swar42_initial_sum_fits_u64 (x y : Nat)
     (hx : x < 2 ^ 63) (hy : y < 2 ^ 63) :
     (x &&& 8198552921648689607) + (x >>> 3 &&& 8198552921648689607) +
