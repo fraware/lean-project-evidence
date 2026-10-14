@@ -53,9 +53,13 @@ The exact translated guest `Leanxmss/Funs.lean` first computes
 `ok none` if `i3 != 0#u64`. Only the other branch executes
 `Digits.sum (Array.make 2#usize [low, high])`
 (source lines 564–594 at the pinned PR #533 head).
-Given `W = 3` and `V = 42`, that shift is 63. The exact
-high-bit OR equivalence is being separately checked as
-[`guest_padded_or_iff` CI #38592278322](https://github.com/fraware/lean-project-evidence/actions/runs/38592278322).
+Given `W = 3` and `V = 42`, that shift is 63. An initial bitvector proof [CI #38592278322](https://github.com/fraware/lean-project-evidence/actions/runs/38592278322)
+compiled, but `#print axioms` exposed the additional native solver axiom
+`leanxmss.Proofs.Encoding.guest_padded_or_iff._native.bv_decide.ax_1_5`.
+That attempt is **excluded from the acceptable kernel-only evidence**.
+The replacement uses Lean's established `BitVec.ushiftRight_or_distrib`
+and `BitVec.or_eq_zero_iff` theorems, under a full multiline axiom
+whitelist CI on the same source-pinned branch.
 
 This control-flow guard explains why a padded-input `Digits.sum`
 lemma is sufficient for the `encode` success branch, assuming the
