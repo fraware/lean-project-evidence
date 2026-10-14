@@ -1,0 +1,25 @@
+name: Strict Lean axiom auditor regression suite
+on:
+  push:
+    branches:
+      - research/lean-strict-axiom-audit-20261014
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Test false-positive and allowed-axiom cases
+        run: |
+          python3 -m unittest discover -s tools/tests -p 'test_lean_axiom_audit.py' -v
+      - name: Demonstrate native computation axiom is rejected
+        run: |
+          printf "'Pkg.thm' depends on axioms: [propext,\n Classical.choice,\n Quot.sound,\n Pkg.thm._native.bv_decide.ax_1]\n" > /tmp/native-axioms.txt
+          if python3 tools/lean_axiom_audit.py /tmp/native-axioms.txt Pkg.thm; then
+            echo 'ERROR: native axiom was accepted' >&2
+            exit 1
+          fi
+          printf "'Pkg.thm' depends on axioms: [propext,\n Classical.choice,\n Quot.sound]\n" > /tmp/standard-axioms.txt
+          python3 tools/lean_axiom_audit.py /tmp/standard-axioms.txt Pkg.thm
