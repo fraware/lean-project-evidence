@@ -14,6 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate contributor handoff without submitting it
+        run: |
+          bash -n handoff_leanvm_533/publish_review.sh
+          grep -Fq 'leanvm-pr533-swar42-reviewed-20261013-v1' handoff_leanvm_533/REVIEW_NOTE.md
       - name: Pin exact upstream head
         run: |
           git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
