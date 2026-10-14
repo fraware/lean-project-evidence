@@ -31,7 +31,7 @@ jobs:
           cd leanVM/verification/leanxmss
           lake exe cache get
           lake build
-          lake env lean -o GuestShiftMaskWP.olean GuestShiftMaskWP.lean
+          lake env lean -o .lake/build/lib/lean/GuestShiftMaskWP.olean GuestShiftMaskWP.lean
           printf 'import GuestShiftMaskWP\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_W_shift_spec\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_even_mask_val\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_low6_mask_val\n' > AxiomAudit.lean
           lake env lean AxiomAudit.lean | tee "$RUNNER_TEMP/axioms.txt"
           for theorem in swar42_guest_W_shift_spec swar42_guest_even_mask_val swar42_guest_low6_mask_val; do
