@@ -1,0 +1,38 @@
+name: leanVM #533 direct Digits.sum guest WP with checked arithmetic
+on:
+  push:
+    branches:
+      - research/leanvm-pr533-digits-sum-wp-bridge-20261014
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  kernel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 48
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Pin translated guest and proven source-specific range file
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
+          git -C leanVM fetch --depth=1 origin pull/533/head
+          git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          test "$(git -C leanVM rev-parse HEAD)" = 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          cp research/leanvm-pr533/Encoding-swar42-late-source-bound.lean leanVM/verification/leanxmss/LeanxmssProofs/Encoding.lean
+          cp research/leanvm-pr533/DigitsSumWPBridge.lean leanVM/verification/leanxmss/DigitsSumWPBridge.lean
+          git -C leanVM diff --check
+      - name: Install pinned Lean toolchain
+        run: |
+          grep -Fxq 'leanprover/lean4:v4.31.0' leanVM/verification/leanxmss/lean-toolchain
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
+          sh /tmp/elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Verify exact guest source-level correspondence
+        run: |
+          cd leanVM/verification/leanxmss
+          lake exe cache get
+          lake build LeanxmssProofs.Encoding
+          lake env lean -o .lake/build/lib/lean/DigitsSumWPBridge.olean DigitsSumWPBridge.lean
+          printf 'import DigitsSumWPBridge\n#print axioms leanxmss.Proofs.Encoding.digits_sum_impl_spec\n' > Axioms.lean
+          lake env lean Axioms.lean | tee "$RUNNER_TEMP/axioms.txt"
+          grep -F "'leanxmss.Proofs.Encoding.digits_sum_impl_spec' depends on axioms:" "$RUNNER_TEMP/axioms.txt" | grep -Fv sorryAx
