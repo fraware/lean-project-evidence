@@ -30,5 +30,13 @@ theorem digits_sum_impl_spec
   unfold leanxmss.Digits.sum
   simp only [leanxmss.Digits.sum.EVEN, leanxmss.Digits.sum.LOW6, leanxmss.W, lift]
   step*
+  all_goals
+    try
+      have low_eq : low = lo := by simpa using low_post
+      have high_eq : high = hi := by simpa using high_post
+      have hfirst := swar42_first_sum_fits_u64 lo.val hi.val hlo hhi
+      simp only [low_eq, high_eq, UScalar.val_and,
+        UScalar.max_UScalarTy_U64_eq, U64.max_eq] at *
+      omega
 
 end leanxmss.Proofs.Encoding
