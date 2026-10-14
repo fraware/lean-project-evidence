@@ -1,0 +1,359 @@
+import LeanxmssProofs.Hash
+
+/-!
+# The target-sum encoding
+
+The guest's `encode` is the specification's `wotsEncode`: it rejects the same digests, and its digits are the
+specification's.
+-/
+
+open Aeneas Aeneas.Std Result WP
+open EthCryptographySpecs.Xmss EthCryptographySpecs.Xmss.Constants
+
+namespace leanxmss.Proofs.Encoding
+
+/-- Base-`B` digits, least significant first, xs a number. -/
+def val (B : Nat) : List Nat → Nat
+  | [] => 0
+  | c :: cs => c + B * val B cs
+
+@[simp] theorem val_nil (B : Nat) : val B [] = 0 := rfl
+@[simp] theorem val_cons (B c : Nat) (cs : List Nat) : val B (c :: cs) = c + B * val B cs := rfl
+
+/-- Masking splits at a field boundary. -/
+theorem land_split (k a b c d : Nat) (ha : a < 2 ^ k) (hc : c < 2 ^ k) :
+    (a + 2 ^ k * b) &&& (c + 2 ^ k * d) = (a &&& c) + 2 ^ k * (b &&& d) := by
+  apply Nat.eq_of_testBit_eq
+  intro j
+  have hac : (a &&& c) < 2 ^ k := Nat.and_lt_two_pow _ hc
+  rw [Nat.testBit_and, Nat.add_comm a, Nat.add_comm c, Nat.add_comm (a &&& c),
+    Nat.testBit_two_pow_mul_add _ ha, Nat.testBit_two_pow_mul_add _ hc, Nat.testBit_two_pow_mul_add _ hac]
+  split <;> simp
+
+/-- Masking a number given by fields with a mask given by fields masks each field. -/
+theorem val_land (k : Nat) : ∀ (xs ms : List Nat), (∀ a ∈ xs, a < 2 ^ k) → (∀ m ∈ ms, m < 2 ^ k) →
+    val (2 ^ k) xs &&& val (2 ^ k) ms = val (2 ^ k) (List.zipWith (· &&& ·) xs ms)
+  | [], _, _, _ => by simp
+  | _ :: _, [], _, _ => by simp
+  | a :: xs, m :: ms, ha, hm => by
+    simp only [val_cons, List.zipWith_cons_cons]
+    rw [land_split k _ _ _ _ (ha a (by simp)) (hm m (by simp)),
+      val_land k xs ms (fun x hx => ha x (by simp [hx])) (fun x hx => hm x (by simp [hx]))]
+
+/-- Dropping the lowest field. -/
+theorem val_cons_div (k c : Nat) (cs : List Nat) (hc : c < 2 ^ k) :
+    val (2 ^ k) (c :: cs) / 2 ^ k = val (2 ^ k) cs := by
+  have : 0 < 2 ^ k := Nat.two_pow_pos k
+  simp only [val_cons]
+  rw [Nat.add_mul_div_left _ _ this, Nat.div_eq_of_lt hc, Nat.zero_add]
+
+/-- Digit `r` of `x` in base eight. -/
+def d (x r : Nat) : Nat := x / 8 ^ r % 8
+
+theorem d_lt (x r : Nat) : d x r < 8 := Nat.mod_lt _ (by decide)
+
+/-- The base-eight digits of `x`, from digit `r`, `n` of them. -/
+def digs (x r : Nat) : Nat → List Nat
+  | 0 => []
+  | n + 1 => d x r :: digs x (r + 1) n
+
+theorem val_digs (x : Nat) : ∀ n r, x / 8 ^ r < 8 ^ n → val 8 (digs x r n) = x / 8 ^ r
+  | 0, r, h => by simp [digs] at *; omega
+  | n + 1, r, h => by
+    simp only [digs, val_cons]
+    rw [val_digs x n (r + 1) (by rw [pow_succ, ← Nat.div_div_eq_div_mul]; rw [pow_succ] at h; omega)]
+    simp only [d, pow_succ, ← Nat.div_div_eq_div_mul]
+    omega
+
+
+theorem d_land_seven (x r : Nat) : d x r &&& 7 = d x r := by
+  rw [show (7 : Nat) = 2 ^ 3 - 1 from rfl, Nat.and_two_pow_sub_one_eq_mod, Nat.mod_eq_of_lt (d_lt x r)]
+
+theorem digs_lt (x r n : Nat) : ∀ a ∈ digs x r n, a < 2 ^ 3 := by
+  induction n generalizing r with
+  | zero => simp [digs]
+  | succ n ih =>
+    intro a ha
+    simp only [digs, List.mem_cons] at ha
+    rcases ha with rfl | ha
+    · exact d_lt x r
+    · exact ih (r + 1) a ha
+
+/-- The 21 digits of a word below `2^63`. -/
+theorem val_digs21 (x : Nat) (hx : x < 2 ^ 63) : val (2 ^ 3) (digs x 0 21) = x := by
+  have := val_digs x 21 0 (by simpa using hx)
+  simpa using this
+
+/-- The 20 digits of such a word shifted by one digit. -/
+theorem val_digs20 (x : Nat) (hx : x < 2 ^ 63) : val (2 ^ 3) (digs x 1 20) = x >>> 3 := by
+  have := val_digs x 20 1 (by rw [Nat.div_lt_iff_lt_mul (by decide)]; simpa using hx)
+  rw [Nat.shiftRight_eq_div_pow]
+  simpa using this
+
+/-- The digit mask `EVEN`. -/
+theorem even_val : (8198552921648689607 : Nat) =
+    val (2 ^ 3) [7, 0, 7, 0, 7, 0, 7, 0, 7, 0, 7, 0, 7, 0, 7, 0, 7, 0, 7, 0, 7] := by
+  simp [val]
+
+/-- The even digits of a word, each in a 6-bit field. -/
+theorem land_even (x : Nat) (hx : x < 2 ^ 63) :
+    x &&& 8198552921648689607 = val 64 [d x 0, d x 2, d x 4, d x 6, d x 8, d x 10, d x 12, d x 14, d x 16,
+      d x 18, d x 20] := by
+  conv_lhs => rw [← val_digs21 x hx, even_val]
+  rw [val_land 3 _ _ (digs_lt x 0 21) (by simp)]
+  simp only [digs, List.zipWith_cons_cons, List.zipWith_nil_right, d_land_seven,
+    Nat.and_zero, val_cons, val_nil, Nat.reduceAdd, Nat.reducePow]
+  omega
+
+/-- The odd digits of a word, each in a 6-bit field. -/
+theorem land_odd (x : Nat) (hx : x < 2 ^ 63) :
+    x >>> 3 &&& 8198552921648689607 = val 64 [d x 1, d x 3, d x 5, d x 7, d x 9, d x 11, d x 13, d x 15, d x 17,
+      d x 19] := by
+  conv_lhs => rw [← val_digs20 x hx, even_val]
+  rw [val_land 3 _ _ (digs_lt x 1 20) (by simp)]
+  simp only [digs, List.zipWith_cons_cons, List.zipWith_nil_left, d_land_seven,
+    Nat.and_zero, val_cons, val_nil, Nat.reduceAdd, Nat.reducePow]
+  omega
+
+/-- The field mask `LOW6`. -/
+theorem low6_val : (17311559823019733055 : Nat) =
+    val (2 ^ 6) [63, 0, 63, 0, 63, 0, 63, 0, 63, 0, 15] := by
+  simp [val]
+
+theorem land_63 {c : Nat} (h : c < 64) : c &&& 63 = c := by
+  rw [show (63 : Nat) = 2 ^ 6 - 1 from rfl, Nat.and_two_pow_sub_one_eq_mod, Nat.mod_eq_of_lt h]
+
+theorem land_15 {c : Nat} (h : c < 16) : c &&& 15 = c := by
+  rw [show (15 : Nat) = 2 ^ 4 - 1 from rfl, Nat.and_two_pow_sub_one_eq_mod, Nat.mod_eq_of_lt h]
+
+/-- Adding neighbouring 6-bit fields into 12-bit fields (`Digits::sum`'s second step). UNFINISHED. -/
+theorem fold6 (c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 : Nat) (h0 : c0 < 64) (h1 : c1 < 64) (h2 : c2 < 64)
+    (h3 : c3 < 64) (h4 : c4 < 64) (h5 : c5 < 64) (h6 : c6 < 64) (h7 : c7 < 64) (h8 : c8 < 64) (h9 : c9 < 64)
+    (h10 : c10 < 16) :
+    (val 64 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] &&& 17311559823019733055) +
+      (val 64 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] >>> 6 &&& 17311559823019733055) =
+    val 4096 [c0 + c1, c2 + c3, c4 + c5, c6 + c7, c8 + c9, c10] := by
+  have hc : ∀ a ∈ [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10], a < 2 ^ 6 := by
+    intro a ha
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
+    rcases ha with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> omega
+  have hm : ∀ m ∈ [63, 0, 63, 0, 63, 0, 63, 0, 63, 0, 15], m < 2 ^ 6 := by
+    simp
+  have heven :
+      val 64 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] &&& 17311559823019733055 =
+        val 64 [c0, 0, c2, 0, c4, 0, c6, 0, c8, 0, c10] := by
+    rw [low6_val]
+    have h := val_land 6 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10]
+      [63, 0, 63, 0, 63, 0, 63, 0, 63, 0, 15] hc hm
+    simpa only [show (2 : Nat) ^ 6 = 64 by decide, List.zipWith_cons_cons,
+      List.zipWith_nil_left, List.zipWith_nil_right, Nat.and_zero,
+      land_63 h0, land_63 h2, land_63 h4, land_63 h6, land_63 h8, land_15 h10] using h
+  have hshift :
+      val 64 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] >>> 6 =
+        val 64 [c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] := by
+    rw [Nat.shiftRight_eq_div_pow]
+    simpa only [show (2 : Nat) ^ 6 = 64 by decide] using
+      (val_cons_div 6 c0 [c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] (by omega))
+  have hc' : ∀ a ∈ [c1, c2, c3, c4, c5, c6, c7, c8, c9, c10], a < 2 ^ 6 := by
+    intro a ha
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at ha
+    rcases ha with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> omega
+  have hodd :
+      (val 64 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] >>> 6 &&&
+          17311559823019733055) =
+        val 64 [c1, 0, c3, 0, c5, 0, c7, 0, c9, 0] := by
+    rw [hshift, low6_val]
+    have h := val_land 6 [c1, c2, c3, c4, c5, c6, c7, c8, c9, c10]
+      [63, 0, 63, 0, 63, 0, 63, 0, 63, 0, 15] hc' hm
+    simpa only [show (2 : Nat) ^ 6 = 64 by decide, List.zipWith_cons_cons,
+      List.zipWith_nil_left, List.zipWith_nil_right, Nat.and_zero,
+      land_63 h1, land_63 h3, land_63 h5, land_63 h7, land_63 h9] using h
+  rw [heven, hodd]
+  simp only [val_cons, val_nil]
+  ring
+
+/-- Folding the six 12-bit fields into the lowest (`Digits::sum`'s last steps). UNFINISHED. -/
+theorem fold12 (e0 e1 e2 e3 e4 e5 : Nat) (h0 : e0 ≤ 56) (h1 : e1 ≤ 56) (h2 : e2 ≤ 56) (h3 : e3 ≤ 56)
+    (h4 : e4 ≤ 56) (h5 : e5 ≤ 56) :
+    let s1 := val 4096 [e0, e1, e2, e3, e4, e5]
+    let s2 := s1 + s1 >>> 12
+    let s3 := s2 + s2 >>> 24
+    (s3 + s3 >>> 48) &&& 4095 = e0 + e1 + e2 + e3 + e4 + e5 := by
+  dsimp
+  rw [show (4095 : Nat) = 2 ^ 12 - 1 by decide, Nat.and_two_pow_sub_one_eq_mod]
+  simp only [Nat.shiftRight_eq_div_pow]
+  norm_num [val]
+  have hd1 :
+      (e0 + 4096 * (e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5))))) /
+          4096 =
+        e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5))) := by
+    omega
+  rw [hd1]
+  have hlow2 : e0 + e1 + 4096 * (e1 + e2) < 16777216 := by omega
+  have hd2 :
+      (e0 + 4096 * (e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5)))) +
+          (e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5))))) /
+          16777216 =
+        (e2 + e3) + 4096 * ((e3 + e4) + 4096 * ((e4 + e5) + 4096 * e5)) := by
+    omega
+  rw [hd2]
+  have hlow4 :
+      (e0 + e1 + e2 + e3) +
+          4096 * (e1 + e2 + e3 + e4) +
+          16777216 * (e2 + e3 + e4 + e5) +
+          68719476736 * (e3 + e4 + e5) <
+        281474976710656 := by
+    omega
+  have hd3 :
+      (e0 + 4096 * (e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5)))) +
+          (e1 + 4096 * (e2 + 4096 * (e3 + 4096 * (e4 + 4096 * e5)))) +
+          ((e2 + e3) + 4096 * ((e3 + e4) + 4096 * ((e4 + e5) + 4096 * e5)))) /
+          281474976710656 =
+        (e4 + e5) + 4096 * e5 := by
+    omega
+  rw [hd3]
+  have hsum : e0 + e1 + e2 + e3 + e4 + e5 < 4096 := by omega
+  omega
+
+/-- The guest's arithmetic SWAR pipeline over both padded digest halves
+    computes the sum of all 42 three-bit XMSS chain digits. -/
+theorem swar42_nat_spec (x y : Nat) (hx : x < 2 ^ 63) (hy : y < 2 ^ 63) :
+    let s := (x &&& 8198552921648689607) + (x >>> 3 &&& 8198552921648689607) +
+      (y &&& 8198552921648689607) + (y >>> 3 &&& 8198552921648689607)
+    let t := (s &&& 17311559823019733055) + (s >>> 6 &&& 17311559823019733055)
+    let u := t + t >>> 12
+    let v := u + u >>> 24
+    (v + v >>> 48) &&& 4095 = (d x 0 + d x 1 + d x 2 + d x 3 + d x 4 + d x 5 + d x 6 + d x 7 + d x 8 + d x 9 + d x 10 + d x 11 + d x 12 + d x 13 + d x 14 + d x 15 + d x 16 + d x 17 + d x 18 + d x 19 + d x 20) + (d y 0 + d y 1 + d y 2 + d y 3 + d y 4 + d y 5 + d y 6 + d y 7 + d y 8 + d y 9 + d y 10 + d y 11 + d y 12 + d y 13 + d y 14 + d y 15 + d y 16 + d y 17 + d y 18 + d y 19 + d y 20) := by
+  dsimp
+  let c0 := d x 0 + d x 1 + d y 0 + d y 1
+  let c1 := d x 2 + d x 3 + d y 2 + d y 3
+  let c2 := d x 4 + d x 5 + d y 4 + d y 5
+  let c3 := d x 6 + d x 7 + d y 6 + d y 7
+  let c4 := d x 8 + d x 9 + d y 8 + d y 9
+  let c5 := d x 10 + d x 11 + d y 10 + d y 11
+  let c6 := d x 12 + d x 13 + d y 12 + d y 13
+  let c7 := d x 14 + d x 15 + d y 14 + d y 15
+  let c8 := d x 16 + d x 17 + d y 16 + d y 17
+  let c9 := d x 18 + d x 19 + d y 18 + d y 19
+  let c10 := d x 20 + d y 20
+  have hc0 : c0 < 64 := by dsimp [c0]; have hx0:= d_lt x 0; have hx1:= d_lt x 1; have hy0:= d_lt y 0; have hy1:= d_lt y 1; omega
+  have hc1 : c1 < 64 := by dsimp [c1]; have hx0:= d_lt x 2; have hx1:= d_lt x 3; have hy0:= d_lt y 2; have hy1:= d_lt y 3; omega
+  have hc2 : c2 < 64 := by dsimp [c2]; have hx0:= d_lt x 4; have hx1:= d_lt x 5; have hy0:= d_lt y 4; have hy1:= d_lt y 5; omega
+  have hc3 : c3 < 64 := by dsimp [c3]; have hx0:= d_lt x 6; have hx1:= d_lt x 7; have hy0:= d_lt y 6; have hy1:= d_lt y 7; omega
+  have hc4 : c4 < 64 := by dsimp [c4]; have hx0:= d_lt x 8; have hx1:= d_lt x 9; have hy0:= d_lt y 8; have hy1:= d_lt y 9; omega
+  have hc5 : c5 < 64 := by dsimp [c5]; have hx0:= d_lt x 10; have hx1:= d_lt x 11; have hy0:= d_lt y 10; have hy1:= d_lt y 11; omega
+  have hc6 : c6 < 64 := by dsimp [c6]; have hx0:= d_lt x 12; have hx1:= d_lt x 13; have hy0:= d_lt y 12; have hy1:= d_lt y 13; omega
+  have hc7 : c7 < 64 := by dsimp [c7]; have hx0:= d_lt x 14; have hx1:= d_lt x 15; have hy0:= d_lt y 14; have hy1:= d_lt y 15; omega
+  have hc8 : c8 < 64 := by dsimp [c8]; have hx0:= d_lt x 16; have hx1:= d_lt x 17; have hy0:= d_lt y 16; have hy1:= d_lt y 17; omega
+  have hc9 : c9 < 64 := by dsimp [c9]; have hx0:= d_lt x 18; have hx1:= d_lt x 19; have hy0:= d_lt y 18; have hy1:= d_lt y 19; omega
+  have hc10 : c10 < 16 := by dsimp [c10]; have hx20:=d_lt x 20; have hy20:=d_lt y 20; omega
+  have he0 : c0 + c1 ≤ 56 := by dsimp [c0, c1]; have hx0 := d_lt x 0; have hx1 := d_lt x 1; have hx2 := d_lt x 2; have hx3 := d_lt x 3; have hy0 := d_lt y 0; have hy1 := d_lt y 1; have hy2 := d_lt y 2; have hy3 := d_lt y 3; omega
+  have he1 : c2 + c3 ≤ 56 := by dsimp [c2, c3]; have hx4 := d_lt x 4; have hx5 := d_lt x 5; have hx6 := d_lt x 6; have hx7 := d_lt x 7; have hy4 := d_lt y 4; have hy5 := d_lt y 5; have hy6 := d_lt y 6; have hy7 := d_lt y 7; omega
+  have he2 : c4 + c5 ≤ 56 := by dsimp [c4, c5]; have hx8 := d_lt x 8; have hx9 := d_lt x 9; have hx10 := d_lt x 10; have hx11 := d_lt x 11; have hy8 := d_lt y 8; have hy9 := d_lt y 9; have hy10 := d_lt y 10; have hy11 := d_lt y 11; omega
+  have he3 : c6 + c7 ≤ 56 := by dsimp [c6, c7]; have hx12 := d_lt x 12; have hx13 := d_lt x 13; have hx14 := d_lt x 14; have hx15 := d_lt x 15; have hy12 := d_lt y 12; have hy13 := d_lt y 13; have hy14 := d_lt y 14; have hy15 := d_lt y 15; omega
+  have he4 : c8 + c9 ≤ 56 := by dsimp [c8, c9]; have hx16 := d_lt x 16; have hx17 := d_lt x 17; have hx18 := d_lt x 18; have hx19 := d_lt x 19; have hy16 := d_lt y 16; have hy17 := d_lt y 17; have hy18 := d_lt y 18; have hy19 := d_lt y 19; omega
+  have he5 : c10 ≤ 56 := by omega
+  have hp :
+      (x &&& 8198552921648689607) + (x >>> 3 &&& 8198552921648689607) +
+      (y &&& 8198552921648689607) + (y >>> 3 &&& 8198552921648689607) =
+        val 64 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] := by
+    rw [land_even x hx, land_odd x hx, land_even y hy, land_odd y hy]
+    dsimp [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, val]
+    ring
+  rw [hp]
+  have h6 := fold6 c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 hc0 hc1 hc2 hc3 hc4 hc5 hc6 hc7 hc8 hc9 hc10
+  rw [h6]
+  have h12 := fold12 (c0 + c1) (c2 + c3) (c4 + c5) (c6 + c7) (c8 + c9) c10 he0 he1 he2 he3 he4 he5
+  dsimp only at h12
+  calc
+    _ = (c0 + c1) + (c2 + c3) + (c4 + c5) + (c6 + c7) + (c8 + c9) + c10 := by
+      simpa only using h12
+    _ = (d x 0 + d x 1 + d x 2 + d x 3 + d x 4 + d x 5 + d x 6 + d x 7 + d x 8 + d x 9 + d x 10 + d x 11 + d x 12 + d x 13 + d x 14 + d x 15 + d x 16 + d x 17 + d x 18 + d x 19 + d x 20) + (d y 0 + d y 1 + d y 2 + d y 3 + d y 4 + d y 5 + d y 6 + d y 7 + d y 8 + d y 9 + d y 10 + d y 11 + d y 12 + d y 13 + d y 14 + d y 15 + d y 16 + d y 17 + d y 18 + d y 19 + d y 20) := by
+      dsimp [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10]
+      omega
+
+
+
+/-- A packed 11-field base-64 word fits into one U64 when its first ten
+    fields are at most 28 and its top field is at most 14. -/
+theorem packed6_eleven_fits_u64 (c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 : Nat)
+    (h0 : c0 ≤ 28) (h1 : c1 ≤ 28) (h2 : c2 ≤ 28) (h3 : c3 ≤ 28) (h4 : c4 ≤ 28) (h5 : c5 ≤ 28) (h6 : c6 ≤ 28) (h7 : c7 ≤ 28) (h8 : c8 ≤ 28) (h9 : c9 ≤ 28) (h10 : c10 ≤ 14) :
+    val 64 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] < 2 ^ 64 := by
+  simp only [val_cons, val_nil]
+  omega
+
+/-- The four masked contributions of the two padded XMSS digest words fit
+    into one 64-bit unsigned value, so the guest's initial accumulations
+    cannot lose a carry due to unsigned modular wraparound. -/
+set_option maxHeartbeats 1200000 in
+theorem swar42_initial_sum_fits_u64 (x y : Nat)
+    (hx : x < 2 ^ 63) (hy : y < 2 ^ 63) :
+    (x &&& 8198552921648689607) + (x >>> 3 &&& 8198552921648689607) +
+      (y &&& 8198552921648689607) + (y >>> 3 &&& 8198552921648689607) < 2 ^ 64 := by
+  let c0 := d x 0 + d x 1 + d y 0 + d y 1
+  let c1 := d x 2 + d x 3 + d y 2 + d y 3
+  let c2 := d x 4 + d x 5 + d y 4 + d y 5
+  let c3 := d x 6 + d x 7 + d y 6 + d y 7
+  let c4 := d x 8 + d x 9 + d y 8 + d y 9
+  let c5 := d x 10 + d x 11 + d y 10 + d y 11
+  let c6 := d x 12 + d x 13 + d y 12 + d y 13
+  let c7 := d x 14 + d x 15 + d y 14 + d y 15
+  let c8 := d x 16 + d x 17 + d y 16 + d y 17
+  let c9 := d x 18 + d x 19 + d y 18 + d y 19
+  let c10 := d x 20 + d y 20
+  have hb0 : c0 ≤ 28 := by dsimp [c0]; have hx0 := d_lt x 0; have hx1 := d_lt x 1; have hy0 := d_lt y 0; have hy1 := d_lt y 1; omega
+  have hb1 : c1 ≤ 28 := by dsimp [c1]; have hx0 := d_lt x 2; have hx1 := d_lt x 3; have hy0 := d_lt y 2; have hy1 := d_lt y 3; omega
+  have hb2 : c2 ≤ 28 := by dsimp [c2]; have hx0 := d_lt x 4; have hx1 := d_lt x 5; have hy0 := d_lt y 4; have hy1 := d_lt y 5; omega
+  have hb3 : c3 ≤ 28 := by dsimp [c3]; have hx0 := d_lt x 6; have hx1 := d_lt x 7; have hy0 := d_lt y 6; have hy1 := d_lt y 7; omega
+  have hb4 : c4 ≤ 28 := by dsimp [c4]; have hx0 := d_lt x 8; have hx1 := d_lt x 9; have hy0 := d_lt y 8; have hy1 := d_lt y 9; omega
+  have hb5 : c5 ≤ 28 := by dsimp [c5]; have hx0 := d_lt x 10; have hx1 := d_lt x 11; have hy0 := d_lt y 10; have hy1 := d_lt y 11; omega
+  have hb6 : c6 ≤ 28 := by dsimp [c6]; have hx0 := d_lt x 12; have hx1 := d_lt x 13; have hy0 := d_lt y 12; have hy1 := d_lt y 13; omega
+  have hb7 : c7 ≤ 28 := by dsimp [c7]; have hx0 := d_lt x 14; have hx1 := d_lt x 15; have hy0 := d_lt y 14; have hy1 := d_lt y 15; omega
+  have hb8 : c8 ≤ 28 := by dsimp [c8]; have hx0 := d_lt x 16; have hx1 := d_lt x 17; have hy0 := d_lt y 16; have hy1 := d_lt y 17; omega
+  have hb9 : c9 ≤ 28 := by dsimp [c9]; have hx0 := d_lt x 18; have hx1 := d_lt x 19; have hy0 := d_lt y 18; have hy1 := d_lt y 19; omega
+  have hb10 : c10 ≤ 14 := by dsimp [c10]; have hx := d_lt x 20; have hy := d_lt y 20; omega
+  have hp :
+      (x &&& 8198552921648689607) + (x >>> 3 &&& 8198552921648689607) +
+      (y &&& 8198552921648689607) + (y >>> 3 &&& 8198552921648689607) =
+      val 64 [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10] := by
+    rw [land_even x hx, land_odd x hx, land_even y hy, land_odd y hy]
+    dsimp [c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, val]
+    ring
+  rw [hp]
+  exact packed6_eleven_fits_u64 c0 c1 c2 c3 c4 c5 c6 c7 c8 c9 c10 hb0 hb1 hb2 hb3 hb4 hb5 hb6 hb7 hb8 hb9 hb10
+
+/-- `Digits::get` of a digit index is that digit of its word, in base eight. -/
+theorem get_ok (lo hi : Std.U64) (i : Std.Usize) (hlt : i.val < 42) :
+    ∃ v, leanxmss.Digits.get (Std.Array.make 2#usize [lo, hi]) i = ok v ∧
+      v.val = ([lo, hi][i.val / 21]'(by simp; omega)).val / 8 ^ (i.val % 21) % 8 := by
+  apply exists_ok_of_spec
+  unfold leanxmss.Digits.get
+  simp only [lift, leanxmss.V, leanxmss.W, leanxmss.CHAIN_LENGTH]
+  have hn : 32 ≤ System.Platform.numBits := by cases System.Platform.numBits_eq <;> simp [*]
+  have h8 : 1 <<< 3 % Usize.size = 8 := by
+    rw [Usize.size_def, Usize.numBits_def, UScalarTy.Usize_numBits_eq, Nat.mod_eq_of_lt]; rfl
+    exact lt_of_lt_of_le (by decide) (Nat.pow_le_pow_right (by decide) hn)
+  step*
+  have h8 : i8.val = 8 := by rw [i8_post, h8]
+  rw [UScalar.val_and, UScalar.cast_val_eq, i9_post, h8, show 8 - 1 = 2 ^ 3 - 1 from rfl,
+    Nat.and_two_pow_sub_one_eq_mod, i6_post, i5_post, i4_post, i1_post, i3_post]
+  simp only [Std.Array.make_val, UScalarTy.Usize_numBits_eq, i2_post, i1_post]
+  rw [Nat.mod_mod_of_dvd _ (Nat.pow_dvd_pow 2 (by omega)), Nat.shiftRight_eq_div_pow, pow_mul]
+  rfl
+end leanxmss.Proofs.Encoding
+
+namespace leanxmss.Proofs
+
+open Bytes
+
+/-- `encode` panics on no input, finds no encoding exactly where `wotsEncode` finds none, and otherwise gives digits
+whose `Digits::get` is the specification's digit `i`, for each chain `i`. -/
+theorem encode_spec (pp : Std.Array U64 2#usize) (leaf : Std.U32) (msg : Std.Array U64 4#usize)
+    (rnd : Std.Array U64 3#usize) :
+    match wotsEncode (Statement.digest pp) (Statement.message msg) (Statement.randomness rnd) (u32 leaf) with
+    | none => leanxmss.encode pp leaf msg rnd = ok none
+    | some x => ∃ d, leanxmss.encode pp leaf msg rnd = ok (some d) ∧
+        ∀ i : Std.Usize, (hi : i.val < Constants.V) → ∃ v, leanxmss.Digits.get d i = ok v ∧ v.val = (x[i.val]'hi).val := by
+  sorry
+
+end leanxmss.Proofs
