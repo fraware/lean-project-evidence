@@ -16,8 +16,8 @@ Until it reports success, do not claim the combined overlay has been checked.
 
 This work does not change the guest implementation or
 `leanxmss.Proofs.encode_spec`. It is not yet an end-to-end proof of
-`leanxmss.Digits.sum`. Its seven remaining direct proof obligations were
-obtained from an independent direct-source diagnostic; see
+`leanxmss.Digits.sum`. Its seven checked-addition overflow obligations and one final
+value-equivalence obligation were identified by a direct-source diagnostic; see
 [CI #38521214202](https://github.com/fraware/lean-project-evidence/actions/runs/38521214202).
 
 No SDK/VM model soundness or Charon/Aeneas extraction correctness is
