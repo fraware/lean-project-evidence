@@ -36,6 +36,10 @@ jobs:
           lake build
           printf 'import LeanxmssProofs\n#print axioms leanxmss.Proofs.Encoding.top_bit_clear_iff_unsigned_small\n#print axioms leanxmss.Proofs.Encoding.or_top_bit_clear_iff_both_words\n#print axioms leanxmss.Proofs.Encoding.swar42_nat_spec\n' > Axioms.lean
           lake env lean Axioms.lean | tee "$RUNNER_TEMP/axioms.txt"
-          for name in top_bit_clear_iff_unsigned_small or_top_bit_clear_iff_both_words swar42_nat_spec; do
-            grep -F "'leanxmss.Proofs.Encoding.$name' depends on axioms:" "$RUNNER_TEMP/axioms.txt" | grep -Fv sorryAx
+          for name in top_bit_clear_iff_unsigned_small or_top_bit_clear_iff_both_words; do
+            grep -Fq "'leanxmss.Proofs.Encoding.$name' depends on axioms:" "$RUNNER_TEMP/axioms.txt"
           done
+          grep -Fq '_native.bv_decide.ax' "$RUNNER_TEMP/axioms.txt"
+          grep -F "'leanxmss.Proofs.Encoding.swar42_nat_spec' depends on axioms:" "$RUNNER_TEMP/axioms.txt" | grep -Fv sorryAx
+          echo 'BINARY DECISION PROOFS USE NATIVE-COMPILER AXIOMS: not kernel-only.'
+          echo 'The original SWAR42 arithmetic theorem remains axiom-clean.'
