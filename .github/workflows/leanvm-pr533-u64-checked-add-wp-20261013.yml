@@ -32,7 +32,7 @@ jobs:
           cd leanVM/verification/leanxmss
           lake exe cache get
           lake build
-          lake env lean -o GuestAddWP.olean GuestAddWP.lean
+          lake env lean -o .lake/build/lib/lean/GuestAddWP.olean GuestAddWP.lean
           printf 'import LeanxmssProofs.Encoding\nimport GuestAddWP\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_first_add_spec\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_initial_prefixes\n' > WpAxioms.lean
           lake env lean WpAxioms.lean | tee "$RUNNER_TEMP/axioms.txt"
           for theorem in swar42_guest_first_add_spec swar42_guest_initial_prefixes; do
