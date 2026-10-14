@@ -35,7 +35,7 @@ theorem digits_sum_impl_spec
     have hlate := swar42_all_late_sums_fit_u64 lo.val hi.val hlo hhi
     have hsum := swar42_nat_spec lo.val hi.val hlo hhi
     dsimp at hlate hsum
-    simp_all only [Std.Array.make_val, UScalar.val_and,
+    simp_all [Std.Array.make_val, UScalar.val_and,
       UScalar.max_UScalarTy_U64_eq, U64.max_eq]
     omega
 
