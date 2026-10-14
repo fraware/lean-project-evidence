@@ -14,6 +14,7 @@ namespace leanxmss.Proofs.Encoding
 theorem guest_padded_or_iff (lo hi : BitVec 64) :
     ((lo ||| hi) >>> 63 = 0) ↔
       (lo >>> 63 = 0 ∧ hi >>> 63 = 0) := by
-  bv_decide
+  rw [BitVec.ushiftRight_or_distrib]
+  exact BitVec.or_eq_zero_iff
 
 end leanxmss.Proofs.Encoding
