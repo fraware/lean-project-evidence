@@ -1,0 +1,29 @@
+name: leanVM #533 SWAR42 full range handoff exact reconstruction
+on:
+  push:
+    branches:
+      - research/leanvm-pr533-swar42-range-handoff-20261013
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reapply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Pin upstream exact proof source
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
+          git -C leanVM fetch --depth=1 origin pull/533/head
+          git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          test "$(git -C leanVM rev-parse HEAD)" = 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+      - name: Reapply and hash-check exact bounded proof source
+        run: |
+          cd leanVM
+          test "$(git hash-object verification/leanxmss/LeanxmssProofs/Encoding.lean)" = 4853d8a398a1ff2762a71473c17c17e175f80b73
+          git apply --check ../handoff_leanvm_533/swar42-and-range.patch
+          git apply ../handoff_leanvm_533/swar42-and-range.patch
+          test "$(git hash-object verification/leanxmss/LeanxmssProofs/Encoding.lean)" = 7460dd8c3920c39e2d599ba36d16b77c3d444d1e
+          git diff --check
+          git diff --stat
+          echo 'SWAR42 range proof source reconstructed from immutable parent.'
