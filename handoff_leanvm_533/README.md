@@ -17,10 +17,15 @@ and adds the following bounded-arithmetic lemmas:
 - `swar42_late_folds_fit_u64`, later packed shift/add accumulators below `2^64`
   ([CI #38518487036](https://github.com/fraware/lean-project-evidence/actions/runs/38518487036)).
 
-**Combined same-build gate**:
-[Actions #38519333671](https://github.com/fraware/lean-project-evidence/actions/runs/38519333671).
-It is a **separate acceptance criterion**, and must finish green before the
-entire set is claimed to have compiled together.
+**Combined same-build gate passed**:
+[Actions #38519333671](https://github.com/fraware/lean-project-evidence/actions/runs/38519333671),
+1,713 Lean build jobs, with axiom reports excluding `sorryAx` for
+`swar42_nat_spec` and all three new range theorems.
+`encode_spec` still includes `sorryAx`.
+
+**Clean-source patch identity gate passed**:
+[Actions #38519933956](https://github.com/fraware/lean-project-evidence/actions/runs/38519933956).
+The exact pinned PR source was reconstructed to the same candidate Git blob.
 
 ### Exact reconstruction
 
