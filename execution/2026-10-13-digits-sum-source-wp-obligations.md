@@ -70,6 +70,22 @@ These establish, for the exact guest's first masked addition, successful
 Aeneas checked-add execution with the mathematical sum, together with
 source-specific bounds for all three initial prefix sums.
 
+**All first-stage checked additions completed.**
+[Same-build CI #38521837459](https://github.com/fraware/lean-project-evidence/actions/runs/38521837459)
+compiled all 1,713 build jobs and independently reported
+`[propext, Classical.choice, Quot.sound]` for
+`swar42_guest_first_add_spec`, `swar42_guest_second_add_spec`,
+`swar42_guest_third_add_spec`, and the common prefix-bound lemma.
+These prove the Aeneas checked-addition contracts under the exact
+operand-value premises at the first three guest arithmetic calls.
+The entire source proof has no `sorryAx` in those dependencies.
+
+[Clean-room source identity CI #38522667380](https://github.com/fraware/lean-project-evidence/actions/runs/38522667380)
+also completed green. It independently reconstructs the parent PR #533
+`Encoding.lean` candidate and the additional proof module using
+content-addressed Git blob checks.
+[Handoff package](https://github.com/fraware/lean-project-evidence/tree/research/leanvm-pr533-checked-add-handoff-20261013/handoff_leanvm_533).
+
 The direct full-function `Digits.sum` theorem remains unproved.
 Other experimental helper branches have independent kernel and axiom gates.
 
