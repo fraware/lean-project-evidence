@@ -1,0 +1,37 @@
+name: leanVM generic LOW6 fold nonwrapping WP preconditions
+on:
+  push:
+    branches:
+      - research/leanvm-pr533-generic-low6-no-wrap-20261013
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  kernel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Pin exact upstream PR and overlay single extra theorem
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
+          git -C leanVM fetch --depth=1 origin pull/533/head
+          git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          test "$(git -C leanVM rev-parse HEAD)" = 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          cp research/leanvm-pr533/Encoding-swar42-generic-low6-no-wrap.lean leanVM/verification/leanxmss/LeanxmssProofs/Encoding.lean
+          git -C leanVM diff --check
+      - name: Pinned compiler
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
+          sh /tmp/elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build source pin and audit general LOW6 no-wrap
+        run: |
+          cd leanVM/verification/leanxmss
+          lake exe cache get
+          lake build
+          printf 'import LeanxmssProofs\n#print axioms leanxmss.Proofs.Encoding.swar_generic_low6_no_wrap\n#print axioms leanxmss.Proofs.Encoding.swar42_nat_spec\n' > AxiomAudit.lean
+          lake env lean AxiomAudit.lean | tee "$RUNNER_TEMP/axioms.txt"
+          for n in swar_generic_low6_no_wrap swar42_nat_spec; do
+            grep -F "'leanxmss.Proofs.Encoding.$n' depends on axioms:" "$RUNNER_TEMP/axioms.txt" | grep -Fv sorryAx
+          done
