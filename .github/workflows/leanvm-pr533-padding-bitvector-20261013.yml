@@ -34,8 +34,8 @@ jobs:
           cd leanVM/verification/leanxmss
           lake exe cache get
           lake build
-          printf 'import LeanxmssProofs\n#print axioms leanxmss.Proofs.Encoding.top_bit_clear_iff_padded\n#print axioms leanxmss.Proofs.Encoding.or_top_bit_clear_iff_both_padded\n#print axioms leanxmss.Proofs.Encoding.swar42_nat_spec\n' > Axioms.lean
+          printf 'import LeanxmssProofs\n#print axioms leanxmss.Proofs.Encoding.top_bit_clear_iff_unsigned_small\n#print axioms leanxmss.Proofs.Encoding.or_top_bit_clear_iff_both_words\n#print axioms leanxmss.Proofs.Encoding.swar42_nat_spec\n' > Axioms.lean
           lake env lean Axioms.lean | tee "$RUNNER_TEMP/axioms.txt"
-          for name in top_bit_clear_iff_padded or_top_bit_clear_iff_both_padded swar42_nat_spec; do
+          for name in top_bit_clear_iff_unsigned_small or_top_bit_clear_iff_both_words swar42_nat_spec; do
             grep -F "'leanxmss.Proofs.Encoding.$name' depends on axioms:" "$RUNNER_TEMP/axioms.txt" | grep -Fv sorryAx
           done
