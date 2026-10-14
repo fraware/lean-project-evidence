@@ -1,0 +1,40 @@
+name: leanVM source-specific 12/24/48 checked-U64 add contracts
+on:
+  push:
+    branches:
+      - research/leanvm-pr533-u64-late-checked-additions-20261013
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  kernel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Pin exact upstream proof model
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
+          git -C leanVM fetch --depth=1 origin pull/533/head
+          git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          test "$(git -C leanVM rev-parse HEAD)" = 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          cp research/leanvm-pr533/Encoding-swar42-all-range-bounds.lean leanVM/verification/leanxmss/LeanxmssProofs/Encoding.lean
+          cp research/leanvm-pr533/GuestLateAddsWP.lean leanVM/verification/leanxmss/GuestLateAddsWP.lean
+          git -C leanVM diff --check
+      - name: Install pinned Lean
+        run: |
+          grep -Fxq 'leanprover/lean4:v4.31.0' leanVM/verification/leanxmss/lean-toolchain
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
+          sh /tmp/elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Check all three late machine additions and axioms
+        run: |
+          cd leanVM/verification/leanxmss
+          lake exe cache get
+          lake build
+          lake env lean -o .lake/build/lib/lean/GuestLateAddsWP.olean GuestLateAddsWP.lean
+          printf 'import GuestLateAddsWP\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_fold12_add_spec\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_fold24_add_spec\n#print axioms leanxmss.Proofs.Encoding.swar42_guest_fold48_add_spec\n' > Axioms.lean
+          lake env lean Axioms.lean | tee "$RUNNER_TEMP/axioms.txt"
+          for n in swar42_guest_fold12_add_spec swar42_guest_fold24_add_spec swar42_guest_fold48_add_spec; do
+            grep -F "'leanxmss.Proofs.Encoding.$n' depends on axioms:" "$RUNNER_TEMP/axioms.txt" | grep -Fv sorryAx
+          done
