@@ -43,10 +43,22 @@ also completed **successfully** at the same candidate revision:
 Its acceptance is separately established by the workflow record and does
 not rely on the 34-test standalone result.
 
-The standard upstream pytest tree excludes `tests/interop`; the new
-registry's three-node interoperability check is a separate gate, initiated
-on `research/ethereum-xmss-key-identity-interop-20261013`. Only the
-completed interop workflow establishes that additional result.
+The standard upstream pytest tree excludes `tests/interop`.
+The [independent macOS interoperability CI #38485973305](https://github.com/fraware/lean-project-evidence/actions/runs/38485973305)
+**completed successfully** against the same eight-file candidate at upstream
+PR #1204 head. One `test_consensus_lifecycle` test passed in **36.51 seconds**
+covering all four declared phases: connectivity, block propagation, attestation
+processing, and continued chain growth. This is not a sustained liveness,
+finality, power-loss, or distributed key-custody experiment.
+
+**Local engineering gate CLOSED:** 2,976 standard tests, 110 focused tests,
+91.80% measured coverage, Ruff, typing, independently verified two-file
+registry patch, and the separate three-node interoperability scenario all
+passed at the pinned revision.
+
+**External adoption gate OPEN:** upstream maintainer approval, policy choices,
+PR integration, source rebase, and production operational assumptions are
+still outstanding. Any code changed in an upstream rebase needs new CI.
 
 ## Limits and external decisions
 
