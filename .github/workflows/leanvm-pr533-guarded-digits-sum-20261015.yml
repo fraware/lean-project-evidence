@@ -1,0 +1,101 @@
+name: leanVM XMSS guarded Digits.sum source-level proof and axiom audit
+on:
+  push:
+    branches:
+      - research/leanvm-pr533-guarded-digits-sum-20261015
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify exact research source identities and pin upstream
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object research/leanvm-pr533/Encoding-swar42-late-source-bound.lean)" = c25a79d599d1a4de399d425187c8bd141b7686f1
+          test "$(git hash-object research/leanvm-pr533/DigitsSumWPSimpall.lean)" = a51dcea1e7e4da6bd40d9b48a15c5b8e63d04402
+          test "$(git hash-object research/leanvm-pr533/EncodingPayloadBridge.lean)" = ac92a741aae9ad922cd79d23143ffced34b9c1f8
+          test "$(git hash-object research/leanvm-pr533/PaddingBitVec.lean)" = 51d38daa37b1317791ed97200fbe2a29efaf489c
+          test "$(git hash-object research/leanvm-pr533/GuestGuardedDigitsSum.lean)" = f84171263254e8b344d3aecf66a26917de4b4d75
+          git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
+          git -C leanVM fetch --depth=1 origin pull/533/head
+          git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          test "$(git -C leanVM rev-parse HEAD)" = 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
+          cp research/leanvm-pr533/Encoding-swar42-late-source-bound.lean leanVM/verification/leanxmss/LeanxmssProofs/Encoding.lean
+          cp research/leanvm-pr533/DigitsSumWPSimpall.lean leanVM/verification/leanxmss/DigitsSumWPSimpall.lean
+          cp research/leanvm-pr533/EncodingPayloadBridge.lean leanVM/verification/leanxmss/EncodingPayloadBridge.lean
+          cp research/leanvm-pr533/PaddingBitVec.lean leanVM/verification/leanxmss/PaddingBitVec.lean
+          cp research/leanvm-pr533/GuestGuardedDigitsSum.lean leanVM/verification/leanxmss/GuestGuardedDigitsSum.lean
+          git -C leanVM diff --check
+      - name: Install pinned Lean toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fxq 'leanprover/lean4:v4.31.0' leanVM/verification/leanxmss/lean-toolchain
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
+          sh /tmp/elan-init.sh -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Compose proofs and audit exact theorem dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd leanVM/verification/leanxmss
+          lake exe cache get
+          lake build LeanxmssProofs.Encoding
+          lake env lean -o .lake/build/lib/lean/DigitsSumWPSimpall.olean DigitsSumWPSimpall.lean
+          lake env lean -o .lake/build/lib/lean/EncodingPayloadBridge.olean EncodingPayloadBridge.lean
+          lake env lean -o .lake/build/lib/lean/PaddingBitVec.olean PaddingBitVec.lean
+          lake env lean -o .lake/build/lib/lean/GuestGuardedDigitsSum.olean GuestGuardedDigitsSum.lean
+          cat > EncodingSeamsAxioms.lean <<'EOF'
+          import DigitsSumWPSimpall
+          import EncodingPayloadBridge
+          import PaddingBitVec
+          import GuestGuardedDigitsSum
+          #print axioms leanxmss.Proofs.Encoding.digits_sum_impl_spec
+          #print axioms leanxmss.Proofs.encoding_payload_words
+          #print axioms leanxmss.Proofs.encoding_tweak_digest
+          #print axioms leanxmss.Proofs.Encoding.guest_padded_or_iff
+          #print axioms leanxmss.Proofs.Encoding.get_ok
+          #print axioms leanxmss.Proofs.Encoding.top_bit_zero_iff_lt
+          #print axioms leanxmss.Proofs.Encoding.guest_guard_iff_digit_sum_bounds
+          #print axioms leanxmss.Proofs.Encoding.digits_sum_succeeds_under_guest_guard
+          #print axioms leanxmss.Proofs.encode_spec
+          EOF
+          lake env lean EncodingSeamsAxioms.lean | tee "$RUNNER_TEMP/axioms.txt"
+          python3 - "$RUNNER_TEMP/axioms.txt" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+          log = Path(sys.argv[1]).read_text()
+          names = (
+              "leanxmss.Proofs.Encoding.digits_sum_impl_spec",
+              "leanxmss.Proofs.encoding_payload_words",
+              "leanxmss.Proofs.encoding_tweak_digest",
+              "leanxmss.Proofs.Encoding.guest_padded_or_iff",
+              "leanxmss.Proofs.Encoding.get_ok",
+              "leanxmss.Proofs.Encoding.top_bit_zero_iff_lt",
+              "leanxmss.Proofs.Encoding.guest_guard_iff_digit_sum_bounds",
+              "leanxmss.Proofs.Encoding.digits_sum_succeeds_under_guest_guard",
+          )
+          allowed = {"propext", "Classical.choice", "Quot.sound"}
+          for name in names:
+              matches = re.findall(
+                  r"^'" + re.escape(name) + r"' depends on axioms: \[([^\]]*)\]$",
+                  log, flags=re.MULTILINE
+              )
+              assert len(matches) == 1, (name, matches)
+              observed = {x.strip() for x in matches[0].split(",") if x.strip()}
+              assert observed <= allowed, (name, observed - allowed)
+              print(f"CHECKED: {name} with axioms {sorted(observed)}")
+          admitted = re.search(
+              r"^'leanxmss\.Proofs\.encode_spec' depends on axioms: \[([^\]]*)\]$",
+              log, flags=re.MULTILINE
+          )
+          assert admitted is not None, "No upstream encode_spec axiom report"
+          assert "sorryAx" in admitted.group(1).split(", ") or "sorryAx" in admitted.group(1), "Unexpected baseline: review encode_spec separately"
+          print("BOUNDARY: upstream encode_spec still admitted")
+          PY
