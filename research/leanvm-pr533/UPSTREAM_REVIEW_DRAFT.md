@@ -6,6 +6,8 @@ I have a checked `fold6`/`fold12` patch preserving both original theorem stateme
 
 The payload-to-spec hash relation, byte-payload equality, guest high-bit OR identity, per-index digit extraction, and translated digit-sum proof also pass together against that same pinned PR head. The source-pinned [joint CI run](https://github.com/fraware/lean-project-evidence/actions/runs/38770808542) checks their individual axiom dependencies. I recorded a [precise `encode_spec` gap analysis](https://github.com/fraware/lean-project-evidence/blob/research/leanvm-pr533-source-bridge-handoff-20261015/research/leanvm-pr533/ENCODE_SPEC_BRIDGE.md), including the remaining digest-byte-to-word and source-level control-flow proof obligations.
 
+A further [source-pinned Lean run](https://github.com/fraware/lean-project-evidence/actions/runs/38772517080) checked three additional declarations that connect the **bitvector condition** in the guest's high-bit test to the numeric bounds needed by the digit-sum proof. In particular, `digits_sum_succeeds_under_guest_guard` has no `sorryAx` dependency. The translated `encode` control-flow correctness and digest-word representation bridge remain independent obligations.
+
 This does **not** complete `encode_spec`; upstream `verify_spec` still depends on `sorryAx`. Nor does an Aeneas model theorem independently verify Charon/Aeneas translation, modeled SDK operations, or the compiled guest.
 
 There are two independently reviewable contributions:
