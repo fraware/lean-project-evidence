@@ -17,11 +17,15 @@ passed with five kernel-checked declarations, all without `sorryAx`:
 `leanxmss.Proofs.Encoding.get_ok`.
 Its input overlay has exact Git blob checks and an independent axiom audit.
 
-The existing [guard-to-range candidate](https://github.com/fraware/lean-project-evidence/tree/research/leanvm-pr533-guarded-digits-sum-20261015/research/leanvm-pr533)
-adds `guest_guard_iff_digit_sum_bounds` and
-`digits_sum_succeeds_under_guest_guard`. Its acceptance status must be
-determined from [run #38771390359](https://github.com/fraware/lean-project-evidence/actions/runs/38771390359).
-Do not conflate source commit with successful CI.
+The [guard-to-range proof](https://github.com/fraware/lean-project-evidence/tree/research/leanvm-pr533-guarded-digits-sum-20261015/research/leanvm-pr533)
+adds `top_bit_zero_iff_lt`, `guest_guard_iff_digit_sum_bounds`, and
+`digits_sum_succeeds_under_guest_guard`. The corrected source was verified at
+research commit `f69726c2363c1e8e524278d83de0644679996735` in
+[source-pinned run #38772517080](https://github.com/fraware/lean-project-evidence/actions/runs/38772517080):
+all three declarations compiled and their independent axiom closures contained
+only `propext`, `Classical.choice`, and `Quot.sound`, without `sorryAx`.
+The proof file's exact Git blob is `0cf38f005a487cbddc4eb8aebf463dee959d4d03`.
+Earlier failed diagnostic runs were not accepted as evidence.
 
 The original `leanxmss.Proofs.encode_spec` still has `sorryAx`. Hence
 `verify_spec`, `verify_ok_iff`, and higher guest claims cannot be reported
