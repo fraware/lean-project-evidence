@@ -1,0 +1,50 @@
+name: Lean Ethereum upstream delivery package gate
+on:
+  push:
+    branches:
+      - delivery/lean-ethereum-upstream-20261015
+    paths:
+      - 'handoff_leanvm_533/**'
+      - 'handoff_pr1204/**'
+      - 'delivery/**'
+      - '.github/workflows/lean-ethereum-upstream-delivery.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify exact 11 release-source blobs without network writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n delivery/ship.sh
+          bash -n handoff_leanvm_533/publish_review.sh
+          bash -n handoff_pr1204/post_review.sh
+          bash delivery/ship.sh verify
+      - name: Run isolated mock-only publication contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s handoff_pr1204 -p test_post_review.py -v
+      - name: Enforce exactly the expected upstream review artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          vm=Path("handoff_leanvm_533/both-folds.patch").read_text()
+          sign=Path("handoff_pr1204/pr1204-atomic-reservation.patch").read_text()
+          assert vm.startswith("diff --git a/verification/leanxmss/LeanxmssProofs/Encoding.lean b/verification/leanxmss/LeanxmssProofs/Encoding.lean")
+          assert vm.count("diff --git ") == 1, "leanVM patch must touch one file"
+          assert vm.count("-  sorry") == 2, "leanVM patch must replace exactly two admits"
+          assert "fold6" in vm and "fold12" in vm
+          assert sign.count("diff --git ") == 4, "leanSpec review patch must stay four files"
+          for note in ("handoff_leanvm_533/REVIEW_NOTE.md", "handoff_pr1204/REVIEW_NOTE.md"):
+              data=Path(note).read_text()
+              assert "sorryAx" in data or "single-writer" in data or "single SQLite" in data
+          print("PASS: scoped patch files and evidence boundaries verified")
+          PY
