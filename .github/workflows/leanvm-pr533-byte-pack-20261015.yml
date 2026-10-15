@@ -17,7 +17,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git hash-object research/leanvm-pr533/DigestBytesBridge.lean)" = e73c1e756b68ce4ae9183850dc452dabab1b532a
-          test "$(git hash-object research/leanvm-pr533/BytePackBitVec.lean)" = 8a0ff2a02e5d0fc89b0df739c876bd88ee93950b
+          test "$(git hash-object research/leanvm-pr533/BytePackBitVec.lean)" = e7e2cbf43c01a59acbe2fabf564f820487d2f837
           git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
           git -C leanVM fetch --depth=1 origin pull/533/head
           git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
