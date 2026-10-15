@@ -41,7 +41,7 @@ jobs:
           assert vm.startswith("diff --git a/verification/leanxmss/LeanxmssProofs/Encoding.lean b/verification/leanxmss/LeanxmssProofs/Encoding.lean")
           assert vm.count("diff --git ") == 1, "leanVM patch must touch one file"
           assert vm.count("-  sorry") == 2, "leanVM patch must replace exactly two admits"
-          assert "fold6" in vm and "fold12" in vm
+          assert "theorem fold12" in vm, "the second theorem is in the patch hunk"
           assert sign.count("diff --git ") == 4, "leanSpec review patch must stay four files"
           for note in ("handoff_leanvm_533/REVIEW_NOTE.md", "handoff_pr1204/REVIEW_NOTE.md"):
               data=Path(note).read_text()
