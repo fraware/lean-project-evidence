@@ -46,6 +46,8 @@ let ws := Std.Array.make 2#usize [lo, hi]
 (Internal.digestWord (Statement.digest ws) 1).toNat = hi.val
 ```
 
+The first direct `Internal.digestWord` experiment has now been evaluated. [CI #38777441572](https://github.com/fraware/lean-project-evidence/actions/runs/38777441572) failed because the expanded goal was outside the fragment supported by `bv_decide`. The [exact diagnostic and modular proof route](https://github.com/fraware/lean-project-evidence/blob/research/leanvm-pr533-digest-bytes-handoff-20261015/research/leanvm-pr533/DIGEST_WORD_DIAGNOSTIC.md) records the evidence without treating this tactic limitation as a mathematical counterexample.
+
 These are *target statements*, not checked declarations. The exact binder
 syntax and elaboration must be validated against the pinned Lean source.
 They must be proved through `Statement.bytes`, `Bytes.ofWords`, and the
