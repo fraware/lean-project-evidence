@@ -25,6 +25,7 @@ theorem bitvec_eight_lane_reconstruct (w : BitVec 64) :
     (((w >>> 40) &&& 255#64) <<< 40) |||
     (((w >>> 48) &&& 255#64) <<< 48) |||
     (((w >>> 56) &&& 255#64) <<< 56) = w := by
-  bv_decide
+  ext i hi
+  interval_cases i <;> simp
 
 end leanxmss.Proofs
