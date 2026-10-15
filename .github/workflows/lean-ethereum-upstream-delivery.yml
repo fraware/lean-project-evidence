@@ -30,6 +30,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest discover -s handoff_pr1204 -p test_post_review.py -v
+          python3 -m unittest discover -s delivery -p test_ship_readonly.py -v
       - name: Enforce exactly the expected upstream review artifacts
         shell: bash
         run: |
