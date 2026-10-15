@@ -1,6 +1,8 @@
 import DigitsSumWPSimpall
 import PaddingBitVec
 
+open Aeneas Aeneas.Std Result WP
+
 /-!
 Source-pinned link between the leanXMSS guest's high-bit admission guard and
 its Aeneas-translated `Digits.sum` preconditions. This is a proof about the
