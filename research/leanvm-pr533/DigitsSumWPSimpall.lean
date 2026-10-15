@@ -36,5 +36,6 @@ theorem digits_sum_impl_spec
     have hsum := swar42_nat_spec lo.val hi.val hlo hhi
     dsimp at hlate hsum
     simp_all [Std.Array.make_val, UScalar.val_and, U64.max_eq]
+    all_goals omega
 
 end leanxmss.Proofs.Encoding
