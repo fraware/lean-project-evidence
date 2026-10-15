@@ -18,10 +18,10 @@ namespace leanxmss.Proofs
 theorem digest_bytes_exact (lo hi : Std.U64) :
     (Statement.digest (Std.Array.make 2#usize [lo, hi])).toList =
       Bytes.le 8 lo.val ++ Bytes.le 8 hi.val := by
-  simpa only [Std.Array.make_val, Bytes.ofWords_cons,
-    Bytes.ofWords_nil, List.append_nil] using
-    (Statement.bytes_toList
-      (Std.Array.make 2#usize [lo, hi]) 16 rfl)
+  change (Statement.bytes (Std.Array.make 2#usize [lo, hi]) 16).toList =
+    Bytes.le 8 lo.val ++ Bytes.le 8 hi.val
+  rw [Statement.bytes_toList _ 16 rfl]
+  simp [Std.Array.make_val, Bytes.ofWords]
 
 /-- The first eight specification bytes represent precisely the guest's
     low word, including leading-zero bytes. -/
