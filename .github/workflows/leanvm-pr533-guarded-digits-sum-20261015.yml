@@ -20,7 +20,7 @@ jobs:
           test "$(git hash-object research/leanvm-pr533/DigitsSumWPSimpall.lean)" = a51dcea1e7e4da6bd40d9b48a15c5b8e63d04402
           test "$(git hash-object research/leanvm-pr533/EncodingPayloadBridge.lean)" = ac92a741aae9ad922cd79d23143ffced34b9c1f8
           test "$(git hash-object research/leanvm-pr533/PaddingBitVec.lean)" = 51d38daa37b1317791ed97200fbe2a29efaf489c
-          test "$(git hash-object research/leanvm-pr533/GuestGuardedDigitsSum.lean)" = f84171263254e8b344d3aecf66a26917de4b4d75
+          test "$(git hash-object research/leanvm-pr533/GuestGuardedDigitsSum.lean)" = 0cf38f005a487cbddc4eb8aebf463dee959d4d03
           git clone --filter=blob:none --no-checkout https://github.com/leanEthereum/leanVM.git leanVM
           git -C leanVM fetch --depth=1 origin pull/533/head
           git -C leanVM checkout --detach 4a5a6cf008fc724ad91f9c234d5a3f3d6a7bdc0d
