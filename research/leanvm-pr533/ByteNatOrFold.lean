@@ -32,4 +32,15 @@ theorem byteOrFold_eq_toNat (bs : List UInt8) :
       Nat.add_comm, Nat.or_comm] using
       (Nat.two_pow_add_eq_or_of_lt (i := 8) hb (Bytes.toNat tail)).symm
 
+/-- An eight-byte (or shorter) OR assembly fits into a 64-bit unsigned
+    word. This is the bound required to transport the natural-number
+    assembly equality into the concrete UInt64 implementation. -/
+theorem byteOrFold_fits_u64 (bs : List UInt8) (hlen : bs.length ≤ 8) :
+    byteOrFold bs < 2 ^ 64 := by
+  rw [byteOrFold_eq_toNat]
+  calc
+    Bytes.toNat bs < 256 ^ bs.length := Bytes.toNat_lt bs
+    _ ≤ 256 ^ 8 := Nat.pow_le_pow_right (by decide) hlen
+    _ = 2 ^ 64 := by decide
+
 end leanxmss.Proofs
