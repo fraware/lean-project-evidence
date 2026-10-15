@@ -34,6 +34,8 @@ a substitute for checking the exact theorem's axiom dependencies.
 
 ## Exact missing correspondence: digest bytes to guest words
 
+The [source-pinned digest-byte proof](https://github.com/fraware/lean-project-evidence/blob/research/leanvm-pr533-digest-bytes-handoff-20261015/research/leanvm-pr533/DIGEST_BYTES_HANDOFF.md) has now been checked in [CI #38777398342](https://github.com/fraware/lean-project-evidence/actions/runs/38777398342): `digest_bytes_exact`, `digest_low_half_exact`, and `digest_high_half_exact` match the exact serialized low/high halves, with no `sorryAx`. These results establish byte ordering, not yet full numeric word reconstruction.
+
 The specification's `Internal.digestWord` reconstructs each `UInt64` from
 eight little-endian bytes. The guest's Aeneas model uses `Std.U64` words.
 The next theorem must establish (for every pair `lo hi : Std.U64`):
